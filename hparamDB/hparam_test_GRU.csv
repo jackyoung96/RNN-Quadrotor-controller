@@ -1,0 +1,2 @@
+,q_lr,policy_lr,param_lr,t_max,hidden_dim,update_interval,mean_reward,dtime,final_eval_reward,final_eval_success_rate
+0,0.0003,3e-05,3e-05,30000,128,2,31.901944977720675,22Apr24133407,-12751.2824589775,0.0

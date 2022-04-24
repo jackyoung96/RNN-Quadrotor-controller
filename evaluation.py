@@ -1,0 +1,252 @@
+import torch
+import gym
+import matplotlib
+from envs.customEnv import domainRandomize
+from gym_pybullet_drones.envs.BaseAviary import DroneModel, Physics, BaseAviary
+from gym_pybullet_drones.envs.single_agent_rl.BaseSingleAgentAviary import ActionType, ObservationType, BaseSingleAgentAviary
+from envs.customEnvDrone import domainRandomAviary
+
+from td3.td3 import *
+from td3.common.buffers import *
+
+import argparse
+import os
+from utils import save_frames_as_gif
+from pyvirtualdisplay import Display
+import numpy as np
+from copy import deepcopy
+import pandas as pd
+from tqdm import tqdm
+
+
+def evaluation(env_name, agent, dyn_range, eval_itr, seed):
+
+    # hyper-parameters for RL training
+    DETERMINISTIC=True  # DDPG: deterministic policy gradient      
+    
+    if 'Pendulum' in env_name:
+        max_steps = 1500
+        envs = gym.make(env_name)
+        envs.seed(seed)
+        setattr(envs,'env_name', env_name)
+        domainRandomize(envs, dyn_range=dyn_range, seed=seed)
+    elif 'aviary' in env_name:
+        max_steps = 4000
+        envs = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
+            drone_model=DroneModel.CF2X,
+            initial_xyzs=np.array([[0.0,0.0,2.0]]),
+            initial_rpys=np.array([[0.0,0.0,0.0]]),
+            physics=Physics.PYB_GND_DRAG_DW,
+            freq=240,
+            aggregate_phy_steps=1,
+            gui=False,
+            record=False, 
+            obs=ObservationType.KIN,
+            act=ActionType.RPM)
+        envs = domainRandomAviary(envs, 'test', 0, seed,
+            observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
+            frame_stack=1,
+            task='stabilize2',
+            reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
+            episode_len_sec=2,
+            max_rpm=66535,
+            initial_xyz=[[0.0,0.0,50.0]], # Far from the ground
+            freq=200,
+            rpy_noise=1.2,
+            vel_noise=1.0,
+            angvel_noise=2.4,
+            mass_range=dyn_range.get('mass_range', 0.0),
+            cm_range=dyn_range.get('cm_range', 0.0),
+            kf_range=dyn_range.get('kf_range', 0.0),
+            km_range=dyn_range.get('km_range', 0.0),
+            battery_range=dyn_range.get('battery_range', 0.0))
+        setattr(envs, 'env_name', env_name)
+    else:
+        raise NotImplementedError
+
+    device = agent.device
+    eval_success = 0
+    eval_reward = 0
+    
+    with torch.no_grad():
+        for i_eval in range(eval_itr):
+
+            eval_env = gym.make(env_name)
+            eval_env.seed(seed+i_eval)
+            setattr(eval_env,'env_name', env_name)
+            domainRandomize(eval_env, dyn_range=dyn_range, seed=seed+i_eval)
+            state = eval_env.reset()[None,:]
+            total_rew = 0
+            last_action = envs.action_space.sample()[None,:]
+            if hasattr(agent, 'rnn_type'):
+                if 'LSTM' == agent.rnn_type:
+                    hidden_out = (torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device), \
+                                torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device))
+                elif 'GRU' == agent.rnn_type or 'RNN' == agent.rnn_type:
+                    hidden_out = torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device)
+
+            with torch.no_grad():
+                total_step, step, success = 0,0,0
+                for _ in range(max_steps):
+                    if hasattr(agent, 'rnn_type'):
+                        hidden_in = hidden_out
+                        action, hidden_out = \
+                            agent.policy_net.get_action(state, 
+                                                            last_action, 
+                                                            hidden_in, 
+                                                            deterministic=DETERMINISTIC, 
+                                                            explore_noise_scale=0.)
+                    else:
+                        action = agent.policy_net.get_action(state, 
+                                                            deterministic=DETERMINISTIC, 
+                                                            explore_noise_scale=0.)
+                    next_state, reward, done, _ = eval_env.step(action) 
+                    if not isinstance(action, np.ndarray):
+                        action = np.array([action])
+                    state, last_action = next_state[None,:], action[None,:]
+                    total_step += 1
+
+                    if "Pendulum" in env_name:
+                        step = step+1 if state[0,0] > np.cos(5 * np.pi/180) else 0
+                        if step > 100:
+                            success = 1
+                            break
+                    elif "aviary" in env_name:
+                        step = step+1 if np.linalg.norm(state[:3]) < 0.1 else 0
+                        if step > 100:
+                            success = 1
+
+                    total_rew += reward
+            
+            eval_env.close()
+
+            eval_success += success
+            eval_reward += total_rew
+            # print("%d iteration reward %.3f success %d"%(i_eval,total_rew,success))
+
+    # print("total average reward %.3f success rate %d"%(eval_reward / eval_itr,eval_success / eval_itr))
+    return eval_reward/eval_itr, eval_success/eval_itr
+
+def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
+    with Display(visible=False, size=(100, 60)) as disp:
+        # hyper-parameters for RL training
+        DETERMINISTIC=True  # DDPG: deterministic policy gradient      
+        
+        if 'Pendulum' in env_name:
+            max_steps = 900
+            envs = gym.make(env_name)
+            envs.seed(seed)
+            setattr(envs,'env_name', env_name)
+            domainRandomize(envs, dyn_range=dyn_range, seed=seed)
+        elif 'aviary' in env_name:
+            max_steps = 4000
+            envs = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
+                drone_model=DroneModel.CF2X,
+                initial_xyzs=np.array([[0.0,0.0,2.0]]),
+                initial_rpys=np.array([[0.0,0.0,0.0]]),
+                physics=Physics.PYB_GND_DRAG_DW,
+                freq=240,
+                aggregate_phy_steps=1,
+                gui=False,
+                record=False, 
+                obs=ObservationType.KIN,
+                act=ActionType.RPM)
+            envs = domainRandomAviary(envs, 'test', 0, seed,
+                observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
+                frame_stack=1,
+                task='stabilize2',
+                reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
+                episode_len_sec=2,
+                max_rpm=66535,
+                initial_xyz=[[0.0,0.0,50.0]], # Far from the ground
+                freq=200,
+                rpy_noise=1.2,
+                vel_noise=1.0,
+                angvel_noise=2.4,
+                mass_range=dyn_range.get('mass_range', 0.0),
+                cm_range=dyn_range.get('cm_range', 0.0),
+                kf_range=dyn_range.get('kf_range', 0.0),
+                km_range=dyn_range.get('km_range', 0.0),
+                battery_range=dyn_range.get('battery_range', 0.0))
+            setattr(envs, 'env_name', env_name)
+        else:
+            raise NotImplementedError
+
+        device = agent.device
+        eval_success = 0
+        eval_reward = 0
+        frames_all = []
+
+        with torch.no_grad():
+            for i_eval in range(test_itr):
+                eval_env = gym.make(env_name)
+                eval_env.seed(seed+i_eval)
+                setattr(eval_env,'env_name', env_name)
+                domainRandomize(eval_env, dyn_range=dyn_range, seed=seed+i_eval)
+                state = eval_env.reset()[None,:]
+                total_rew = 0
+                last_action = envs.action_space.sample()[None,:]
+                if 'LSTM' == agent.rnn_type:
+                    hidden_out = (torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device), \
+                                torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device))
+                elif agent.rnn_type in ['GRU','RNN']:
+                    hidden_out = torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device)
+
+                total_step, step, success = 0,0,0
+                frames = []
+                for _ in range(max_steps):
+                    if agent.rnn_type in ['GRU','RNN','LSTM']:
+                        hidden_in = hidden_out
+                        action, hidden_out = \
+                            agent.policy_net.get_action(state, 
+                                                            last_action, 
+                                                            hidden_in, 
+                                                            deterministic=DETERMINISTIC, 
+                                                            explore_noise_scale=0.)
+                    else:
+                        action = agent.policy_net.get_action(state, 
+                                                            deterministic=DETERMINISTIC, 
+                                                            explore_noise_scale=0.)
+                    if record:
+                        frames.append(eval_env.render(mode="rgb_array"))
+                    next_state, reward, done, _ = eval_env.step(action) 
+                    if not isinstance(action, np.ndarray):
+                        action = np.array([action])
+                    state, last_action = next_state[None,:], action[None,:]
+                    total_step += 1
+
+                    if "Pendulum" in env_name:
+                        step = step+1 if state[0,0] > np.cos(5 * np.pi/180) else 0
+                        if step > 100:
+                            success = 1
+                            break
+                    elif "aviary" in env_name:
+                        step = step+1 if np.linalg.norm(state[:3]) < 0.1 else 0
+                        if step > 100:
+                            success = 1
+
+                    total_rew += reward
+                
+                if record:
+                    frames.extend([np.zeros_like(frames[-1])] * 20)
+                frames_all.extend(frames)
+                eval_env.close()
+
+                eval_success += success
+                eval_reward += total_rew
+
+                print("%d iteration reward %.3f success %d"%(i_eval,total_rew,success))
+        
+        if record:
+            if not os.path.isdir("gifs"):
+                os.mkdir("gifs")
+            num = 0
+            for file in os.listdir("gifs"):
+                if env_name+"_"+type(agent).__name__ in file:
+                    num = max(num,int(file.strip(".gif").split("_")[-1]) + 1)
+            
+            save_frames_as_gif(frames_all, path="gifs", filename="%s_%s_%03d.gif"%(env_name, type(agent).__name__, num))
+    
+    print("total average reward %.3f success rate %d"%(eval_reward / test_itr,eval_success / test_itr))
+    
+    return eval_reward / test_itr, eval_success / test_itr
