@@ -309,7 +309,7 @@ class domainRandeEnv(parallelEnv):
                     reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
                     episode_len_sec=2,
                     max_rpm=66535,
-                    initial_xyz=[[0.0,0.0,50.0]], # Far from the ground
+                    initial_xyz=[[0.0,0.0,10000.0]], # Far from the ground
                     freq=200,
                     rpy_noise=1.2,
                     vel_noise=1.0,

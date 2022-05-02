@@ -12,6 +12,7 @@ import pybullet as p
 import os
 import shutil
 import time
+from datetime import datetime
 
 from scipy.spatial.transform import Rotation as R
 
@@ -77,9 +78,32 @@ class customAviary(gym.Wrapper):
         # if os.path.isdir('tb_log/reward_test'):
         #     shutil.rmtree('tb_log/reward_test')
         # self.summary = SummaryWriter('tb_log/reward_test')
+        
         self.reward_buf = []
         self.reward_steps = 0
+
+        # Recording
+        if self.env.RECORD:
+            self.env.ONBOARD_IMG_PATH = os.path.dirname(os.path.abspath(__file__))+"/../videos/onboard-"+datetime.now().strftime("%m.%d.%Y_%H.%M.%S")+"/"
+            os.makedirs(os.path.dirname(self.env.ONBOARD_IMG_PATH), exist_ok=True)
+            self.env._startVideoRecording = self._startVideoRecording
     
+    def _startVideoRecording(self):
+        """Starts the recording of a video output.
+
+        The format of the video output is .mp4, if GUI is True, or .png, otherwise.
+        The video is saved under folder `files/videos`.
+
+        """
+        if self.env.RECORD and self.env.GUI:
+            self.env.VIDEO_ID = p.startStateLogging(loggingType=p.STATE_LOGGING_VIDEO_MP4,
+                                                fileName=os.path.dirname(os.path.abspath(__file__))+"/../videos/video-"+datetime.now().strftime("%m.%d.%Y_%H.%M.%S")+".mp4",
+                                                physicsClientId=self.env.CLIENT
+                                                )
+        if self.env.RECORD and not self.env.GUI:
+            self.env.FRAME_NUM = 0
+            self.env.IMG_PATH = os.path.dirname(os.path.abspath(__file__))+"/../videos/video-"+datetime.now().strftime("%m.%d.%Y_%H.%M.%S")+"/"
+            os.makedirs(os.path.dirname(self.env.IMG_PATH), exist_ok=True)
 
     def observable_obs_space(self):
         rng = np.inf
@@ -535,10 +559,12 @@ class domainRandomAviary(customAviary):
 
         self.battery = self.orig_params['BATTERY'] * np.random.uniform(1.0-self.battery_range, 1.0)
         norm_battery = 2*(self.battery-(1-self.battery_range))/(self.battery_range)-1
-        self.env.KF = self.battery * self.orig_params['KF'] * np.random.uniform(1.0-self.kf_range, 1.0+self.kf_range, size=(4,))
-        self.env.KM = self.battery * self.orig_params['KM'] * np.random.uniform(1.0-self.km_range, 1.0+self.km_range, size=(4,))
+        self.env.KF = self.orig_params['KF'] * np.random.uniform(1.0-self.kf_range, 1.0+self.kf_range, size=(4,))
+        self.env.KM = self.orig_params['KM'] * np.random.uniform(1.0-self.km_range, 1.0+self.km_range, size=(4,))
         norm_KF = 2*(self.env.KF/self.orig_params['KF']-(1-self.kf_range))/(2*self.kf_range)-1
         norm_KM = 2*(self.env.KM/self.orig_params['KM']-(1-self.km_range))/(2*self.km_range)-1
+        self.env.KF = self.battery * self.env.KF
+        self.env.KM = self.battery * self.env.KM
         #### Compute constants #####################################
         self.env.GRAVITY = self.env.G*self.env.M
         self.env.HOVER_RPM = np.sqrt(self.env.GRAVITY / np.sum(self.env.KF))
@@ -617,8 +643,4 @@ class domainRandomAviary(customAviary):
             #### It severly slows down the GUI #########################
             if self.env.GUI and self.env.USER_DEBUG:
                 self.env._showDroneLocalAxes(i)
-            #### Disable collisions between drones' and the ground plane
-            #### E.g., to start a drone at [0,0,0] #####################
-            # p.setCollisionFilterPair(bodyUniqueIdA=self.PLANE_ID, bodyUniqueIdB=self.DRONE_IDS[i], linkIndexA=-1, linkIndexB=-1, enableCollision=0, physicsClientId=self.CLIENT)
-        if self.env.OBSTACLES:
-            self.env._addObstacles()
+ 

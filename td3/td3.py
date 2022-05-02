@@ -5,6 +5,7 @@ original paper: https://arxiv.org/pdf/1802.09477.pdf
 '''
 import math
 import random
+from sqlite3 import Timestamp
 
 import gym
 import numpy as np
@@ -19,6 +20,8 @@ from torch.distributions import Normal
 from .common.buffers import ReplayBuffer, ReplayBufferPER
 from .common.value_networks import ValueNetwork, QNetwork, QNetworkLSTM, QNetworkGRU, QNetworkRNN
 from .common.policy_networks import PolicyNetworkLSTM, PolicyNetwork, PolicyNetworkRNN, PolicyNetworkGRU
+
+from time import time
 
 # torch.manual_seed(1234)  #Reproducibility
 
@@ -258,32 +261,44 @@ class TD3RNN_Trainer():
         return target_net
     
     def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
+        time_test = {}
+
+        t_start = time()
         hidden_in, hidden_out, state, action, last_action, reward, next_state, done = self.replay_buffer.sample(batch_size)
+        time_test['sample'] = time()-t_start
         # print('sample:', state, action,  reward, done)
 
+        t_start = time()
         state      = torch.FloatTensor(state).to(self.device)
         next_state = torch.FloatTensor(next_state).to(self.device)
         action     = torch.FloatTensor(action).to(self.device)
         last_action     = torch.FloatTensor(last_action).to(self.device)
         reward     = torch.FloatTensor(reward).unsqueeze(-1).to(self.device)  
         done       = torch.FloatTensor(np.float32(done)).unsqueeze(-1).to(self.device)
+        time_test['tensor'] = time()-t_start
  
+        t_start = time()
         predicted_q_value1, _ = self.q_net1(state, action, last_action, hidden_in)
         predicted_q_value2, _ = self.q_net2(state, action, last_action, hidden_in)
+        time_test['q'] = time()-t_start
+        t_start = time()
         new_action, hidden_out, hidden_all, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
         new_next_action, hidden_out, hidden_all, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
+        time_test['p'] = time()-t_start
         # reward = (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6) # normalize with batch mean and std; plus a small number to prevent numerical problem
 
         # Training Q Function
+        t_start = time()
         target_q_1, _ = self.target_q_net1(next_state, new_next_action, action, hidden_out)
         target_q_2, _ = self.target_q_net2(next_state, new_next_action, action, hidden_out)
         target_q_min = torch.min(target_q_1, target_q_2)
+        time_test['q_target'] = time()-t_start
 
         target_q_value = reward + (1 - done) * gamma * target_q_min # if done==1, only reward 
         
 
         # print("debug",predicted_q_value1[0,:,0], target_q_value[0,:,0])
-
+        t_start = time()
         q_value_loss1 = ((predicted_q_value1 - target_q_value.detach())**2).mean()  # detach: no gradients for the variable
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()
         self.q_optimizer1.zero_grad()
@@ -317,12 +332,13 @@ class TD3RNN_Trainer():
             self.target_q_net1=self.target_soft_update(self.q_net1, self.target_q_net1, soft_tau)
             self.target_q_net2=self.target_soft_update(self.q_net2, self.target_q_net2, soft_tau)
             self.target_policy_net=self.target_soft_update(self.policy_net, self.target_policy_net, soft_tau)
-
+        time_test['backward'] = time()-t_start
         self.update_cnt+=1
 
         return {"policy_loss": policy_loss.item() if not policy_loss is None else 0, 
                 "q_loss_1": q_value_loss1.item(), 
-                "q_loss_2": q_value_loss2.item()}
+                "q_loss_2": q_value_loss2.item(),
+                "time_test":time_test}
 
     def save_model(self, path):
         torch.save(self.q_net1.state_dict(), path+'_q1.pt')

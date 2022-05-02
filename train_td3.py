@@ -12,6 +12,7 @@ from envs.customEnv import domainRandeEnv
 
 import argparse
 import gym
+import psutil
 
 import os
 from torch.utils.tensorboard import SummaryWriter
@@ -22,6 +23,8 @@ import random
 import pickle as pkl
 import pandas as pd
 import itertools
+
+from time import time
 
 def train(args, hparam, ):
     
@@ -104,20 +107,25 @@ def train(args, hparam, ):
         max_steps = 150
         batch_size  = 64 if args.rnn is not None else 64 * max_steps
         param_num = 3
+        nenvs = 16
+        explore_noise_scale = 0.5
+        eval_noise_scale = 0.5
     elif 'aviary' in env_name:
-        max_episodes  = 20000
+        max_episodes  = 6000
         hidden_dim = 128
-        max_steps = 400
-        batch_size  = 8 if args.rnn is not None else 8 * max_steps
-        param_num = 4
+        max_steps = 300
+        batch_size  = 64 if args.rnn is not None else 8 * max_steps
+        param_num = 12
+        nenvs = 2
+        explore_noise_scale = 0.25
+        eval_noise_scale = 0.25
     else:
         raise NotImplementedError
 
-    nenvs = 16
     best_score = -np.inf
     frame_idx   = 0
     replay_buffer_size = int(1e6/max_steps) if args.rnn is not None else 1e6
-    explore_steps = int(1e4/max_steps) if args.rnn is not None else 1e5  # for random action sampling in the beginning of training
+    explore_steps = int(max_episodes/20) if args.rnn is not None else 1e5  # for random action sampling in the beginning of training
     update_itr = 1
     policy_target_update_interval = hparam['update_interval'] # delayed update for the policy network and target networks
     
@@ -125,8 +133,7 @@ def train(args, hparam, ):
     eval_itr = 50
 
     DETERMINISTIC=True  # DDPG: deterministic policy gradient
-    explore_noise_scale = 0.5
-    eval_noise_scale = 0.5
+    
 
     # Define environment
     envs = domainRandeEnv(env_name=env_name, tag=tag, n=nenvs, randomize=args.randomize, seed=1000000, dyn_range=dyn_range)
@@ -180,8 +187,10 @@ def train(args, hparam, ):
                     "q_loss_1":[],
                     "q_loss_2":[]}
 
+
     for i_episode in range(1,max_episodes+1):
         # print(i_episode)
+        time_test = {"get_action":[0],"step":[0],"sample":[0],"tensor":[0],'q':[0],'p':[0],'q_target':[0],'backward':[0]}
         state, param = envs.reset()
         last_action = np.stack([envs.action_space.sample() for _ in range(nenvs)],axis=0).squeeze()
         last_action = np.zeros_like(last_action)
@@ -199,16 +208,21 @@ def train(args, hparam, ):
 
         policy_loss = []
         q_loss_1,q_loss_2,param_loss = [],[],[]
+
         for step in range(max_steps):
             if args.rnn is not None:
                 hidden_in = hidden_out
+                t_start = time()
                 action, hidden_out = \
                     td3_trainer.policy_net.get_action(state, 
                                                     last_action, 
                                                     hidden_in, 
                                                     deterministic=DETERMINISTIC, 
                                                     explore_noise_scale=explore_noise_scale)
+                time_test['get_action'].append(time()-t_start)
+                t_start = time()
                 next_state, reward, done, _ = envs.step(action) 
+                time_test['step'].append(time()-t_start)
                 if step == 0:
                     ini_hidden_in = hidden_in
                     ini_hidden_out = hidden_out
@@ -234,6 +248,9 @@ def train(args, hparam, ):
             if len(replay_buffer) > explore_steps:
                 for i in range(update_itr):
                     loss_dict = td3_trainer.update(batch_size, deterministic=DETERMINISTIC, eval_noise_scale=eval_noise_scale)
+                    update_t = loss_dict['time_test']
+                    for k,v in update_t.items():
+                        time_test[k].append(v)
                     # policy_loss, q_loss_1, q_loss_2
                     policy_loss.append(loss_dict['policy_loss'])
                     q_loss_1.append(loss_dict['q_loss_1'])
@@ -241,6 +258,10 @@ def train(args, hparam, ):
                     if 'fast' in args.rnn:
                         param_loss.append(loss_dict['param_loss'])
         
+        time_test = {k:"%.2f"%np.sum(v) for k,v in time_test.items()}
+        if len(replay_buffer) > explore_steps:
+            time_test
+
         if args.rnn is not None: 
             if 'fast' in args.rnn:
                 replay_buffer.push_batch(ini_hidden_in, 
@@ -296,7 +317,15 @@ def train(args, hparam, ):
                 writer.add_histogram(f'q_net/{name}', weight, i_episode)
                 if weight.grad is not None:
                     writer.add_histogram(f'q_net/{name}.grad', weight.grad, i_episode)
+
+            if 'aviary' in env_name:
+                writer.add_scalar('loss/position', np.sum(np.stack(episode_state)[:,:,:3]**2, axis=-1).mean(), i_episode)
         
+            if i_episode % eval_freq == 0 and i_episode != 0:
+                eval_rew, eval_success = evaluation(env_name, agent=td3_trainer, dyn_range=dyn_range, eval_itr=eval_itr, seed=i_episode)
+                writer.add_scalar('eval/reward', eval_rew, i_episode)
+                writer.add_scalar('eval/success_rate', eval_success, i_episode)
+
         if i_episode % 500 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
             # td3_trainer.save_model(os.path.join(savepath,"iter%05d"%i_episode))
@@ -304,11 +333,6 @@ def train(args, hparam, ):
         if np.mean(scores_window)>=best_score: 
             td3_trainer.save_model(os.path.join(savepath,"best"))
             best_score = np.mean(scores_window)
-
-        if i_episode % eval_freq == 0 and i_episode != 0:
-            eval_rew, eval_success = evaluation(env_name, agent=td3_trainer, dyn_range=dyn_range, eval_itr=eval_itr, seed=i_episode)
-            writer.add_scalar('eval/reward', eval_rew, i_episode)
-            writer.add_scalar('eval/success_rate', eval_success, i_episode)
         
     td3_trainer.save_model(os.path.join(savepath,"final"))
     print('\rFinal\tAverage Score: {:.2f}'.format(np.mean(scores_window)))
@@ -345,7 +369,7 @@ def test(args):
     hparam = {'hidden_dim': args.hidden_dim}
 
     # Define environment
-    envs = domainRandeEnv(env_name=env_name)
+    envs = domainRandeEnv(env_name=env_name, dyn_range=dyn_range)
     action_space = envs.action_space
     state_space = envs.observation_space
 
@@ -406,9 +430,9 @@ hparam_set = {
     "q_lr": [3e-4],
     "policy_lr": [3e-5],
     "param_lr": [3e-5],
-    "t_max": [30000, 50000, 100000],
+    "t_max": [50000, 30000, 100000],
     "hidden_dim": [128],
-    "update_interval": [2,3,4,5]
+    "update_interval": [3,2,4,5]
 }
 
 if __name__=='__main__':

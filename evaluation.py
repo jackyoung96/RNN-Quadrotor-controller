@@ -24,60 +24,54 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
     # hyper-parameters for RL training
     DETERMINISTIC=True  # DDPG: deterministic policy gradient      
     
-    if 'Pendulum' in env_name:
-        max_steps = 1500
-        envs = gym.make(env_name)
-        envs.seed(seed)
-        setattr(envs,'env_name', env_name)
-        domainRandomize(envs, dyn_range=dyn_range, seed=seed)
-    elif 'aviary' in env_name:
-        max_steps = 4000
-        envs = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
-            drone_model=DroneModel.CF2X,
-            initial_xyzs=np.array([[0.0,0.0,2.0]]),
-            initial_rpys=np.array([[0.0,0.0,0.0]]),
-            physics=Physics.PYB_GND_DRAG_DW,
-            freq=240,
-            aggregate_phy_steps=1,
-            gui=False,
-            record=False, 
-            obs=ObservationType.KIN,
-            act=ActionType.RPM)
-        envs = domainRandomAviary(envs, 'test', 0, seed,
-            observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
-            frame_stack=1,
-            task='stabilize2',
-            reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
-            episode_len_sec=2,
-            max_rpm=66535,
-            initial_xyz=[[0.0,0.0,50.0]], # Far from the ground
-            freq=200,
-            rpy_noise=1.2,
-            vel_noise=1.0,
-            angvel_noise=2.4,
-            mass_range=dyn_range.get('mass_range', 0.0),
-            cm_range=dyn_range.get('cm_range', 0.0),
-            kf_range=dyn_range.get('kf_range', 0.0),
-            km_range=dyn_range.get('km_range', 0.0),
-            battery_range=dyn_range.get('battery_range', 0.0))
-        setattr(envs, 'env_name', env_name)
-    else:
-        raise NotImplementedError
-
     device = agent.device
     eval_success = 0
     eval_reward = 0
     
+    if 'aviary' in env_name:
+        max_steps=1000
+    else:
+        max_steps=900
+    
     with torch.no_grad():
         for i_eval in range(eval_itr):
-
-            eval_env = gym.make(env_name)
-            eval_env.seed(seed+i_eval)
+            if 'aviary' in env_name:
+                eval_env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
+                    drone_model=DroneModel.CF2X,
+                    initial_xyzs=np.array([[0.0,0.0,2.0]]),
+                    initial_rpys=np.array([[0.0,0.0,0.0]]),
+                    physics=Physics.PYB_GND_DRAG_DW,
+                    freq=240,
+                    aggregate_phy_steps=1,
+                    gui=False,
+                    record=False, 
+                    obs=ObservationType.KIN,
+                    act=ActionType.RPM)
+                eval_env = domainRandomAviary(eval_env, 'test', 0, seed+i_eval,
+                    observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
+                    frame_stack=1,
+                    task='stabilize2',
+                    reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
+                    episode_len_sec=2,
+                    max_rpm=66535,
+                    initial_xyz=[[0.0,0.0,10000.0]], # Far from the ground
+                    freq=200,
+                    rpy_noise=1.2,
+                    vel_noise=1.0,
+                    angvel_noise=2.4,
+                    mass_range=dyn_range.get('mass_range', 0.0),
+                    cm_range=dyn_range.get('cm_range', 0.0),
+                    kf_range=dyn_range.get('kf_range', 0.0),
+                    km_range=dyn_range.get('km_range', 0.0),
+                    battery_range=dyn_range.get('battery_range', 0.0))
+            else:
+                eval_env = gym.make(env_name)
+                eval_env.seed(seed+i_eval)
             setattr(eval_env,'env_name', env_name)
             domainRandomize(eval_env, dyn_range=dyn_range, seed=seed+i_eval)
             state = eval_env.reset()[None,:]
             total_rew = 0
-            last_action = envs.action_space.sample()[None,:]
+            last_action = eval_env.action_space.sample()[None,:]
             if hasattr(agent, 'rnn_type'):
                 if 'LSTM' == agent.rnn_type:
                     hidden_out = (torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device), \
@@ -112,7 +106,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                             success = 1
                             break
                     elif "aviary" in env_name:
-                        step = step+1 if np.linalg.norm(state[:3]) < 0.1 else 0
+                        step = step+1 if np.sum(state[:3]**2) < 0.1 else 0
                         if step > 100:
                             success = 1
 
@@ -158,7 +152,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                 reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
                 episode_len_sec=2,
                 max_rpm=66535,
-                initial_xyz=[[0.0,0.0,50.0]], # Far from the ground
+                initial_xyz=[[0.0,0.0,2.0]], # Far from the ground
                 freq=200,
                 rpy_noise=1.2,
                 vel_noise=1.0,
@@ -179,10 +173,43 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
 
         with torch.no_grad():
             for i_eval in range(test_itr):
-                eval_env = gym.make(env_name)
-                eval_env.seed(seed+i_eval)
-                setattr(eval_env,'env_name', env_name)
-                domainRandomize(eval_env, dyn_range=dyn_range, seed=seed+i_eval)
+                if 'Pendulum' in env_name:
+                    max_steps = 900
+                    eval_env = gym.make(env_name)
+                    eval_env.seed(seed)
+                    setattr(eval_env,'env_name', env_name)
+                    domainRandomize(eval_env, dyn_range=dyn_range, seed=seed)
+                elif 'aviary' in env_name:
+                    max_steps = 4000
+                    eval_env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
+                        drone_model=DroneModel.CF2X,
+                        initial_xyzs=np.array([[0.0,0.0,2.0]]),
+                        initial_rpys=np.array([[0.0,0.0,0.0]]),
+                        physics=Physics.PYB_GND_DRAG_DW,
+                        freq=240,
+                        aggregate_phy_steps=1,
+                        gui=False,
+                        record=True, 
+                        obs=ObservationType.KIN,
+                        act=ActionType.RPM)
+                    eval_env = domainRandomAviary(eval_env, 'test', 0, seed,
+                        observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
+                        frame_stack=1,
+                        task='stabilize2',
+                        reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
+                        episode_len_sec=2,
+                        max_rpm=66535,
+                        initial_xyz=[[0.0,0.0,1000.0]], # Far from the ground
+                        freq=200,
+                        rpy_noise=1.2,
+                        vel_noise=1.0,
+                        angvel_noise=2.4,
+                        mass_range=dyn_range.get('mass_range', 0.0),
+                        cm_range=dyn_range.get('cm_range', 0.0),
+                        kf_range=dyn_range.get('kf_range', 0.0),
+                        km_range=dyn_range.get('km_range', 0.0),
+                        battery_range=dyn_range.get('battery_range', 0.0))
+                    setattr(eval_env, 'env_name', env_name)
                 state = eval_env.reset()[None,:]
                 total_rew = 0
                 last_action = envs.action_space.sample()[None,:]
@@ -203,6 +230,8 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                                                             hidden_in, 
                                                             deterministic=DETERMINISTIC, 
                                                             explore_noise_scale=0.)
+                        print("ACTION:",action)
+                        print("STATE:", state)
                     else:
                         action = agent.policy_net.get_action(state, 
                                                             deterministic=DETERMINISTIC, 
