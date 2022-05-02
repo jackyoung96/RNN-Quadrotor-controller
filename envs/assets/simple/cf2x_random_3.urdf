@@ -7,9 +7,9 @@
   <link name="base_link"> 
 
     <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
-      <mass value="0.027" />
-      <inertia ixx="1.4e-05" ixy="0.0" ixz="0.0" iyy="1.4e-05" iyz="0.0" izz="2.8e-05" />
+      <origin rpy="0 0 0" xyz="0.0049580811347632574 -0.004980649119093666 0.0" />
+      <mass value="0.02782292602170812" />
+      <inertia ixx="1.5116901969368071e-05" ixy="0.0" ixz="0.0" iyy="1.5110661367507686e-05" iyz="0.0" izz="3.0227563336875758e-05" />
     </inertial>
 
     
@@ -83,7 +83,7 @@
 
   <link name="center_of_mass_link">
     <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <origin rpy="0 0 0" xyz="0.0049580811347632574 -0.004980649119093666 0.0" />
       <mass value="0" />
       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0" />
     </inertial>
