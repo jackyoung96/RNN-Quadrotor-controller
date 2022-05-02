@@ -23,8 +23,8 @@ import pickle as pkl
 import pandas as pd
 import itertools
 
-def train(args, hparam, ):
-    
+def train(args, hparam):
+
     print("hyperparam set:",hparam)
     algorithm_name = 'TD3'
     env_name = args.env
@@ -109,7 +109,7 @@ def train(args, hparam, ):
         hidden_dim = 128
         max_steps = 400
         batch_size  = 8 if args.rnn is not None else 8 * max_steps
-        param_num = 4
+        param_num = 12
     else:
         raise NotImplementedError
 
@@ -132,7 +132,7 @@ def train(args, hparam, ):
     envs = domainRandeEnv(env_name=env_name, tag=tag, n=nenvs, randomize=args.randomize, seed=1000000, dyn_range=dyn_range)
     action_space = envs.action_space
     state_space = envs.observation_space
-
+    
     if args.rnn in ["RNN", "LSTM", "GRU"]:
         if args.rnn=='LSTM':
             replay_buffer = ReplayBufferLSTM(replay_buffer_size)
@@ -178,7 +178,8 @@ def train(args, hparam, ):
     scores_window = deque(maxlen=100)
     loss_storage = {"policy_loss":[],
                     "q_loss_1":[],
-                    "q_loss_2":[]}
+                    "q_loss_2":[],
+                    'param_loss':[]}
 
     for i_episode in range(1,max_episodes+1):
         # print(i_episode)
@@ -191,7 +192,7 @@ def train(args, hparam, ):
         episode_reward = []
         episode_next_state = []
         episode_done = []
-        if args.rnn == "LSTM":
+        if "LSTM" in args.rnn:
             hidden_out = (torch.zeros([1, nenvs, hidden_dim], dtype=torch.float).to(device), \
                         torch.zeros([1, nenvs, hidden_dim], dtype=torch.float).to(device))  # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
         else:
@@ -284,9 +285,6 @@ def train(args, hparam, ):
             writer.add_scalar('lr/q_lr',td3_trainer.scheduler_q1.get_last_lr()[0], i_episode)
             writer.add_scalar('lr/policy_lr',td3_trainer.scheduler_policy.get_last_lr()[0], i_episode)
 
-            if hasattr(td3_trainer, 'scheduler_param'):
-                writer.add_scalar('lr/param_lr',td3_trainer.scheduler_param.get_last_lr()[0], i_episode)
-
             for name, weight in td3_trainer.policy_net.named_parameters():
                 writer.add_histogram(f'policy_net/{name}', weight, i_episode)
                 if weight.grad is not None:
@@ -296,7 +294,15 @@ def train(args, hparam, ):
                 writer.add_histogram(f'q_net/{name}', weight, i_episode)
                 if weight.grad is not None:
                     writer.add_histogram(f'q_net/{name}.grad', weight.grad, i_episode)
-        
+            
+            if 'fast' in args.rnn:
+                if hasattr(td3_trainer, 'scheduler_param'):
+                    writer.add_scalar('lr/param_lr',td3_trainer.scheduler_param.get_last_lr()[0], i_episode)
+                for name, weight in td3_trainer.param_net.named_parameters():
+                    writer.add_histogram(f'policy_net/{name}', weight, i_episode)
+                    if weight.grad is not None:
+                        writer.add_histogram(f'policy_net/{name}.grad', weight.grad, i_episode)
+
         if i_episode % 500 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
             # td3_trainer.save_model(os.path.join(savepath,"iter%05d"%i_episode))
@@ -344,10 +350,18 @@ def test(args):
     # hyper-parameters for RL training
     hparam = {'hidden_dim': args.hidden_dim}
 
+    if 'Pendulum' in env_name:
+        param_num = 3
+    elif 'aviary' in env_name:
+        param_num = 12
+    else:
+        raise NotImplementedError
+
     # Define environment
     envs = domainRandeEnv(env_name=env_name)
     action_space = envs.action_space
     state_space = envs.observation_space
+    envs.close()
 
     if args.rnn in ["RNN", "LSTM", "GRU"]:
         if args.rnn=='LSTM':
@@ -372,6 +386,7 @@ def test(args):
                     state_space, 
                     action_space, 
                     rnn_type=args.rnn,
+                    param_num=param_num,
                     out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
@@ -388,12 +403,8 @@ def test(args):
 
     td3_trainer.load_model(args.path)
     
-    generate_result(env_name, td3_trainer, dyn_range, 5, 0, record=True)
+    generate_result(env_name, td3_trainer, dyn_range, test_itr=5, seed=0, record=args.record)
     # evaluation(env_name, td3_trainer, dyn_range, 1, 0)
-
-
-def train_stablebaseline():
-    pass
 
 hparam_set = {
     # "q_lr": [3e-4, 1e-4, 3e-5],
@@ -406,9 +417,9 @@ hparam_set = {
     "q_lr": [3e-4],
     "policy_lr": [3e-5],
     "param_lr": [3e-5],
-    "t_max": [30000, 50000, 100000],
+    "t_max": [50000, 30000, 100000],
     "hidden_dim": [128],
-    "update_interval": [2,3,4,5]
+    "update_interval": [3,2,4,5]
 }
 
 if __name__=='__main__':
@@ -425,6 +436,7 @@ if __name__=='__main__':
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--hidden_dim', type=int, default=None, help='only required at test phase')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
+    parser.add_argument('--record', action='store_true', help='whether record or not')
     args = parser.parse_args()
     if not args.test:
         if args.multitask and args.randomize:

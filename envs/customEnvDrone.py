@@ -554,6 +554,7 @@ class domainRandomAviary(customAviary):
         self.km = self.env.KM
 
         # return np.array([mass, x_cm, y_cm, self.battery, *self.env.KF, *self.env.KM])
+        # param_num = 12 
         return np.array([norm_mass, norm_xcm, norm_ycm, norm_battery, *norm_KF, *norm_KM])
 
     def _housekeeping(self):

@@ -442,11 +442,17 @@ class TD3FastAdaptRNN_Trainer(TD3RNN_Trainer):
             self.target_policy_net=self.target_soft_update(self.policy_net, self.target_policy_net, soft_tau)
 
         self.update_cnt+=1
-
         return {"policy_loss": policy_loss.item() if not policy_loss is None else 0, 
                 "q_loss_1": q_value_loss1.item(), 
                 "q_loss_2": q_value_loss2.item(),
                 "param_loss": param_loss.item()}
+
+    def predict_param(self, hidden):
+        with torch.no_grad():
+            hidden = hidden.to(self.device)
+            predicted_params = self.param_net(hidden) # detach: no gradients for policy (TODO gradient 유무에 따라 결과가 바뀔 수 있을 듯)
+
+        return predicted_params.cpu().numpy()
         
     def save_model(self, path):
         super().save_model(path)
