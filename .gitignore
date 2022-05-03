@@ -12,7 +12,7 @@ figs/
 paperutils/
 videos/
 
+envs/assets/
 !envs/assets/cf2x_default.urdf
 !envs/assets/quad.obj
 !envs/assets/cf2.dae
-envs/assets/
