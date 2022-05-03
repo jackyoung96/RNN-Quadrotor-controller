@@ -16,3 +16,6 @@ envs/assets/
 !envs/assets/cf2x_default.urdf
 !envs/assets/quad.obj
 !envs/assets/cf2.dae
+
+__pycache__/
+envs/__pycache__/
