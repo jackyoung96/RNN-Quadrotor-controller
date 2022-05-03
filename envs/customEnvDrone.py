@@ -540,8 +540,8 @@ class domainRandomAviary(customAviary):
         norm_mass = 2*(mass/self.orig_params['M']-(1-self.mass_range))/(2*self.mass_range)-1
         norm_xcm = 2*(x_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
         norm_ycm = 2*(y_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
-        norm_ixx = 2*(i_xx-(1-self.i_range))/(2*self.i_range)-1
-        norm_iyy = 2*(i_yy-(1-self.i_range))/(2*self.i_range)-1
+        norm_ixx = 2*(i_xx-(1-self.i_range))/(2*self.i_range)-1 if self.i_range!=0 else 0
+        norm_iyy = 2*(i_yy-(1-self.i_range))/(2*self.i_range)-1 if self.i_range!=0 else 0
 
         generate_urdf(self.URDF, mass, x_cm, y_cm, i_xx, i_yy, 0.0)
         self.env.M, \
