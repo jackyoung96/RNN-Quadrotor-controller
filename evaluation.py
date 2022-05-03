@@ -65,6 +65,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                     cm_range=dyn_range.get('cm_range', 0.0),
                     kf_range=dyn_range.get('kf_range', 0.0),
                     km_range=dyn_range.get('km_range', 0.0),
+                    i_range=dyn_range.get('i_range', 0.0),
                     battery_range=dyn_range.get('battery_range', 0.0))
             else:
                 eval_env = gym.make(env_name)
@@ -176,6 +177,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                     cm_range=dyn_range.get('cm_range', 0.0),
                     kf_range=dyn_range.get('kf_range', 0.0),
                     km_range=dyn_range.get('km_range', 0.0),
+                    i_range=dyn_range.get('i_range', 0.0),
                     battery_range=dyn_range.get('battery_range', 0.0))
             else:
                 eval_env = gym.make(env_name)

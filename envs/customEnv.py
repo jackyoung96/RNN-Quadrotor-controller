@@ -318,6 +318,7 @@ class domainRandeEnv(parallelEnv):
                     cm_range=dyn_range.get('cm_range', 0.0),
                     kf_range=dyn_range.get('kf_range', 0.0),
                     km_range=dyn_range.get('km_range', 0.0),
+                    i_range=dyn_range.get('i_range', 0.0),
                     battery_range=dyn_range.get('battery_range', 0.0))
                 setattr(env, 'env_name', env_name)
                 env_fns.append(env)
