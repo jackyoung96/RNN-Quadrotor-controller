@@ -228,7 +228,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                         success = 1
                         break
                 elif "aviary" in env_name:
-                    print(state[0,:3], reward)
+                    # print(state[0,:3], reward)
                     step = step+1 if np.linalg.norm(state[0,:3], ord=2) < 0.1 else 0 # 1/6 된 값임
                     if step > 100:
                         success = 1
