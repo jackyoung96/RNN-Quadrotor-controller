@@ -513,6 +513,7 @@ class domainRandomAviary(customAviary):
 
         self.mass_range = kwargs.get('mass_range', 0.0)
         self.cm_range = kwargs.get('cm_range', 0.0)
+        self.i_range = kwargs.get('i_range', 0.0)
         self.kf_range = kwargs.get('kf_range', 0.0) # percentage
         self.km_range = kwargs.get('km_range', 0.0) # percentage
         self.battery_range = kwargs.get('battery_range', 0.0)
@@ -534,11 +535,14 @@ class domainRandomAviary(customAviary):
     def random_urdf(self):
         mass = np.random.uniform(1-self.mass_range, 1+self.mass_range) * self.orig_params['M']
         x_cm, y_cm = np.random.uniform(-self.cm_range, self.cm_range, size=(2,)) * self.orig_params['L']
+        i_xx, i_yy = np.random.uniform(1-self.i_range, 1+self.i_range, size=(2,))
         norm_mass = 2*(mass/self.orig_params['M']-(1-self.mass_range))/(2*self.mass_range)-1
         norm_xcm = 2*(x_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
         norm_ycm = 2*(y_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
+        norm_ixx = 2*(i_xx-(1-self.i_range))/(2*self.i_range)-1
+        norm_iyy = 2*(i_yy-(1-self.i_range))/(2*self.i_range)-1
 
-        generate_urdf(self.URDF, mass, x_cm, y_cm, 0.0)
+        generate_urdf(self.URDF, mass, x_cm, y_cm, i_xx, i_yy, 0.0)
         self.env.M, \
         self.env.L, \
         self.env.THRUST2WEIGHT_RATIO, \
@@ -581,7 +585,7 @@ class domainRandomAviary(customAviary):
 
         # return np.array([mass, x_cm, y_cm, self.battery, *self.env.KF, *self.env.KM])
         # param_num = 12 
-        return np.array([norm_mass, norm_xcm, norm_ycm, norm_battery, *norm_KF, *norm_KM])
+        return np.array([norm_mass, norm_xcm, norm_ycm, norm_ixx, norm_iyy, norm_battery, *norm_KF, *norm_KM])
 
     def _housekeeping(self):
         """Housekeeping function.

@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 import os
 
 
-def generate_urdf(path, mass=0.027, x_cm=0, y_cm=0, z_cm=0):
+def generate_urdf(path, mass=0.027, x_cm=0, y_cm=0, i_xx=1, i_yy=1, z_cm=0):
 
     tree = ET.parse(os.path.dirname(os.path.abspath(__file__))+"/cf2x_default.urdf")
     root = tree.getroot()
@@ -16,8 +16,8 @@ def generate_urdf(path, mass=0.027, x_cm=0, y_cm=0, z_cm=0):
 
     # center of mass part
     original_mass = 0.027
-    ixx = 1.4e-5 * mass / original_mass + mass * y_cm ** 2
-    iyy = 1.4e-5 * mass / original_mass + mass * x_cm ** 2
+    ixx = i_xx * 1.4e-5 * mass / original_mass + mass * y_cm ** 2
+    iyy = i_yy * 1.4e-5 * mass / original_mass + mass * x_cm ** 2
     izz = ixx + iyy
     root.findall("link")[0].find('inertial').find('origin').set('rpy', '0 0 0')
     root.findall("link")[0].find('inertial').find('origin').set('xyz', '%s %s %s'%(str(x_cm), str(y_cm), str(z_cm)))

@@ -176,7 +176,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                                                     "step": i_step,
                                                     "param_gt": param,
                                                     "param_pred": predict_param,
-                                                    "dparam":np.sum((predict_param-param)**2)}])
+                                                    "dparam":np.sum((predict_param-param)**2)}], ignore_index=True)
                 else:
                     action = agent.policy_net.get_action(state, 
                                                         deterministic=DETERMINISTIC, 
@@ -225,7 +225,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
     
     # plt.figure()
     pd_param.to_csv(os.path.join('gifs',"%s_%s_indi.csv"%(env_name, type(agent).__name__)))
-    sns.lineplot(data=pd_param.loc[pd_param['step']<=150], x="step", y="dparam", hue="episode", style="episode")
+    sns.lineplot(data=pd_param, x="step", y="dparam", hue="episode", style="episode")
     plt.savefig(os.path.join('gifs',"%s_%s_indi.png"%(env_name, type(agent).__name__)))
     plt.close()
     # plt.figure()
