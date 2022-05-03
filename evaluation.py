@@ -43,7 +43,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                     initial_xyzs=np.array([[0.0,0.0,2.0]]),
                     initial_rpys=np.array([[0.0,0.0,0.0]]),
                     physics=Physics.PYB_GND_DRAG_DW,
-                    freq=240,
+                    freq=200,
                     aggregate_phy_steps=1,
                     gui=False,
                     record=False, 
@@ -115,6 +115,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                     total_rew += reward
             
             eval_env.close()
+            del eval_env
 
             eval_success += success
             eval_reward += total_rew
@@ -131,9 +132,9 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
     DETERMINISTIC=True  # DDPG: deterministic policy gradient      
     
     if 'Pendulum' in env_name:
-        max_steps = 900
+        max_steps = 1000
     elif 'aviary' in env_name:
-        max_steps = 4000
+        max_steps = 900
     else:
         raise NotImplementedError
 
@@ -146,8 +147,38 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
 
     with torch.no_grad():
         for i_eval in range(test_itr):
-            eval_env = gym.make(env_name)
-            eval_env.seed(seed+i_eval)
+            if 'aviary' in env_name:
+                eval_env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
+                    drone_model=DroneModel.CF2X,
+                    initial_xyzs=np.array([[0.0,0.0,2.0]]),
+                    initial_rpys=np.array([[0.0,0.0,0.0]]),
+                    physics=Physics.PYB_GND_DRAG_DW,
+                    freq=240,
+                    aggregate_phy_steps=1,
+                    gui=False,
+                    record=False, 
+                    obs=ObservationType.KIN,
+                    act=ActionType.RPM)
+                eval_env = domainRandomAviary(eval_env, 'test', 0, seed+i_eval,
+                    observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
+                    frame_stack=1,
+                    task='stabilize2',
+                    reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
+                    episode_len_sec=2,
+                    max_rpm=66535,
+                    initial_xyz=[[0.0,0.0,10000.0]], # Far from the ground
+                    freq=200,
+                    rpy_noise=1.2,
+                    vel_noise=1.0,
+                    angvel_noise=2.4,
+                    mass_range=dyn_range.get('mass_range', 0.0),
+                    cm_range=dyn_range.get('cm_range', 0.0),
+                    kf_range=dyn_range.get('kf_range', 0.0),
+                    km_range=dyn_range.get('km_range', 0.0),
+                    battery_range=dyn_range.get('battery_range', 0.0))
+            else:
+                eval_env = gym.make(env_name)
+                eval_env.seed(seed+i_eval)
             setattr(eval_env,'env_name', env_name)
             param = domainRandomize(eval_env, dyn_range=dyn_range, seed=seed+i_eval)
             state = eval_env.reset()[None,:]
@@ -224,14 +255,15 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
         disp.stop()
     
     # plt.figure()
-    pd_param.to_csv(os.path.join('gifs',"%s_%s_indi.csv"%(env_name, type(agent).__name__)))
-    sns.lineplot(data=pd_param, x="step", y="dparam", hue="episode", style="episode")
-    plt.savefig(os.path.join('gifs',"%s_%s_indi.png"%(env_name, type(agent).__name__)))
-    plt.close()
-    # plt.figure()
-    sns.lineplot(data=pd_param, x="step", y="dparam")
-    plt.savefig(os.path.join('gifs',"%s_%s_all.png"%(env_name, type(agent).__name__)))
-    plt.close()
+    if hasattr(agent, 'param_net'):
+        pd_param.to_csv(os.path.join('gifs',"%s_%s_indi.csv"%(env_name, type(agent).__name__)))
+        sns.lineplot(data=pd_param, x="step", y="dparam", hue="episode", style="episode")
+        plt.savefig(os.path.join('gifs',"%s_%s_indi.png"%(env_name, type(agent).__name__)))
+        plt.close()
+        # plt.figure()
+        sns.lineplot(data=pd_param, x="step", y="dparam")
+        plt.savefig(os.path.join('gifs',"%s_%s_all.png"%(env_name, type(agent).__name__)))
+        plt.close()
     
     print("total average reward %.3f success rate %d"%(eval_reward / test_itr,eval_success / test_itr))
     
