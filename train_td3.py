@@ -31,7 +31,6 @@ def train(args, hparam, ):
     print("hyperparam set:",hparam)
     algorithm_name = 'TD3'
     env_name = args.env
-    args.rnn = None if args.rnn=='None' else args.rnn
 
     dtime = datetime.now()
 
@@ -41,7 +40,7 @@ def train(args, hparam, ):
     elif args.multitask:
         tag = "multitask"
 
-    rnn_tag = args.rnn if args.rnn is not None else 'FF'
+    rnn_tag = args.rnn if args.rnn != "None" else 'FF'
 
     savepath = "save/%s/%s/%s/%s/%s"%(algorithm_name,tag,rnn_tag,env_name, dtime.strftime("%y%b%d%H%M%S"))
 
@@ -105,7 +104,7 @@ def train(args, hparam, ):
         max_episodes  = 3000
         hidden_dim = hparam['hidden_dim']
         max_steps = 150
-        batch_size  = 64 if args.rnn is not None else 64 * max_steps
+        batch_size  = 64 if args.rnn != "None" else 64 * max_steps
         param_num = 3
         nenvs = 16
         explore_noise_scale = 0.5
@@ -114,8 +113,8 @@ def train(args, hparam, ):
         max_episodes  = 6000
         hidden_dim = 128
         max_steps = 300
-        batch_size  = 64 if args.rnn is not None else 8 * max_steps
-        param_num = 12
+        batch_size  = 64 if args.rnn != "None" else 8 * max_steps
+        param_num = 14
         nenvs = 2
         explore_noise_scale = 0.25
         eval_noise_scale = 0.25
@@ -124,8 +123,8 @@ def train(args, hparam, ):
 
     best_score = -np.inf
     frame_idx   = 0
-    replay_buffer_size = int(1e6/max_steps) if args.rnn is not None else 1e6
-    explore_steps = int(max_episodes/20) if args.rnn is not None else 1e5  # for random action sampling in the beginning of training
+    replay_buffer_size = int(1e6/max_steps) if args.rnn != "None" else 1e6
+    explore_steps = int(max_episodes/20) if args.rnn != "None" else 1e5  # for random action sampling in the beginning of training
     update_itr = 1
     policy_target_update_interval = hparam['update_interval'] # delayed update for the policy network and target networks
     
@@ -169,7 +168,7 @@ def train(args, hparam, ):
                     device=device, 
                     policy_target_update_interval=policy_target_update_interval,
                     **hparam)
-    elif args.rnn is None:
+    elif args.rnn == "None":
         replay_buffer = ReplayBuffer(replay_buffer_size)
         td3_trainer = TD3_Trainer(replay_buffer,
                     state_space, 
@@ -179,6 +178,8 @@ def train(args, hparam, ):
                     device=device, 
                     policy_target_update_interval=policy_target_update_interval,
                     **hparam)
+    else:
+        raise "Something wrong"
 
     # keep track of progress
     mean_rewards = []
@@ -211,7 +212,7 @@ def train(args, hparam, ):
         q_loss_1,q_loss_2,param_loss = [],[],[]
 
         for step in range(max_steps):
-            if args.rnn is not None:
+            if args.rnn != "None":
                 hidden_in = hidden_out
                 t_start = time()
                 action, hidden_out = \
@@ -241,6 +242,7 @@ def train(args, hparam, ):
                 next_state, reward, done, _ = envs.step(action)
                 replay_buffer.push_batch(state, action, reward, next_state, done)
                 episode_reward.append(reward)
+                episode_state.append(state)
 
             state = next_state
             last_action = action
@@ -249,9 +251,6 @@ def train(args, hparam, ):
             if len(replay_buffer) > explore_steps:
                 for i in range(update_itr):
                     loss_dict = td3_trainer.update(batch_size, deterministic=DETERMINISTIC, eval_noise_scale=eval_noise_scale)
-                    update_t = loss_dict['time_test']
-                    for k,v in update_t.items():
-                        time_test[k].append(v)
                     # policy_loss, q_loss_1, q_loss_2
                     policy_loss.append(loss_dict['policy_loss'])
                     q_loss_1.append(loss_dict['q_loss_1'])
@@ -263,7 +262,7 @@ def train(args, hparam, ):
         if len(replay_buffer) > explore_steps:
             time_test
 
-        if args.rnn is not None: 
+        if args.rnn != "None": 
             if 'fast' in args.rnn:
                 replay_buffer.push_batch(ini_hidden_in, 
                                 ini_hidden_out, 

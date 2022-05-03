@@ -207,7 +207,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                                                     "step": i_step,
                                                     "param_gt": param,
                                                     "param_pred": predict_param,
-                                                    "dparam":np.sum((predict_param-param)**2)}])
+                                                    "dparam":np.sum((predict_param-param)**2)}], ignore_index=True)
                 else:
                     action = agent.policy_net.get_action(state, 
                                                         deterministic=DETERMINISTIC, 
