@@ -56,7 +56,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                     reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
                     episode_len_sec=max_steps/200,
                     max_rpm=66535,
-                    initial_xyz=[[0.0,0.0,10000.0]], # Far from the ground
+                    initial_xyzs=[[0.0,0.0,10000.0]], # Far from the ground
                     freq=200,
                     rpy_noise=1.2,
                     vel_noise=1.0,
@@ -167,7 +167,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                     reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
                     episode_len_sec=max_steps/200,
                     max_rpm=66535,
-                    initial_xyz=[[0.0,0.0,10000.0]], # Far from the ground
+                    initial_xyzs=[[0.0,0.0,10000.0]], # Far from the ground
                     freq=200,
                     rpy_noise=1.2,
                     vel_noise=1.0,
@@ -228,7 +228,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                         success = 1
                         break
                 elif "aviary" in env_name:
-                    # print(state[0])
+                    print(state[0,:3], reward)
                     step = step+1 if np.linalg.norm(state[0,:3], ord=2) < 0.1 else 0 # 1/6 된 값임
                     if step > 100:
                         success = 1
