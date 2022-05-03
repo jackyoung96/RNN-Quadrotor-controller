@@ -409,10 +409,10 @@ class customAviary(gym.Wrapper):
             self.previous_state = state.copy()
 
             # done reward
-            done_reward = 0
-            done = self._computeDone()
-            if done:
-                done_reward = self.step_counter/self.SIM_FREQ - self.EPISODE_LEN_SEC
+            # done_reward = 0
+            # done = self._computeDone()
+            # if done:
+            #     done_reward = self.step_counter/self.SIM_FREQ - self.EPISODE_LEN_SEC
 
             self.reward_buf.append([xyz,vel,ang_vel,d_action])
             summary_freq = self.env.EPISODE_LEN_SEC * self.env.SIM_FREQ
@@ -426,7 +426,7 @@ class customAviary(gym.Wrapper):
                 self.reward_buf = []
             self.reward_steps += 1
                 
-            return -(f_s + f_a) + done_reward
+            return -(f_s + f_a)
 
         elif self.task == 'stabilize3':
             # No position constrain

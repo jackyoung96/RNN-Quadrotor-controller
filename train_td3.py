@@ -334,7 +334,7 @@ def train(args, hparam, ):
 
         if i_episode % 500 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
-            # td3_trainer.save_model(os.path.join(savepath,"iter%05d"%i_episode))
+            td3_trainer.save_model(os.path.join(savepath,"iter%05d"%i_episode))
 
         if np.mean(scores_window)>=best_score: 
             td3_trainer.save_model(os.path.join(savepath,"best"))
@@ -342,11 +342,14 @@ def train(args, hparam, ):
         
     td3_trainer.save_model(os.path.join(savepath,"final"))
     print('\rFinal\tAverage Score: {:.2f}'.format(np.mean(scores_window)))
+
+    envs.close()
+    del envs
+    
     return mean_rewards, loss_storage, eval_rew, eval_success, dtime
 
 def test(args):
     env_name = args.env
-    args.rnn = None if args.rnn=='None' else args.rnn
 
     dyn_range = {
         # cartpole
@@ -415,7 +418,7 @@ def test(args):
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     **hparam)
-    elif args.rnn is None:
+    elif args.rnn == "None":
         replay_buffer = ReplayBuffer(1e6)
         td3_trainer = TD3_Trainer(replay_buffer,
                     state_space, 
@@ -424,9 +427,14 @@ def test(args):
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     **hparam)
+    else:
+        raise "Something wrong!!"
 
     td3_trainer.load_model(args.path)
     
+    eval_rew, eval_success = evaluation(env_name, agent=td3_trainer, dyn_range=dyn_range, eval_itr=5, seed=0)
+    print("EVALUATION REWARD:",eval_rew)
+    print("EVALUATION SUCCESS RATE:",eval_success)
     generate_result(env_name, td3_trainer, dyn_range, test_itr=5, seed=0, record=args.record)
     # evaluation(env_name, td3_trainer, dyn_range, 1, 0)
 
