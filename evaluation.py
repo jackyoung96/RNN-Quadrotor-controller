@@ -54,7 +54,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                     frame_stack=1,
                     task='stabilize2',
                     reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
-                    episode_len_sec=2,
+                    episode_len_sec=max_steps/200,
                     max_rpm=66535,
                     initial_xyz=[[0.0,0.0,10000.0]], # Far from the ground
                     freq=200,
@@ -108,7 +108,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                             success = 1
                             break
                     elif "aviary" in env_name:
-                        step = step+1 if np.sum(state[:3]**2) < 0.1 else 0
+                        step = step+1 if np.sum(state[0,:3]**2) < 0.1 else 0
                         if step > 100:
                             success = 1
 
@@ -147,6 +147,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
 
     with torch.no_grad():
         for i_eval in range(test_itr):
+            print("---------%02d------------"%i_eval)
             if 'aviary' in env_name:
                 eval_env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
                     drone_model=DroneModel.CF2X,
@@ -164,7 +165,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                     frame_stack=1,
                     task='stabilize2',
                     reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
-                    episode_len_sec=2,
+                    episode_len_sec=max_steps/200,
                     max_rpm=66535,
                     initial_xyz=[[0.0,0.0,10000.0]], # Far from the ground
                     freq=200,
@@ -184,16 +185,17 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
             state = eval_env.reset()[None,:]
             total_rew = 0
             last_action = eval_env.action_space.sample()[None,:]
-            if 'LSTM' == agent.rnn_type:
-                hidden_out = (torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device), \
-                            torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device))
-            else:
-                hidden_out = torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device)
+            if hasattr(agent, 'rnn_type'):
+                if 'LSTM' == agent.rnn_type:
+                    hidden_out = (torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device), \
+                                torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device))
+                else:
+                    hidden_out = torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device)
 
             total_step, step, success = 0,0,0
             frames = []
             for i_step in range(max_steps):
-                if agent.rnn_type in ['GRU','RNN','LSTM']:
+                if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                     hidden_in = hidden_out
                     action, hidden_out = \
                         agent.policy_net.get_action(state, 
@@ -226,7 +228,8 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                         success = 1
                         break
                 elif "aviary" in env_name:
-                    step = step+1 if np.linalg.norm(state[:3]) < 0.1 else 0
+                    # print(state[0])
+                    step = step+1 if np.linalg.norm(state[0,:3], ord=2) < 0.1 else 0 # 1/6 된 값임
                     if step > 100:
                         success = 1
 

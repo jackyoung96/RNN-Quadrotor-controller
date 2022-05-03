@@ -53,7 +53,7 @@ class customAviary(gym.Wrapper):
 
         self.reward_coeff = kwargs.get('reward_coeff', None)
 
-        self.env.EPISODE_LEN_SEC = kwargs.get('episode_len_sec', 3)
+        self.env.EPISODE_LEN_SEC = kwargs.get('episode_len_sec', 2)
         self.MAX_RPM = kwargs.get('max_rpm', 2*16-1)
         self.env.SIM_FREQ = kwargs.get('freq', 240)
 
@@ -266,8 +266,8 @@ class customAviary(gym.Wrapper):
         MAX_LIN_VEL_XY = 3 
         MAX_LIN_VEL_Z = 1
 
-        MAX_XY = MAX_LIN_VEL_XY*self.env.EPISODE_LEN_SEC
-        MAX_Z = MAX_LIN_VEL_Z*self.env.EPISODE_LEN_SEC
+        MAX_XY = MAX_LIN_VEL_XY * 2# * self.env.EPISODE_LEN_SEC
+        MAX_Z = MAX_LIN_VEL_Z * 2 # * self.env.EPISODE_LEN_SEC
 
         MAX_ROLL_YAW = np.pi
         MAX_PITCH = np.pi/2
@@ -412,6 +412,7 @@ class customAviary(gym.Wrapper):
             # done_reward = 0
             # done = self._computeDone()
             # if done:
+            #     print(self.step_counter, self.SIM_FREQ, self.EPISODE_LEN_SEC)
             #     done_reward = self.step_counter/self.SIM_FREQ - self.EPISODE_LEN_SEC
 
             self.reward_buf.append([xyz,vel,ang_vel,d_action])
@@ -426,7 +427,7 @@ class customAviary(gym.Wrapper):
                 self.reward_buf = []
             self.reward_steps += 1
                 
-            return -(f_s + f_a)
+            return -(f_s + f_a) # + done_reward
 
         elif self.task == 'stabilize3':
             # No position constrain
