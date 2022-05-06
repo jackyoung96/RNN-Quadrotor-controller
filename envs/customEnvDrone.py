@@ -49,7 +49,7 @@ class customAviary(gym.Wrapper):
         self.vel_noise = kwargs.get('vel_noise', 0.5)
         self.angvel_noise = kwargs.get('angvel_noise', 0.6)
 
-        self.goal_pos = self.env.INIT_RPYS.copy()
+        self.goal_pos = self.env.INIT_XYZS.copy()
 
         self.reward_coeff = kwargs.get('reward_coeff', None)
 
@@ -208,7 +208,7 @@ class customAviary(gym.Wrapper):
                                 linearVelocity = vel.tolist(),\
                                 angularVelocity = (self.angvel_noise * np.random.normal(0.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
-            self.goal_pos[i,:] = 0.5*vel + self.env.INIT_XYZS[i,:]
+            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] # + 0.5*vel
 
 
         for i in range(self.env.NUM_DRONES):
@@ -278,6 +278,7 @@ class customAviary(gym.Wrapper):
 
         if type=='pos':
             # norm_state = norm_state - self.env.INIT_XYZS[0,:]
+            # print("DEBUG", norm_state, self.goal_pos[0,:])
             norm_state = norm_state - self.goal_pos[0,:]
             norm_state[:2] = norm_state[:2] / MAX_XY
             norm_state[2:] = norm_state[2:] / MAX_Z
@@ -394,18 +395,24 @@ class customAviary(gym.Wrapper):
         elif self.task == 'stabilize2':
 
             coeff = {
-                'xyz': self.reward_coeff['xyz'],
-                'vel': self.reward_coeff['vel'],
-                'ang_vel': self.reward_coeff['ang_vel'],
-                'd_action': self.reward_coeff['d_action']
+                'pos': self.reward_coeff['pos'], # 0~3
+                'vel': self.reward_coeff['vel'], # 10~13
+                'ang_vel': self.reward_coeff['ang_vel'], # 13~16
+                'd_action': self.reward_coeff['d_action'] # 16~20
             }
-            xyz = coeff['xyz'] * np.linalg.norm(self._normalizeState(state[:3]-self.goal_pos[0,:],'xyz'), ord=2) # for single agent temporarily
+            xyz = coeff['pos'] * np.linalg.norm(self._normalizeState(state[:3],'pos'), ord=2) # for single agent temporarily
             vel = coeff['vel'] * np.linalg.norm(self._normalizeState(state[10:13],'vel'),ord=2)
             ang_vel = coeff['ang_vel'] * np.linalg.norm(self._normalizeState(state[13:16],'angular_vel'),ord=2)
             f_s = xyz + vel + ang_vel
 
             d_action = coeff['d_action'] * np.linalg.norm(self._normalizeState(state[16:]-self.previous_state[16:],'rpm'),ord=2) if self.previous_state is not None else 0
             f_a = d_action
+            # print("XYZ",xyz/coeff['pos'],np.linalg.norm(state[:3]-self.goal_pos[0,:]),"\n",
+            #     "RPY",np.linalg.norm(state[7:10]),"\n",
+            #     "VEL",vel/coeff['vel'],np.linalg.norm(state[10:13]),"\n",
+            #     "ANGVEL",ang_vel/coeff['ang_vel'], np.linalg.norm(state[13:16]),"\n",
+            #     "dACT",d_action/coeff['d_action'])
+
             self.previous_state = state.copy()
 
             # done reward
@@ -526,6 +533,7 @@ class domainRandomAviary(customAviary):
                             "KM":self.env.KM,
                             "BATTERY":1.0}
         self.random_urdf()
+        self.env._housekeeping = self._housekeeping
 
     def test(self):
         self.train = False
@@ -641,7 +649,7 @@ class domainRandomAviary(customAviary):
                                 linearVelocity = vel.tolist(),\
                                 angularVelocity = (self.angvel_noise * np.random.normal(0.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
-            self.goal_pos[i,:] = 0.5*vel + self.env.INIT_XYZS[i,:]
+            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] # + 0.5*vel 
 
 
         for i in range(self.env.NUM_DRONES):

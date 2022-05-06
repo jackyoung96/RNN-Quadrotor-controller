@@ -141,6 +141,7 @@ def train(args, hparam, ):
     state_space = envs.observation_space
     
     if args.rnn in ["RNN", "LSTM", "GRU"]:
+        # RNN w/o param
         if args.rnn=='LSTM':
             replay_buffer = ReplayBufferLSTM(replay_buffer_size)
         else:
@@ -148,6 +149,38 @@ def train(args, hparam, ):
         td3_trainer = TD3RNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
+                    rnn_type=args.rnn,
+                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    action_scale=1.0 if 'aviary' in env_name else 10.0,
+                    device=device, 
+                    policy_target_update_interval=policy_target_update_interval,
+                    **hparam)
+    elif args.rnn in ["RNN2", "LSTM2", "GRU2"]:
+        # Param + FF
+        if args.rnn=='LSTM2':
+            replay_buffer = ReplayBufferFastAdaptLSTM(replay_buffer_size)
+        else:
+            replay_buffer = ReplayBufferFastAdaptGRU(replay_buffer_size)
+        td3_trainer = TD3RNN_Trainer2(replay_buffer,
+                    state_space, 
+                    action_space, 
+                    param_num=param_num,
+                    rnn_type=args.rnn,
+                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    action_scale=1.0 if 'aviary' in env_name else 10.0,
+                    device=device, 
+                    policy_target_update_interval=policy_target_update_interval,
+                    **hparam)
+    elif args.rnn in ["RNN3", "LSTM3", "GRU3"]:
+        # Param + RNN
+        if args.rnn=='LSTM3':
+            replay_buffer = ReplayBufferFastAdaptLSTM(replay_buffer_size)
+        else:
+            replay_buffer = ReplayBufferFastAdaptGRU(replay_buffer_size)
+        td3_trainer = TD3RNN_Trainer3(replay_buffer,
+                    state_space, 
+                    action_space, 
+                    param_num=param_num,
                     rnn_type=args.rnn,
                     out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
@@ -264,7 +297,16 @@ def train(args, hparam, ):
             time_test
 
         if args.rnn != "None": 
-            if 'fast' in args.rnn:
+            if args.rnn in ['RNN', "LSTM", "GRU"]:
+                replay_buffer.push_batch(ini_hidden_in, 
+                                ini_hidden_out, 
+                                episode_state, 
+                                episode_action, 
+                                episode_last_action,
+                                episode_reward, 
+                                episode_next_state, 
+                                episode_done)
+            else:           
                 replay_buffer.push_batch(ini_hidden_in, 
                                 ini_hidden_out, 
                                 episode_state, 
@@ -274,15 +316,7 @@ def train(args, hparam, ):
                                 episode_next_state, 
                                 episode_done,
                                 param)
-            else:           
-                replay_buffer.push_batch(ini_hidden_in, 
-                                ini_hidden_out, 
-                                episode_state, 
-                                episode_action, 
-                                episode_last_action,
-                                episode_reward, 
-                                episode_next_state, 
-                                episode_done)
+                
             
         loss_storage['policy_loss'].append(np.mean(policy_loss))
         loss_storage['q_loss_1'].append(np.mean(q_loss_1))
@@ -381,7 +415,7 @@ def test(args):
     if 'Pendulum' in env_name:
         param_num = 3
     elif 'aviary' in env_name:
-        param_num = 12
+        param_num = 14
     else:
         raise NotImplementedError
 
@@ -400,6 +434,34 @@ def test(args):
         td3_trainer = TD3RNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
+                    rnn_type=args.rnn,
+                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    action_scale=1.0 if 'aviary' in env_name else 10.0,
+                    device=device, 
+                    **hparam)
+    elif args.rnn in ["RNN2", "LSTM2", "GRU2"]:
+        if args.rnn=='LSTM2':
+            replay_buffer = ReplayBufferFastAdaptLSTM(1e6)
+        else:
+            replay_buffer = ReplayBufferFastAdaptGRU(1e6)
+        td3_trainer = TD3RNN_Trainer2(replay_buffer,
+                    state_space, 
+                    action_space, 
+                    param_num=param_num,
+                    rnn_type=args.rnn,
+                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    action_scale=1.0 if 'aviary' in env_name else 10.0,
+                    device=device, 
+                    **hparam)
+    elif args.rnn in ["RNN3", "LSTM3", "GRU3"]:
+        if args.rnn=='LSTM3':
+            replay_buffer = ReplayBufferFastAdaptLSTM(1e6)
+        else:
+            replay_buffer = ReplayBufferFastAdaptGRU(1e6)
+        td3_trainer = TD3RNN_Trainer3(replay_buffer,
+                    state_space, 
+                    action_space, 
+                    param_num,
                     rnn_type=args.rnn,
                     out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
@@ -461,7 +523,10 @@ if __name__=='__main__':
     parser.add_argument('--env', required=True, choices=['Pendulum-v0','HalfCheetah-v2','takeoff-aviary-v0'])
     parser.add_argument('--multitask',action='store_true', help="Multitask")
     parser.add_argument('--randomize',action='store_true', help="Domain randomize")
-    parser.add_argument('--rnn', choices=['None','RNN','GRU','LSTM','fastRNN','fastGRU','fastLSTM'], default='None', help='Use memory network (LSTM)')
+    parser.add_argument('--rnn', choices=['None','RNN','GRU','LSTM',
+                                            'RNN2','GRU2','LSTM2',
+                                            'RNN3','GRU3','LSTM3',
+                                            'fastRNN','fastGRU','fastLSTM'], default='None', help='Use memory network (LSTM)')
     parser.add_argument('--tb_log', action='store_true', help="Tensorboard logging")
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--hparam', action='store_true', help="find hparam set")

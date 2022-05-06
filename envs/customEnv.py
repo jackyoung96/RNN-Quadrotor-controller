@@ -293,7 +293,7 @@ class domainRandeEnv(parallelEnv):
             for idx in range(n):
                 env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
                     drone_model=DroneModel.CF2X,
-                    initial_xyzs=np.array([[0.0,0.0,2.0]]),
+                    initial_xyzs=np.array([[0.0,0.0,10000.0]]),
                     initial_rpys=np.array([[0.0,0.0,0.0]]),
                     physics=Physics.PYB_GND_DRAG_DW,
                     freq=200,
@@ -306,7 +306,7 @@ class domainRandeEnv(parallelEnv):
                     observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
                     frame_stack=1,
                     task='stabilize2',
-                    reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
+                    reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
                     episode_len_sec=2,
                     max_rpm=66535,
                     initial_xyzs=[[0.0,0.0,10000.0]], # Far from the ground

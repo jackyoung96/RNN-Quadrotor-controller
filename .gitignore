@@ -19,3 +19,4 @@ envs/assets/
 
 __pycache__/
 envs/__pycache__/
+.vscode/
