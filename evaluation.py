@@ -40,7 +40,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
             if 'aviary' in env_name:
                 eval_env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
                     drone_model=DroneModel.CF2X,
-                    initial_xyzs=np.array([[0.0,0.0,2.0]]),
+                    initial_xyzs=np.array([[0.0,0.0,10000.0]]),
                     initial_rpys=np.array([[0.0,0.0,0.0]]),
                     physics=Physics.PYB_GND_DRAG_DW,
                     freq=200,
@@ -53,7 +53,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                     observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
                     frame_stack=1,
                     task='stabilize2',
-                    reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
+                    reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
                     episode_len_sec=max_steps/200,
                     max_rpm=66535,
                     initial_xyzs=[[0.0,0.0,10000.0]], # Far from the ground
@@ -109,7 +109,8 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                             success = 1
                             break
                     elif "aviary" in env_name:
-                        step = step+1 if np.sum(state[0,:3]**2) < 0.1 else 0
+                        # 1/6 scaling ->  meter unit 
+                        step = step+1 if np.sum(state[0,:3]**2) < (0.1/6) else 0
                         if step > 100:
                             success = 1
 
@@ -152,20 +153,20 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
             if 'aviary' in env_name:
                 eval_env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
                     drone_model=DroneModel.CF2X,
-                    initial_xyzs=np.array([[0.0,0.0,2.0]]),
+                    initial_xyzs=np.array([[0.0,0.0,1.5]]),
                     initial_rpys=np.array([[0.0,0.0,0.0]]),
                     physics=Physics.PYB_GND_DRAG_DW,
                     freq=240,
                     aggregate_phy_steps=1,
                     gui=False,
-                    record=False, 
+                    record=record, 
                     obs=ObservationType.KIN,
                     act=ActionType.RPM)
                 eval_env = domainRandomAviary(eval_env, 'test', 0, seed+i_eval,
                     observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
                     frame_stack=1,
                     task='stabilize2',
-                    reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
+                    reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
                     episode_len_sec=max_steps/200,
                     max_rpm=66535,
                     initial_xyzs=[[0.0,0.0,2.0]], # Far from the ground
@@ -231,7 +232,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                         break
                 elif "aviary" in env_name:
                     # print(state[0,:3], reward)
-                    step = step+1 if np.linalg.norm(state[0,:3], ord=2) < 0.1 else 0 # 1/6 된 값임
+                    step = step+1 if np.sum(state[0,:3]**2) < (0.1/6) else 0
                     if step > 100:
                         success = 1
 
