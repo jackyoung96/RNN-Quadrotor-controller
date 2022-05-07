@@ -92,12 +92,13 @@ class TD3_Trainer():
         self.q_optimizer2 = optim.Adam(self.q_net2.parameters(), lr=q_lr, weight_decay=weight_decay)
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr, weight_decay=weight_decay)
 
-        # self.scheduler_q1 = CosineAnnealingLR(self.q_optimizer1, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
-        self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
-        # self.scheduler_q2 = CosineAnnealingLR(self.q_optimizer2, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
-        self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
-        # self.scheduler_policy = CosineAnnealingLR(self.policy_optimizer, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
-        self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=policy_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+        if self.lr_scheduler:
+            # self.scheduler_q1 = CosineAnnealingLR(self.q_optimizer1, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
+            self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+            # self.scheduler_q2 = CosineAnnealingLR(self.q_optimizer2, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
+            self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+            # self.scheduler_policy = CosineAnnealingLR(self.policy_optimizer, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
+            self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=policy_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
     def target_ini(self, net, target_net):
         for target_param, param in zip(target_net.parameters(), net.parameters()):
@@ -244,12 +245,13 @@ class TD3RNN_Trainer():
         self.q_optimizer2 = optim.Adam(self.q_net2.parameters(), lr=q_lr, weight_decay=weight_decay)
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr, weight_decay=weight_decay)
 
-        # self.scheduler_q1 = CosineAnnealingLR(self.q_optimizer1, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
-        self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
-        # self.scheduler_q2 = CosineAnnealingLR(self.q_optimizer2, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
-        self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
-        # self.scheduler_policy = CosineAnnealingLR(self.policy_optimizer, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
-        self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=policy_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+        if self.lr_scheduler:
+            # self.scheduler_q1 = CosineAnnealingLR(self.q_optimizer1, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
+            self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+            # self.scheduler_q2 = CosineAnnealingLR(self.q_optimizer2, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
+            self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+            # self.scheduler_policy = CosineAnnealingLR(self.policy_optimizer, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
+            self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=policy_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
     
     def target_ini(self, net, target_net):
         for target_param, param in zip(target_net.parameters(), net.parameters()):
@@ -382,8 +384,9 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
         self.q_optimizer1 = optim.Adam(self.q_net1.parameters(), lr=q_lr, weight_decay=weight_decay)
         self.q_optimizer2 = optim.Adam(self.q_net2.parameters(), lr=q_lr, weight_decay=weight_decay)
 
-        self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
-        self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+        if self.lr_scheduler:
+            self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+            self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
         
     def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
         hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param = self.replay_buffer.sample(batch_size)
@@ -572,8 +575,10 @@ class TD3FastAdaptRNN_Trainer(TD3RNN_Trainer):
         t_max = kwargs.get('t_max',1000)
         self.param_net = ParamPredictorNetwork(hidden_dim, param_num).to(self.device)
         self.param_optimizer = optim.Adam(self.param_net.parameters(), lr=param_lr, weight_decay=weight_decay)
-        # self.scheduler_param = CosineAnnealingLR(self.param_optimizer, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
-        self.scheduler_param = CyclicLR(self.param_optimizer, base_lr=1e-7, max_lr=param_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+        
+        if self.lr_scheduler:
+            # self.scheduler_param = CosineAnnealingLR(self.param_optimizer, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
+            self.scheduler_param = CyclicLR(self.param_optimizer, base_lr=1e-7, max_lr=param_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
     def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
         hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param = self.replay_buffer.sample(batch_size)
