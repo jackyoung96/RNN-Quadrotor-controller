@@ -187,15 +187,20 @@ def train(args, hparam):
                     device=device, 
                     policy_target_update_interval=policy_target_update_interval,
                     **hparam)
-    elif args.rnn in ["fastRNN", "fastLSTM", "fastGRU"]:
-        if args.rnn=='fastLSTM':
-            replay_buffer = ReplayBufferFastAdaptLSTM(replay_buffer_size)
+    elif args.rnn in ["RNNHER", "LSTMHER", "GRUHER"]:
+        if args.rnn=='LSTMHER':
+            replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size, 
+                                sample_length=100 if 'aviary' in env_name else 50)
         else:
-            replay_buffer = ReplayBufferFastAdaptGRU(replay_buffer_size)
-        td3_trainer = TD3FastAdaptRNN_Trainer(replay_buffer,
+            replay_buffer = HindsightReplayBufferGRU(replay_buffer_size, 
+                                sample_length=100 if 'aviary' in env_name else 50)
+        # For aviary, it include the last action in the state
+        goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
+        td3_trainer = TD3HERRNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
                     param_num=param_num,
+                    goal_dim=goal_dim,
                     rnn_type=args.rnn,
                     out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
@@ -317,7 +322,6 @@ def train(args, hparam):
                                 episode_done,
                                 param)
                 
-            
         loss_storage['policy_loss'].append(np.mean(policy_loss))
         loss_storage['q_loss_1'].append(np.mean(q_loss_1))
         loss_storage['q_loss_2'].append(np.mean(q_loss_2))
@@ -528,7 +532,7 @@ if __name__=='__main__':
     parser.add_argument('--rnn', choices=['None','RNN','GRU','LSTM',
                                             'RNN2','GRU2','LSTM2',
                                             'RNN3','GRU3','LSTM3',
-                                            'fastRNN','fastGRU','fastLSTM'], default='None', help='Use memory network (LSTM)')
+                                            'RNNHER','GRUHER','LSTMHER'], default='None', help='Use memory network (LSTM)')
     parser.add_argument('--tb_log', action='store_true', help="Tensorboard logging")
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--hparam', action='store_true', help="find hparam set")
