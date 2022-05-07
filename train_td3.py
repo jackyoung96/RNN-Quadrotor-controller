@@ -26,7 +26,7 @@ import itertools
 
 from time import time
 
-def train(args, hparam, ):
+def train(args, hparam):
     
     print("hyperparam set:",hparam)
     algorithm_name = 'TD3'
@@ -530,6 +530,7 @@ if __name__=='__main__':
     parser.add_argument('--tb_log', action='store_true', help="Tensorboard logging")
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--hparam', action='store_true', help="find hparam set")
+    parser.add_argument('--lr_scheduler', action='store_true', help="Use lr scheduler")
 
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--hidden_dim', type=int, default=None, help='only required at test phase')
@@ -555,6 +556,7 @@ if __name__=='__main__':
 
             for i_hparam, hparam in enumerate(hparam_list):
                 print("%dth hparam test"%i_hparam)
+                hparam['lr_scheduler'] = args.lr_scheduler
                 mean_rewards, loss_storage, eval_rew, eval_success, dtime = train(args, hparam)
                 hparam['mean_reward'] = np.mean(mean_rewards)
                 hparam['dtime'] = dtime.strftime("%y%b%d%H%M%S")
@@ -564,6 +566,7 @@ if __name__=='__main__':
                 df_hparam.to_csv("hparamDB/hparam_test_%s.csv"%args.rnn)
         else:
             hparam = dict([(k,v[0]) for k,v in hparam_set.items()])
+            hparam['lr_scheduler'] = args.lr_scheduler
             train(args, hparam)
     else:
         if args.hidden_dim is None:

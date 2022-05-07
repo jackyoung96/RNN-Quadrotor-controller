@@ -84,6 +84,7 @@ class TD3_Trainer():
         policy_lr = kwargs.get('policy_lr',1e-4)
         weight_decay = kwargs.get('weight_decay',1e-4)
         t_max = kwargs.get('t_max', 1000)
+        self.lr_scheduler = kwargs.get('lr_scheduler', False)
         self.update_cnt = 0
         self.policy_target_update_interval = policy_target_update_interval
 
@@ -144,12 +145,14 @@ class TD3_Trainer():
         q_value_loss1.backward()
         nn.utils.clip_grad_norm_(self.q_net1.parameters(), 1.0)
         self.q_optimizer1.step()
-        self.scheduler_q1.step()
+        if self.lr_scheduler:
+            self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
         nn.utils.clip_grad_norm_(self.q_net2.parameters(), 1.0)
         self.q_optimizer2.step()
-        self.scheduler_q2.step()
+        if self.lr_scheduler:
+            self.scheduler_q2.step()
 
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
@@ -166,7 +169,8 @@ class TD3_Trainer():
             policy_loss.backward()
             nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
             self.policy_optimizer.step()
-            self.scheduler_policy.step()
+            if self.lr_scheduler:
+                self.scheduler_policy.step()
         
         # Soft update the target nets
             self.target_q_net1=self.target_soft_update(self.q_net1, self.target_q_net1, soft_tau)
@@ -232,6 +236,7 @@ class TD3RNN_Trainer():
         policy_lr = kwargs.get('policy_lr',1e-4)
         weight_decay = kwargs.get('weight_decay',1e-4)
         t_max = kwargs.get('t_max', 1000)
+        self.lr_scheduler = kwargs.get('lr_scheduler', False)
         self.update_cnt = 0
         self.policy_target_update_interval = policy_target_update_interval
 
@@ -305,12 +310,14 @@ class TD3RNN_Trainer():
         q_value_loss1.backward()
         nn.utils.clip_grad_norm_(self.q_net1.parameters(), 1.0)
         self.q_optimizer1.step()
-        self.scheduler_q1.step()
+        if self.lr_scheduler:
+            self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
         nn.utils.clip_grad_norm_(self.q_net2.parameters(), 1.0)
         self.q_optimizer2.step()
-        self.scheduler_q2.step()
+        if self.lr_scheduler:
+            self.scheduler_q2.step()
 
         # print(target_q_value[0][149].item(), predicted_q_value1[0][149].item(), q_value_loss1.item())
         
@@ -327,7 +334,8 @@ class TD3RNN_Trainer():
             policy_loss.backward()
             nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
             self.policy_optimizer.step()
-            self.scheduler_policy.step()
+            if self.lr_scheduler:
+                self.scheduler_policy.step()
             # Soft update the target nets
             self.target_q_net1=self.target_soft_update(self.q_net1, self.target_q_net1, soft_tau)
             self.target_q_net2=self.target_soft_update(self.q_net2, self.target_q_net2, soft_tau)
@@ -369,6 +377,7 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
         q_lr = kwargs.get('q_lr',1e-3)
         weight_decay = kwargs.get('weight_decay',1e-4)
         t_max = kwargs.get('t_max', 1000)
+        self.lr_scheduler = kwargs.get('lr_scheduler', False)
 
         self.q_optimizer1 = optim.Adam(self.q_net1.parameters(), lr=q_lr, weight_decay=weight_decay)
         self.q_optimizer2 = optim.Adam(self.q_net2.parameters(), lr=q_lr, weight_decay=weight_decay)
@@ -407,12 +416,14 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
         q_value_loss1.backward()
         nn.utils.clip_grad_norm_(self.q_net1.parameters(), 1.0)
         self.q_optimizer1.step()
-        self.scheduler_q1.step()
+        if self.lr_scheduler:
+            self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
         nn.utils.clip_grad_norm_(self.q_net2.parameters(), 1.0)
         self.q_optimizer2.step()
-        self.scheduler_q2.step()
+        if self.lr_scheduler:
+            self.scheduler_q2.step()
         
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
@@ -427,7 +438,8 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
             policy_loss.backward()
             nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
             self.policy_optimizer.step()
-            self.scheduler_policy.step()
+            if self.lr_scheduler:
+                self.scheduler_policy.step()
             # Soft update the target nets
             self.target_q_net1=self.target_soft_update(self.q_net1, self.target_q_net1, soft_tau)
             self.target_q_net2=self.target_soft_update(self.q_net2, self.target_q_net2, soft_tau)
@@ -492,12 +504,14 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
         q_value_loss1.backward()
         nn.utils.clip_grad_norm_(self.q_net1.parameters(), 1.0)
         self.q_optimizer1.step()
-        self.scheduler_q1.step()
+        if self.lr_scheduler:
+            self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
         nn.utils.clip_grad_norm_(self.q_net2.parameters(), 1.0)
         self.q_optimizer2.step()
-        self.scheduler_q2.step()
+        if self.lr_scheduler:
+            self.scheduler_q2.step()
         
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
@@ -512,7 +526,8 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
             policy_loss.backward()
             nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
             self.policy_optimizer.step()
-            self.scheduler_policy.step()
+            if self.lr_scheduler:
+                self.scheduler_policy.step()
             # Soft update the target nets
             self.target_q_net1=self.target_soft_update(self.q_net1, self.target_q_net1, soft_tau)
             self.target_q_net2=self.target_soft_update(self.q_net2, self.target_q_net2, soft_tau)
@@ -586,7 +601,8 @@ class TD3FastAdaptRNN_Trainer(TD3RNN_Trainer):
         param_loss.backward()
         nn.utils.clip_grad_norm_(self.param_net.parameters(), 1.0)
         self.param_optimizer.step()
-        self.scheduler_param.step()
+        if self.lr_scheduler:
+            self.scheduler_param.step()
         # reward = (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6) # normalize with batch mean and std; plus a small number to prevent numerical problem
 
         # Training Q Function
@@ -602,12 +618,14 @@ class TD3FastAdaptRNN_Trainer(TD3RNN_Trainer):
         q_value_loss1.backward()
         nn.utils.clip_grad_norm_(self.q_net1.parameters(), 1.0)
         self.q_optimizer1.step()
-        self.scheduler_q1.step()
+        if self.lr_scheduler:
+            self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
         nn.utils.clip_grad_norm_(self.q_net2.parameters(), 1.0)
         self.q_optimizer2.step()
-        self.scheduler_q2.step()
+        if self.lr_scheduler:
+            self.scheduler_q2.step()
         
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
@@ -622,7 +640,8 @@ class TD3FastAdaptRNN_Trainer(TD3RNN_Trainer):
             policy_loss.backward()
             nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
             self.policy_optimizer.step()
-            self.scheduler_policy.step()
+            if self.lr_scheduler:
+                self.scheduler_policy.step()
             # Soft update the target nets
             self.target_q_net1=self.target_soft_update(self.q_net1, self.target_q_net1, soft_tau)
             self.target_q_net2=self.target_soft_update(self.q_net2, self.target_q_net2, soft_tau)
