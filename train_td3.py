@@ -337,8 +337,9 @@ def train(args, hparam):
                 writer.add_scalar('loss/loss_param', np.mean(loss_storage['param_loss'][-writer_iterval:]), i_episode)
             writer.add_scalar('rewards', scores_window[-1], i_episode)
             
-            writer.add_scalar('lr/q_lr',td3_trainer.scheduler_q1.get_last_lr()[0], i_episode)
-            writer.add_scalar('lr/policy_lr',td3_trainer.scheduler_policy.get_last_lr()[0], i_episode)
+            if args.lr_scheduler:
+                writer.add_scalar('lr/q_lr',td3_trainer.scheduler_q1.get_last_lr()[0], i_episode)
+                writer.add_scalar('lr/policy_lr',td3_trainer.scheduler_policy.get_last_lr()[0], i_episode)
 
             for name, weight in td3_trainer.policy_net.named_parameters():
                 writer.add_histogram(f'policy_net/{name}', weight, i_episode)
@@ -352,7 +353,8 @@ def train(args, hparam):
             
             if 'fast' in args.rnn:
                 if hasattr(td3_trainer, 'scheduler_param'):
-                    writer.add_scalar('lr/param_lr',td3_trainer.scheduler_param.get_last_lr()[0], i_episode)
+                    if args.lr_scheduler:
+                        writer.add_scalar('lr/param_lr',td3_trainer.scheduler_param.get_last_lr()[0], i_episode)
                 for name, weight in td3_trainer.param_net.named_parameters():
                     writer.add_histogram(f'policy_net/{name}', weight, i_episode)
                     if weight.grad is not None:
