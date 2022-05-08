@@ -410,7 +410,7 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
         self.sample_length = sample_length
 
     def sample(self, batch_size):
-        s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ho_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[],[],[]
+        s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ho_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[]
         batch = random.sample(self.buffer, batch_size)
         for sample in batch:
             h_in, h_out, state, action, last_action, reward, next_state, done, param = sample

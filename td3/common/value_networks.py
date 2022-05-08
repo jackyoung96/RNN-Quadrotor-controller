@@ -101,7 +101,35 @@ class QNetworkParam(QNetworkBase):
             x = self.linear4(x)
         else:
             x = self.output_activation(self.linear4(x))
-        return x       
+        return x    
+
+class QNetworkGoalParam(QNetworkBase):
+    def __init__(self, state_space, action_space, param_dim, hidden_dim, goal_dim, activation=F.relu, output_activation=None):
+        super().__init__(state_space, action_space, activation)
+        self._param_dim = param_dim
+        self._goal_dim = goal_dim
+
+        self.linear1 = nn.Linear(self._state_dim+self._action_dim+self._param_dim+self._goal_dim, hidden_dim)
+        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
+        self.linear3 = nn.Linear(hidden_dim, hidden_dim)
+        self.linear4 = nn.Linear(hidden_dim, 1)
+        # weights initialization
+        self.linear4.apply(linear_weights_init)
+
+        
+    def forward(self, state, action, param, goal):
+        if len(state.shape)==len(action.shape)+1:
+            action = action.unsqueeze(-1)
+        goal = goal[:,:,:self._goal_dim]
+        x = torch.cat([state, action, param, goal], -1) # the dim 0 is number of samples
+        x = self.activation(self.linear1(x))
+        x = self.activation(self.linear2(x))
+        x = self.activation(self.linear3(x))
+        if self.output_activation is None:
+            x = self.linear4(x)
+        else:
+            x = self.output_activation(self.linear4(x))
+        return x    
 
 class QNetworkRNN(QNetworkBase):
     """

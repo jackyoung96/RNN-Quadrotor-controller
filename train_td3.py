@@ -188,6 +188,7 @@ def train(args, hparam):
                     policy_target_update_interval=policy_target_update_interval,
                     **hparam)
     elif args.rnn in ["RNNHER", "LSTMHER", "GRUHER"]:
+        batch_size = batch_size*4 if 'aviary' in env_name else batch_size*3
         if args.rnn=='LSTMHER':
             replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size, 
                                 sample_length=100 if 'aviary' in env_name else 50)
@@ -254,12 +255,21 @@ def train(args, hparam):
             if args.rnn != "None":
                 hidden_in = hidden_out
                 t_start = time()
-                action, hidden_out = \
-                    td3_trainer.policy_net.get_action(state, 
-                                                    last_action, 
-                                                    hidden_in, 
-                                                    deterministic=DETERMINISTIC, 
-                                                    explore_noise_scale=explore_noise_scale)
+                if not "HER" in args.rnn:
+                    action, hidden_out = \
+                        td3_trainer.policy_net.get_action(state, 
+                                                        last_action, 
+                                                        hidden_in, 
+                                                        deterministic=DETERMINISTIC, 
+                                                        explore_noise_scale=explore_noise_scale)
+                else:
+                    action, hidden_out = \
+                        td3_trainer.policy_net.get_action(state, 
+                                                        last_action, 
+                                                        hidden_in,
+                                                        goal=np.zeros((nenvs,goal_dim)),
+                                                        deterministic=DETERMINISTIC, 
+                                                        explore_noise_scale=explore_noise_scale)
                 time_test['get_action'].append(time()-t_start)
                 t_start = time()
                 next_state, reward, done, _ = envs.step(action) 
