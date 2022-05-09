@@ -321,7 +321,7 @@ def train(args, hparam):
                                 episode_next_state, 
                                 episode_done,
                                 param)
-                
+
         loss_storage['policy_loss'].append(np.mean(policy_loss))
         loss_storage['q_loss_1'].append(np.mean(q_loss_1))
         loss_storage['q_loss_2'].append(np.mean(q_loss_2))
@@ -473,19 +473,25 @@ def test(args):
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     **hparam)
-    elif args.rnn in ["fastRNN", "fastLSTM", "fastGRU"]:
-        if args.rnn=='fastLSTM':
-            replay_buffer = ReplayBufferFastAdaptLSTM(1e6)
+    elif args.rnn in ["RNNHER", "LSTMHER", "GRUHER"]:
+        if args.rnn=='LSTMHER':
+            replay_buffer = HindsightReplayBufferLSTM(1e6, 
+                                sample_length=100 if 'aviary' in env_name else 50)
         else:
-            replay_buffer = ReplayBufferFastAdaptGRU(1e6)
-        td3_trainer = TD3FastAdaptRNN_Trainer(replay_buffer,
+            replay_buffer = HindsightReplayBufferGRU(1e6, 
+                                sample_length=100 if 'aviary' in env_name else 50)
+        # For aviary, it include the last action in the state
+        goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
+        td3_trainer = TD3HERRNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
-                    rnn_type=args.rnn,
                     param_num=param_num,
+                    goal_dim=goal_dim,
+                    rnn_type=args.rnn,
                     out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
+                    policy_target_update_interval=1,
                     **hparam)
     elif args.rnn == "None":
         replay_buffer = ReplayBuffer(1e6)
