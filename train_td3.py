@@ -71,8 +71,8 @@ def train(args, hparam):
             # drones
             'mass_range': 0.3, # (1-n) ~ (1+n)
             'cm_range': 0.3, # (1-n) ~ (1+n)
-            'kf_range': 0.3, # (1-n) ~ (1+n)
-            'km_range': 0.3, # (1-n) ~ (1+n)
+            'kf_range': 0.1, # (1-n) ~ (1+n)
+            'km_range': 0.1, # (1-n) ~ (1+n)
             'i_range': 0.3,
             'battery_range': 0.3 # (1-n) ~ (1)
         }
@@ -125,7 +125,7 @@ def train(args, hparam):
     best_score = -np.inf
     frame_idx   = 0
     replay_buffer_size = int(1e6/max_steps) if args.rnn != "None" else 1e6
-    explore_steps = int(max_episodes/20) if args.rnn != "None" else 1e5  # for random action sampling in the beginning of training
+    explore_steps = int(1e5/max_steps) if args.rnn != "None" else 1e5  # for random action sampling in the beginning of training
     update_itr = 1
     policy_target_update_interval = hparam['update_interval'] # delayed update for the policy network and target networks
     
@@ -196,7 +196,7 @@ def train(args, hparam):
             replay_buffer = HindsightReplayBufferGRU(replay_buffer_size, 
                                 sample_length=100 if 'aviary' in env_name else 50)
         # For aviary, it include the last action in the state
-        goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
+        goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]-1
         td3_trainer = TD3HERRNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
@@ -263,11 +263,12 @@ def train(args, hparam):
                                                         deterministic=DETERMINISTIC, 
                                                         explore_noise_scale=explore_noise_scale)
                 else:
+                    goal = np.zeros((nenvs,goal_dim)) if 'aviary' in env_name else np.array([[1,0]]*nenvs)
                     action, hidden_out = \
                         td3_trainer.policy_net.get_action(state, 
                                                         last_action, 
                                                         hidden_in,
-                                                        goal=np.zeros((nenvs,goal_dim)),
+                                                        goal=goal,
                                                         deterministic=DETERMINISTIC, 
                                                         explore_noise_scale=explore_noise_scale)
                 time_test['get_action'].append(time()-t_start)
@@ -416,8 +417,8 @@ def test(args):
         # drones
         'mass_range': 0.3, # (1-n) ~ (1+n)
         'cm_range': 0.3, # (1-n) ~ (1+n)
-        'kf_range': 0.3, # (1-n) ~ (1+n)
-        'km_range': 0.3, # (1-n) ~ (1+n)
+        'kf_range': 0.1, # (1-n) ~ (1+n)
+        'km_range': 0.1, # (1-n) ~ (1+n)
         'i_range': 0.3,
         'battery_range': 0.3 # (1-n) ~ (1)
     }

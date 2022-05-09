@@ -29,7 +29,8 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
     device = agent.device
     eval_success = 0
     eval_reward = 0
-    goal_dim=agent.q_net1._goal_dim
+    if hasattr(agent.q_net1, '_goal_dim'):
+        goal_dim=agent.q_net1._goal_dim
     
     if 'aviary' in env_name:
         max_steps=1000
@@ -96,11 +97,12 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                                                                 deterministic=DETERMINISTIC, 
                                                                 explore_noise_scale=0.)
                         else:
+                            goal = np.zeros((1,goal_dim)) if 'aviary' in env_name else np.array([[1,0,0]])
                             action, hidden_out = \
                                 agent.policy_net.get_action(state, 
                                                                 last_action, 
                                                                 hidden_in, 
-                                                                goal=np.zeros((1,goal_dim)),
+                                                                goal=goal,
                                                                 deterministic=DETERMINISTIC, 
                                                                 explore_noise_scale=0.)
                     else:
@@ -108,6 +110,11 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                                                             deterministic=DETERMINISTIC, 
                                                             explore_noise_scale=0.)
                     next_state, reward, done, _ = eval_env.step(action) 
+                    print("DEBUG")
+                    print("POS", state[0,:3])
+                    print("VEL", state[0,12:15])
+                    print("ANGVEL", state[0,15:18])
+                    print("REW", reward)
                     if not isinstance(action, np.ndarray):
                         action = np.array([action])
                     state, last_action = next_state[None,:], action[None,:]
