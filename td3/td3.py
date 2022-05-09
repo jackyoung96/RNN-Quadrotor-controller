@@ -19,7 +19,7 @@ from torch.distributions import Normal
 
 from .common.buffers import ReplayBuffer, ReplayBufferPER
 from .common.value_networks import *
-from .common.policy_networks import PolicyNetworkLSTM, PolicyNetwork, PolicyNetworkRNN, PolicyNetworkGRU
+from .common.policy_networks import PolicyNetworkGoalRNN, PolicyNetworkLSTM, PolicyNetwork, PolicyNetworkRNN, PolicyNetworkGRU
 
 from time import time
 
@@ -204,7 +204,7 @@ class TD3RNN_Trainer():
         self.device = device
         self.hidden_dim = hidden_dim
         self.rnn_type = rnn_type
-
+        
         if rnn_type=='RNN':
             self.q_net1 = QNetworkRNN(state_space, action_space, hidden_dim).to(self.device)
             self.q_net2 = QNetworkRNN(state_space, action_space, hidden_dim).to(self.device)
@@ -544,42 +544,43 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
 
 class TD3HERRNN_Trainer(TD3RNN_Trainer):
     def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, goal_dim, rnn_type='RNN', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
-        super().__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.strip('2'), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
-        if rnn_type=='RNN':
-            self.q_net1 = QNetworkGoalRNN(state_space, action_space, hidden_dim, param_num, goal_dim).to(self.device)
-            self.q_net2 = QNetworkGoalRNN(state_space, action_space, hidden_dim, param_num, goal_dim).to(self.device)
-            self.target_q_net1 = QNetworkGoalRNN(state_space, action_space, hidden_dim, param_num, goal_dim).to(self.device)
-            self.target_q_net2 = QNetworkGoalRNN(state_space, action_space, hidden_dim, param_num, goal_dim).to(self.device)
-        elif rnn_type=='LSTM':
-            self.q_net1 = QNetworkGoalLSTM(state_space, action_space, hidden_dim, param_num, goal_dim).to(self.device)
-            self.q_net2 = QNetworkGoalLSTM(state_space, action_space, hidden_dim, param_num, goal_dim).to(self.device)
-            self.target_q_net1 = QNetworkGoalLSTM(state_space, action_space, hidden_dim, param_num, goal_dim).to(self.device)
-            self.target_q_net2 = QNetworkGoalLSTM(state_space, action_space, hidden_dim, param_num, goal_dim).to(self.device)
-        elif rnn_type=='GRU':
-            self.q_net1 = QNetworkGoalGRU(state_space, action_space, hidden_dim, param_num, goal_dim).to(self.device)
-            self.q_net2 = QNetworkGoalGRU(state_space, action_space, hidden_dim, param_num, goal_dim).to(self.device)
-            self.target_q_net1 = QNetworkGoalGRU(state_space, action_space, hidden_dim, param_num, goal_dim).to(self.device)
-            self.target_q_net2 = QNetworkGoalGRU(state_space, action_space, hidden_dim, param_num, goal_dim).to(self.device)
-        else:
-            assert NotImplementedError
+        super().__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.replace('HER',''), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
+        self.q_net1 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim).to(self.device)
+        self.q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim).to(self.device)
+        self.target_q_net1 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim).to(self.device)
+        self.target_q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim).to(self.device)
+        if rnn_type=='RNNHER':
+            self.policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
+            self.target_policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
+        elif rnn_type=='LSTMHER':
+            self.policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
+            self.target_policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
+        elif rnn_type=='GRUHER':
+            self.policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
+            self.target_policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
+        self.target_policy_net = self.target_ini(self.policy_net, self.target_policy_net)
         
         q_lr = kwargs.get('q_lr',1e-3)
+        policy_lr = kwargs.get('policy_lr',1e-4)
         weight_decay = kwargs.get('weight_decay',1e-4)
         t_max = kwargs.get('t_max', 1000)
         self.lr_scheduler = kwargs.get('lr_scheduler', False)
 
         self.q_optimizer1 = optim.Adam(self.q_net1.parameters(), lr=q_lr, weight_decay=weight_decay)
         self.q_optimizer2 = optim.Adam(self.q_net2.parameters(), lr=q_lr, weight_decay=weight_decay)
+        self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr, weight_decay=weight_decay)
 
         if self.lr_scheduler:
             self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
             self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
-        
+            self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=policy_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+
+
     def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
-        hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal = self.replay_buffer.sample(batch_size)
+        hidden_in, hidden_out, state, action, last_action, reward, next_state, done, goal, param = self.replay_buffer.sample(batch_size)
         # print('sample:', state, action,  reward, done)
 
         B,L        = state.shape[:2]
@@ -590,7 +591,7 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         reward     = torch.FloatTensor(reward).unsqueeze(-1).to(self.device)  
         done       = torch.FloatTensor(np.float32(done)).unsqueeze(-1).to(self.device)
         param      = torch.FloatTensor(param[:,None,:]).expand(B,L,-1).to(self.device)
-        goal       = torch.FloatTensor(goal).to(self.device)
+        goal       = torch.FloatTensor(goal).expand(B,L,-1).to(self.device)
  
         predicted_q_value1 = self.q_net1(state, action, param, goal)
         predicted_q_value2 = self.q_net2(state, action, param, goal)

@@ -282,6 +282,10 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         else:
             assert True, "Something wrong"
 
+        if len(goal.shape)==2:
+            goal = goal[:,:self._goal_dim]
+        elif len(goal.shape)==3:
+            goal = goal[:,:,:self._goal_dim]
         sg_cat = torch.cat([state,goal], dim=-1)
         fc_x = F.relu(self.linear1(sg_cat))  
         # fc_x = F.relu(self.linear2(fc_x)) 

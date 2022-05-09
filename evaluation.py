@@ -29,6 +29,8 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
     device = agent.device
     eval_success = 0
     eval_reward = 0
+    if hasattr(agent.q_net1, '_goal_dim'):
+        goal_dim=agent.q_net1._goal_dim
     
     if 'aviary' in env_name:
         max_steps=1000
@@ -87,17 +89,32 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                 for _ in range(max_steps):
                     if hasattr(agent, 'rnn_type'):
                         hidden_in = hidden_out
-                        action, hidden_out = \
-                            agent.policy_net.get_action(state, 
-                                                            last_action, 
-                                                            hidden_in, 
-                                                            deterministic=DETERMINISTIC, 
-                                                            explore_noise_scale=0.)
+                        if not hasattr(agent.q_net1, '_goal_dim'):
+                            action, hidden_out = \
+                                agent.policy_net.get_action(state, 
+                                                                last_action, 
+                                                                hidden_in, 
+                                                                deterministic=DETERMINISTIC, 
+                                                                explore_noise_scale=0.)
+                        else:
+                            goal = np.zeros((1,goal_dim)) if 'aviary' in env_name else np.array([[1,0,0]])
+                            action, hidden_out = \
+                                agent.policy_net.get_action(state, 
+                                                                last_action, 
+                                                                hidden_in, 
+                                                                goal=goal,
+                                                                deterministic=DETERMINISTIC, 
+                                                                explore_noise_scale=0.)
                     else:
                         action = agent.policy_net.get_action(state, 
                                                             deterministic=DETERMINISTIC, 
                                                             explore_noise_scale=0.)
                     next_state, reward, done, _ = eval_env.step(action) 
+                    print("DEBUG")
+                    print("POS", state[0,:3])
+                    print("VEL", state[0,12:15])
+                    print("ANGVEL", state[0,15:18])
+                    print("REW", reward)
                     if not isinstance(action, np.ndarray):
                         action = np.array([action])
                     state, last_action = next_state[None,:], action[None,:]
@@ -169,7 +186,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                     reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
                     episode_len_sec=max_steps/200,
                     max_rpm=66535,
-                    initial_xyzs=[[0.0,0.0,1.5]], # Far from the ground
+                    initial_xyzs=[[0.0,0.0,2.0]], # Far from the ground
                     freq=200,
                     rpy_noise=1.2,
                     vel_noise=1.0,
