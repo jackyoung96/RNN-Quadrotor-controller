@@ -7,3 +7,6 @@
 
 ## Hyperparameter search
 > ```python train_td3.py --env Pendulum-v0 --randomize --rnn GRU --tb_log --gpu 3 --hparam```
+
+
+LSTM은 0.01, RNN은 0.05로 km kf 설정

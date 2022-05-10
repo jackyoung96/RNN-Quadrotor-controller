@@ -33,7 +33,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
         goal_dim=agent.q_net1._goal_dim
     
     if 'aviary' in env_name:
-        max_steps=1000
+        max_steps=500
     else:
         max_steps=900
     
@@ -55,14 +55,14 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                     observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
                     frame_stack=1,
                     task='stabilize2',
-                    reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
+                    reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
                     episode_len_sec=max_steps/200,
                     max_rpm=66535,
                     initial_xyzs=[[0.0,0.0,10000.0]], # Far from the ground
                     freq=200,
-                    rpy_noise=1.2,
-                    vel_noise=1.0,
-                    angvel_noise=2.4,
+                    rpy_noise=np.pi/4,
+                    vel_noise=2.0,
+                    angvel_noise=np.pi/2,
                     mass_range=dyn_range.get('mass_range', 0.0),
                     cm_range=dyn_range.get('cm_range', 0.0),
                     kf_range=dyn_range.get('kf_range', 0.0),
@@ -77,6 +77,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
             state = eval_env.reset()[None,:]
             total_rew = 0
             last_action = eval_env.action_space.sample()[None,:]
+            last_action = np.zeros_like(last_action)
             if hasattr(agent, 'rnn_type'):
                 if 'LSTM' == agent.rnn_type:
                     hidden_out = (torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device), \
@@ -110,11 +111,11 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                                                             deterministic=DETERMINISTIC, 
                                                             explore_noise_scale=0.)
                     next_state, reward, done, _ = eval_env.step(action) 
-                    print("DEBUG")
-                    print("POS", state[0,:3])
-                    print("VEL", state[0,12:15])
-                    print("ANGVEL", state[0,15:18])
-                    print("REW", reward)
+                    # print("DEBUG")
+                    # print("POS", state[0,:3])
+                    # print("VEL", state[0,12:15])
+                    # print("ANGVEL", state[0,15:18])
+                    # print("REW", reward)
                     if not isinstance(action, np.ndarray):
                         action = np.array([action])
                     state, last_action = next_state[None,:], action[None,:]
@@ -127,9 +128,14 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                             break
                     elif "aviary" in env_name:
                         # 1/6 scaling ->  meter unit 
-                        step = step+1 if np.sum(state[0,:3]**2) < (0.1/6) else 0
-                        if step > 100:
+                        if np.linalg.norm(6*state[0,:3]) < np.linalg.norm([0.2]*3) and\
+                            np.arccos(state[0,11]) < 10*np.pi/180:
+                            step = step+1 
+                        else:
+                            step = 0
+                        if step > 50:
                             success = 1
+                            break
 
                     total_rew += reward
             
@@ -153,7 +159,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
     if 'Pendulum' in env_name:
         max_steps = 1000
     elif 'aviary' in env_name:
-        max_steps = 900
+        max_steps = 400
     else:
         raise NotImplementedError
 
@@ -183,14 +189,14 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                     observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
                     frame_stack=1,
                     task='stabilize2',
-                    reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.08, 'd_action':0.002},
+                    reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
                     episode_len_sec=max_steps/200,
                     max_rpm=66535,
-                    initial_xyzs=[[0.0,0.0,2.0]], # Far from the ground
+                    initial_xyzs=[[0.0,0.0,1.5]], # Far from the ground
                     freq=200,
-                    rpy_noise=1.2,
-                    vel_noise=1.0,
-                    angvel_noise=2.4,
+                    rpy_noise=np.pi/4,
+                    vel_noise=2.0,
+                    angvel_noise=np.pi/2,
                     mass_range=dyn_range.get('mass_range', 0.0),
                     cm_range=dyn_range.get('cm_range', 0.0),
                     kf_range=dyn_range.get('kf_range', 0.0),
@@ -205,6 +211,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
             state = eval_env.reset()[None,:]
             total_rew = 0
             last_action = eval_env.action_space.sample()[None,:]
+            last_action = np.zeros_like(last_action)
             if hasattr(agent, 'rnn_type'):
                 if 'LSTM' == agent.rnn_type:
                     hidden_out = (torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device), \
