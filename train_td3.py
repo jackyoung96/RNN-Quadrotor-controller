@@ -69,12 +69,12 @@ def train(args, hparam):
             'l': 3, # 1/n ~ n
 
             # drones
-            'mass_range': 0.3, # (1-n) ~ (1+n)
-            'cm_range': 0.3, # (1-n) ~ (1+n)
-            'kf_range': 0.1, # (1-n) ~ (1+n)
-            'km_range': 0.1, # (1-n) ~ (1+n)
-            'i_range': 0.3,
-            'battery_range': 0.3 # (1-n) ~ (1)
+            'mass_range': 0.0, # (1-n) ~ (1+n)
+            'cm_range': 0.0, # (1-n) ~ (1+n)
+            'kf_range': 0.0, # (1-n) ~ (1+n)
+            'km_range': 0.0, # (1-n) ~ (1+n)
+            'i_range': 0.0,
+            'battery_range': 0.0 # (1-n) ~ (1)
         }
     else:
         dyn_range = {
@@ -90,11 +90,11 @@ def train(args, hparam):
             'l': 1, # 1/n ~ n
 
             # drones
-            'mass_range': 0, # (1-n) ~ (1+n)
-            'cm_range': 0, # (1-n) ~ (1+n)
-            'kf_range': 0, # (1-n) ~ (1+n)
-            'km_range': 0, # (1-n) ~ (1+n)
-            'battery_range': 0 # (1-n) ~ (1)
+            'mass_range': 0.3, # (1-n) ~ (1+n)
+            'cm_range': 0.3, # (1-n) ~ (1+n)
+            'kf_range': 0.3, # (1-n) ~ (1+n)
+            'km_range': 0.3, # (1-n) ~ (1+n)
+            'battery_range': 0.3 # (1-n) ~ (1)
         }
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
@@ -136,7 +136,7 @@ def train(args, hparam):
     
 
     # Define environment
-    envs = domainRandeEnv(env_name=env_name, tag=tag, n=nenvs, randomize=args.randomize, seed=1000000, dyn_range=dyn_range)
+    envs = domainRandeEnv(env_name=env_name, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), n=nenvs, randomize=args.randomize, seed=1000000, dyn_range=dyn_range)
     action_space = envs.action_space
     state_space = envs.observation_space
     
@@ -150,7 +150,7 @@ def train(args, hparam):
                     state_space, 
                     action_space, 
                     rnn_type=args.rnn,
-                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    out_actf=F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     policy_target_update_interval=policy_target_update_interval,
@@ -166,7 +166,7 @@ def train(args, hparam):
                     action_space, 
                     param_num=param_num,
                     rnn_type=args.rnn,
-                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    out_actf=F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     policy_target_update_interval=policy_target_update_interval,
@@ -182,7 +182,7 @@ def train(args, hparam):
                     action_space, 
                     param_num=param_num,
                     rnn_type=args.rnn,
-                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    out_actf=F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     policy_target_update_interval=policy_target_update_interval,
@@ -203,7 +203,7 @@ def train(args, hparam):
                     param_num=param_num,
                     goal_dim=goal_dim,
                     rnn_type=args.rnn,
-                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    out_actf=F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     policy_target_update_interval=policy_target_update_interval,
@@ -213,7 +213,7 @@ def train(args, hparam):
         td3_trainer = TD3_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
-                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    out_actf=F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     policy_target_update_interval=policy_target_update_interval,
@@ -311,7 +311,7 @@ def train(args, hparam):
         time_test = {k:"%.2f"%np.sum(v) for k,v in time_test.items()}
         if len(replay_buffer) > explore_steps:
             time_test
-
+        
         if args.rnn != "None": 
             if args.rnn in ['RNN', "LSTM", "GRU"]:
                 replay_buffer.push_batch(ini_hidden_in, 
@@ -376,8 +376,11 @@ def train(args, hparam):
                         writer.add_histogram(f'policy_net/{name}.grad', weight.grad, i_episode)
 
             if 'aviary' in env_name:
-                writer.add_scalar('loss/position', np.sum(np.stack(episode_state)[:,:,:3]**2, axis=-1).mean(), i_episode)
-        
+                writer.add_scalar('loss/position[m]', np.linalg.norm((6*np.stack(episode_state)[:,:,:3])**2, axis=-1).mean(), i_episode)
+                writer.add_scalar('loss/velocity[m/s]', np.linalg.norm((3*np.stack(episode_state)[:,:,12:15])**2, axis=-1).mean(), i_episode)
+                writer.add_scalar('loss/ang_velocity[deg/s]', np.linalg.norm((2*180*np.stack(episode_state)[:,:,15:18])**2, axis=-1).mean(), i_episode)
+                writer.add_scalar('loss/angle', np.arccos(np.stack(episode_state)[:,:,11].flatten()).mean(), i_episode)
+
             if i_episode % eval_freq == 0 and i_episode != 0:
                 eval_rew, eval_success = evaluation(env_name, agent=td3_trainer, dyn_range=dyn_range, eval_itr=eval_itr, seed=i_episode)
                 writer.add_scalar('eval/reward', eval_rew, i_episode)
@@ -415,12 +418,12 @@ def test(args):
         'l': 3, # 1/n ~ n
 
         # drones
-        'mass_range': 0.3, # (1-n) ~ (1+n)
-        'cm_range': 0.3, # (1-n) ~ (1+n)
-        'kf_range': 0.1, # (1-n) ~ (1+n)
-        'km_range': 0.1, # (1-n) ~ (1+n)
-        'i_range': 0.3,
-        'battery_range': 0.3 # (1-n) ~ (1)
+        'mass_range': 0.0, # (1-n) ~ (1+n)
+        'cm_range': 0.0, # (1-n) ~ (1+n)
+        'kf_range': 0.0, # (1-n) ~ (1+n)
+        'km_range': 0.0, # (1-n) ~ (1+n)
+        'i_range': 0.0,
+        'battery_range': 0.0 # (1-n) ~ (1)
     }
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
@@ -452,7 +455,7 @@ def test(args):
                     state_space, 
                     action_space, 
                     rnn_type=args.rnn,
-                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    out_actf=F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     **hparam)
@@ -466,7 +469,7 @@ def test(args):
                     action_space, 
                     param_num=param_num,
                     rnn_type=args.rnn,
-                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    out_actf=F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     **hparam)
@@ -480,7 +483,7 @@ def test(args):
                     action_space, 
                     param_num,
                     rnn_type=args.rnn,
-                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    out_actf=F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     **hparam)
@@ -499,7 +502,7 @@ def test(args):
                     param_num=param_num,
                     goal_dim=goal_dim,
                     rnn_type=args.rnn,
-                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    out_actf=F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     policy_target_update_interval=1,
@@ -509,7 +512,7 @@ def test(args):
         td3_trainer = TD3_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
-                    out_actf=F.sigmoid if 'aviary' in env_name else F.tanh,
+                    out_actf=F.tanh,
                     action_scale=1.0 if 'aviary' in env_name else 10.0,
                     device=device, 
                     **hparam)

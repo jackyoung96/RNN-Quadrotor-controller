@@ -195,20 +195,25 @@ class customAviary(gym.Wrapper):
         self.env.PLANE_ID = p.loadURDF("plane.urdf", physicsClientId=self.env.CLIENT)
 
         # Put gaussian noise to initialize RPY
+        init_rpys = []
+        for i in range(self.env.NUM_DRONES):
+            init_rpy = self.env.INIT_RPYS[i,:] + self.rpy_noise*np.random.uniform(-1.0,1.0,self.env.INIT_RPYS[i,:].shape)
+            init_rpy[i,-1] = init_rpy[i,-1] + np.random.uniform(-np.pi, np.pi) # random yaw
+            init_rpys.append(init_rpy)
         self.env.DRONE_IDS = np.array([p.loadURDF(os.path.dirname(os.path.abspath(__file__))+"/../../../gym_pybullet_drones/assets/"+self.env.URDF,
                                               self.env.INIT_XYZS[i,:],
-                                              p.getQuaternionFromEuler(self.env.INIT_RPYS[i,:] + self.rpy_noise*np.random.normal(0.0,1.0,self.env.INIT_RPYS[i,:].shape)),
+                                              p.getQuaternionFromEuler(init_rpys[i]),
                                               flags = p.URDF_USE_INERTIA_FROM_FILE,
                                               physicsClientId=self.env.CLIENT
                                               ) for i in range(self.env.NUM_DRONES)])
         # random velocity initialize
         for i in range (self.env.NUM_DRONES):
-            vel = self.vel_noise * np.random.normal(0.0,1.0,size=3)
+            vel = self.vel_noise * np.random.uniform(-1.0,1.0,size=3)
             p.resetBaseVelocity(self.env.DRONE_IDS[i],\
                                 linearVelocity = vel.tolist(),\
-                                angularVelocity = (self.angvel_noise * np.random.normal(0.0,1.0,size=3)).tolist(),\
+                                angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
-            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] # + 0.5*vel
+            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] + 0.5 * vel
 
 
         for i in range(self.env.NUM_DRONES):
@@ -263,28 +268,21 @@ class customAviary(gym.Wrapper):
                                 state,
                                 type
                                ):
-        MAX_LIN_VEL_XY = 3 
-        MAX_LIN_VEL_Z = 1
+        MAX_LIN_VEL = 3 
 
-        MAX_XY = MAX_LIN_VEL_XY * 2# * self.env.EPISODE_LEN_SEC
-        MAX_Z = MAX_LIN_VEL_Z * 2 # * self.env.EPISODE_LEN_SEC
+        MAX_XYZ = MAX_LIN_VEL * 2# * self.env.EPISODE_LEN_SEC
 
         MAX_ROLL_YAW = np.pi
         MAX_PITCH = np.pi/2
 
-        MAX_RPY_RATE = 30*np.pi # temporary
+        MAX_RPY_RATE = 2*np.pi # temporary
 
         norm_state = state.copy()
 
         if type=='pos':
             # norm_state = norm_state - self.env.INIT_XYZS[0,:]
             # print("DEBUG", norm_state, self.goal_pos[0,:])
-            norm_state = norm_state - self.goal_pos[0,:]
-            norm_state[:2] = norm_state[:2] / MAX_XY
-            norm_state[2:] = norm_state[2:] / MAX_Z
-            
-        elif type=='z':
-            norm_state = state / MAX_Z
+            norm_state = (norm_state - self.goal_pos[0,:]) / MAX_XYZ
 
         elif type=='quaternion':
             # don't need normalization
@@ -299,8 +297,7 @@ class customAviary(gym.Wrapper):
             norm_state[1:2] = state[1:2] / MAX_PITCH
             
         elif type=='vel':
-            norm_state[:2] = state[:2] / MAX_LIN_VEL_XY
-            norm_state[2:] = state[2:] / MAX_LIN_VEL_Z
+            norm_state = state / MAX_LIN_VEL
 
         elif type=='angular_vel':
             norm_state = state / MAX_RPY_RATE
@@ -542,14 +539,20 @@ class domainRandomAviary(customAviary):
         self.train = True
     
     def random_urdf(self):
+        norm_mass, norm_xcm, norm_ycm, norm_ixx, norm_iyy, norm_battery = 0,0,0,0,0,0
+        norm_KF, norm_KM = [0,0,0,0], [0,0,0,0]
+
         mass = np.random.uniform(1-self.mass_range, 1+self.mass_range) * self.orig_params['M']
         x_cm, y_cm = np.random.uniform(-self.cm_range, self.cm_range, size=(2,)) * self.orig_params['L']
         i_xx, i_yy = np.random.uniform(1-self.i_range, 1+self.i_range, size=(2,))
-        norm_mass = 2*(mass/self.orig_params['M']-(1-self.mass_range))/(2*self.mass_range)-1
-        norm_xcm = 2*(x_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
-        norm_ycm = 2*(y_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
-        norm_ixx = 2*(i_xx-(1-self.i_range))/(2*self.i_range)-1 if self.i_range!=0 else 0
-        norm_iyy = 2*(i_yy-(1-self.i_range))/(2*self.i_range)-1 if self.i_range!=0 else 0
+        if self.mass_range != 0:
+            norm_mass = 2*(mass/self.orig_params['M']-(1-self.mass_range))/(2*self.mass_range)-1
+        if self.cm_range != 0:
+            norm_xcm = 2*(x_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
+            norm_ycm = 2*(y_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
+        if self.i_range != 0:
+            norm_ixx = 2*(i_xx-(1-self.i_range))/(2*self.i_range)-1 if self.i_range!=0 else 0
+            norm_iyy = 2*(i_yy-(1-self.i_range))/(2*self.i_range)-1 if self.i_range!=0 else 0
 
         generate_urdf(self.URDF, mass, x_cm, y_cm, i_xx, i_yy, 0.0)
         self.env.M, \
@@ -571,11 +574,14 @@ class domainRandomAviary(customAviary):
         self.env.DW_COEFF_3 = self.env._parseURDFParameters()
 
         self.battery = self.orig_params['BATTERY'] * np.random.uniform(1.0-self.battery_range, 1.0)
-        norm_battery = 2*(self.battery-(1-self.battery_range))/(self.battery_range)-1
+        if self.battery_range != 0:
+            norm_battery = 2*(self.battery-(1-self.battery_range))/(self.battery_range)-1
         self.env.KF = self.orig_params['KF'] * np.random.uniform(1.0-self.kf_range, 1.0+self.kf_range, size=(4,))
         self.env.KM = self.orig_params['KM'] * np.random.uniform(1.0-self.km_range, 1.0+self.km_range, size=(4,))
-        norm_KF = 2*(self.env.KF/self.orig_params['KF']-(1-self.kf_range))/(2*self.kf_range)-1
-        norm_KM = 2*(self.env.KM/self.orig_params['KM']-(1-self.km_range))/(2*self.km_range)-1
+        if self.kf_range != 0:
+            norm_KF = 2*(self.env.KF/self.orig_params['KF']-(1-self.kf_range))/(2*self.kf_range)-1
+        if self.km_range != 0:
+            norm_KM = 2*(self.env.KM/self.orig_params['KM']-(1-self.km_range))/(2*self.km_range)-1
         self.env.KF = self.battery * self.env.KF
         self.env.KM = self.battery * self.env.KM
         #### Compute constants #####################################
@@ -636,20 +642,25 @@ class domainRandomAviary(customAviary):
 
         # Put gaussian noise to initialize RPY
         # Random urdf generation
+        init_rpys = []
+        for i in range(self.env.NUM_DRONES):
+            init_rpy = self.env.INIT_RPYS[i,:] + self.rpy_noise*np.random.uniform(-1.0,1.0,self.env.INIT_RPYS[i,:].shape)
+            init_rpy[-1] = init_rpy[-1] + np.random.uniform(-np.pi, np.pi) # random yaw
+            init_rpys.append(init_rpy)
         self.env.DRONE_IDS = np.array([p.loadURDF(os.path.dirname(os.path.abspath(__file__))+"/assets/"+self.URDF,
                                               self.env.INIT_XYZS[i,:],
-                                              p.getQuaternionFromEuler(self.env.INIT_RPYS[i,:] + self.rpy_noise*np.random.normal(0.0,1.0,self.env.INIT_RPYS[i,:].shape)),
+                                              p.getQuaternionFromEuler(init_rpys[i]),
                                               flags = p.URDF_USE_INERTIA_FROM_FILE,
                                               physicsClientId=self.env.CLIENT
                                               ) for i in range(self.env.NUM_DRONES)])
         # random velocity initialize
         for i in range (self.env.NUM_DRONES):
-            vel = self.vel_noise * np.random.normal(0.0,1.0,size=3)
+            vel = self.vel_noise * np.random.uniform(-1.0,1.0,size=3)
             p.resetBaseVelocity(self.env.DRONE_IDS[i],\
                                 linearVelocity = vel.tolist(),\
-                                angularVelocity = (self.angvel_noise * np.random.normal(0.0,1.0,size=3)).tolist(),\
+                                angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
-            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] # + 0.5*vel 
+            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] + 0.5*vel 
 
 
         for i in range(self.env.NUM_DRONES):
