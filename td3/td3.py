@@ -19,7 +19,7 @@ from torch.distributions import Normal
 
 from .common.buffers import ReplayBuffer, ReplayBufferPER
 from .common.value_networks import *
-from .common.policy_networks import PolicyNetworkGoalRNN, PolicyNetworkLSTM, PolicyNetwork, PolicyNetworkRNN, PolicyNetworkGRU
+from .common.policy_networks import *
 
 from time import time
 
@@ -553,11 +553,11 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
             self.policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
             self.target_policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
         elif rnn_type=='LSTMHER':
-            self.policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
-            self.target_policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
+            self.policy_net = PolicyNetworkGoalLSTM(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
+            self.target_policy_net = PolicyNetworkGoalLSTM(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
         elif rnn_type=='GRUHER':
-            self.policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
-            self.target_policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
+            self.policy_net = PolicyNetworkGoalGRU(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
+            self.target_policy_net = PolicyNetworkGoalGRU(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
