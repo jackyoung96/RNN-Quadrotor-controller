@@ -94,7 +94,7 @@ def train(args, hparam):
             'cm_range': 0.3, # (1-n) ~ (1+n)
             'kf_range': 0.3, # (1-n) ~ (1+n)
             'km_range': 0.3, # (1-n) ~ (1+n)
-            'battery_range': 0.3 # (1-n) ~ (1)
+            'battery_range': 0.3 # (1-n) ~ (1) 
         }
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
@@ -376,10 +376,10 @@ def train(args, hparam):
                         writer.add_histogram(f'policy_net/{name}.grad', weight.grad, i_episode)
 
             if 'aviary' in env_name:
-                writer.add_scalar('loss/position[m]', np.linalg.norm((6*np.stack(episode_state)[:,:,:3])**2, axis=-1).mean(), i_episode)
-                writer.add_scalar('loss/velocity[m/s]', np.linalg.norm((3*np.stack(episode_state)[:,:,12:15])**2, axis=-1).mean(), i_episode)
-                writer.add_scalar('loss/ang_velocity[deg/s]', np.linalg.norm((2*180*np.stack(episode_state)[:,:,15:18])**2, axis=-1).mean(), i_episode)
-                writer.add_scalar('loss/angle', np.arccos(np.stack(episode_state)[:,:,11].flatten()).mean(), i_episode)
+                writer.add_scalar('loss/position[m]', np.linalg.norm((6*np.stack(episode_state)[:,:,:3]), axis=-1).mean(), i_episode)
+                writer.add_scalar('loss/velocity[m/s]', np.linalg.norm((3*np.stack(episode_state)[:,:,12:15]), axis=-1).mean(), i_episode)
+                writer.add_scalar('loss/ang_velocity[deg/s]', np.linalg.norm((2*180*np.stack(episode_state)[:,:,15:18]), axis=-1).mean(), i_episode)
+                writer.add_scalar('loss/angle[deg]', 180/np.pi*np.arccos(np.stack(episode_state)[:,:,11].flatten()).mean(), i_episode)
 
             if i_episode % eval_freq == 0 and i_episode != 0:
                 eval_rew, eval_success = evaluation(env_name, agent=td3_trainer, dyn_range=dyn_range, eval_itr=eval_itr, seed=i_episode)

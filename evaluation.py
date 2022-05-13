@@ -128,12 +128,12 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                             break
                     elif "aviary" in env_name:
                         # 1/6 scaling ->  meter unit 
-                        if np.linalg.norm(6*state[0,:3]) < np.linalg.norm([0.2]*3) and\
+                        if np.linalg.norm(6*state[0,:3]) < np.linalg.norm([0.1]*3) and\
                             np.arccos(state[0,11]) < 10*np.pi/180:
                             step = step+1 
                         else:
                             step = 0
-                        if step > 50:
+                        if step > 100:
                             success = 1
                             break
 
@@ -256,9 +256,14 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                         break
                 elif "aviary" in env_name:
                     # print(state[0,:3], reward)
-                    step = step+1 if np.sum(state[0,:3]**2) < (0.1/6) else 0
+                    if np.linalg.norm(6*state[0,:3]) < np.linalg.norm([0.1]*3) and\
+                        np.arccos(state[0,11]) < 10*np.pi/180:
+                        step = step+1 
+                    else:
+                        step = 0
                     if step > 100:
                         success = 1
+                        break
 
                 total_rew += reward
             
