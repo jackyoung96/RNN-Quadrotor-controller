@@ -365,27 +365,48 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
     def __init__(self, capacity, sample_length):
         super().__init__(capacity)
         self.sample_length = sample_length
+    
+    def push(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
+        if len(self.buffer) < self.capacity:
+            self.buffer.append(None)
+        self.buffer[self.position] = (hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal)
+        self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
+
+    def push_batch(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
+        np.stack(last_action,axis=1)
+        state, action, last_action, reward, next_state, done = \
+            map(lambda x: np.stack(x, axis=1),[state, action, last_action, reward, next_state, done])
+        assert all(state.shape[0] == x.shape[0] for x in [action, last_action, reward, next_state, done]), "Somethings wrong on dimension"
+        num_batch = state.shape[0]
+        hidden_in = (hidden_in[0].view(num_batch,1,1,-1), hidden_in[1].view(num_batch,1,1,-1))
+        hidden_out = (hidden_out[0].view(num_batch,1,1,-1), hidden_out[1].view(num_batch,1,1,-1))
+        self.buffer.extend([None]*int(min(num_batch,self.capacity-len(self.buffer))))
+        for hin_h,hin_c, hout_h,hout_c, s,a,la,r,ns,d,p,g in zip(*hidden_in, *hidden_out, state, action, last_action, reward, next_state, done,param, goal):
+            self.buffer[self.position] = ((hin_h,hin_c),(hout_h,hout_c),s,a,la,r,ns,d,p,g)
+            self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
 
     def sample(self, batch_size):
         s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ci_lst, ho_lst, co_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[],[],[]
         batch = random.sample(self.buffer, batch_size)
         for sample in batch:
-            (h_in, c_in), (h_out, c_out), state, action, last_action, reward, next_state, done, param = sample
+            (h_in, c_in), (h_out, c_out), state, action, last_action, reward, next_state, done, param, goal = sample
             t = np.random.randint(0,state.shape[0]-self.sample_length)
-            s_lst.append(state[t:t+self.sample_length]) 
-            a_lst.append(action[t:t+self.sample_length])
-            la_lst.append(last_action[t:t+self.sample_length])
-            new_reward = -np.ones_like(reward[t:t+self.sample_length])
-            new_reward[-1] = 0
-            r_lst.append(new_reward)
-            ns_lst.append(next_state[t:t+self.sample_length])
-            d_lst.append(done[t:t+self.sample_length])
-            hi_lst.append(h_in)  # h_in: (1, batch_size=1, hidden_size)
-            ci_lst.append(c_in)
-            ho_lst.append(h_out)
-            co_lst.append(c_out)
-            p_lst.append(param)
-            g_lst.append(state[t+self.sample_length-1:t+self.sample_length])
+            t0 = 0
+            # t0 = np.random.randint(0,state.shape[0]-self.sample_length)
+            s_lst.extend([state[t0:t0+self.sample_length], state[t:t+self.sample_length]]) 
+            a_lst.extend([action[t0:t0+self.sample_length],action[t:t+self.sample_length]])
+            la_lst.extend([last_action[t0:t0+self.sample_length],last_action[t:t+self.sample_length]])
+            r = np.zeros_like(reward[t:t+self.sample_length])
+            r[-1] = 1
+            r_lst.extend([reward[t0:t0+self.sample_length]+r,reward[t:t+self.sample_length]+r])
+            ns_lst.extend([next_state[t0:t0+self.sample_length],next_state[t:t+self.sample_length]])
+            d_lst.extend([done[t0:t0+self.sample_length],done[t:t+self.sample_length]])
+            hi_lst.extend([h_in,h_in])  # h_in: (1, batch_size=1, hidden_size)
+            ci_lst.extend([c_in,c_in])
+            ho_lst.extend([h_out, h_out])
+            co_lst.extend([c_out,c_out])
+            p_lst.extend([param,param])
+            g_lst.extend([next_state[t0+self.sample_length-1:t0+self.sample_length],next_state[t+self.sample_length-1:t+self.sample_length]])
         hi_lst = torch.cat(hi_lst, dim=-2).detach() # cat along the batch dim
         ho_lst = torch.cat(ho_lst, dim=-2).detach()
         ci_lst = torch.cat(ci_lst, dim=-2).detach()
@@ -395,7 +416,35 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
         hidden_out = (ho_lst, co_lst)
         s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst = map(lambda x: np.stack(x,axis=0), [s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst])
 
-        return hidden_in, hidden_out, s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst
+        return hidden_in, hidden_out, s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst
+
+    def sample_original(self, batch_size):
+        s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ci_lst, ho_lst, co_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[],[],[]
+        batch = random.sample(self.buffer, 2*batch_size)
+        for sample in batch:
+            (h_in, c_in), (h_out, c_out), state, action, last_action, reward, next_state, done, param, goal = sample
+            s_lst.append(state) 
+            a_lst.append(action)
+            la_lst.append(last_action)
+            r_lst.append(reward)
+            ns_lst.append(next_state)
+            d_lst.append(done)
+            hi_lst.append(h_in)  # h_in: (1, batch_size=1, hidden_size)
+            ci_lst.append(c_in)
+            ho_lst.append(h_out)
+            co_lst.append(c_out)
+            p_lst.append(param)
+            g_lst.append(np.tile(goal, (state.shape[0],1)))
+        hi_lst = torch.cat(hi_lst, dim=-2).detach() # cat along the batch dim
+        ho_lst = torch.cat(ho_lst, dim=-2).detach()
+        ci_lst = torch.cat(ci_lst, dim=-2).detach()
+        co_lst = torch.cat(co_lst, dim=-2).detach()
+
+        hidden_in = (hi_lst, ci_lst)
+        hidden_out = (ho_lst, co_lst)
+        s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst = map(lambda x: np.stack(x,axis=0), [s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst])
+
+        return hidden_in, hidden_out, s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst
 
 class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
     """ 
@@ -408,31 +457,76 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
     def __init__(self, capacity, sample_length):
         super().__init__(capacity)
         self.sample_length = sample_length
+        self.gamma = 1
+
+    def push(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
+        if len(self.buffer) < self.capacity:
+            self.buffer.append(None)
+        self.buffer[self.position] = (hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal)
+        self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
+
+    def push_batch(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
+        np.stack(last_action,axis=1)
+        state, action, last_action, reward, next_state, done = \
+            map(lambda x: np.stack(x, axis=1),[state, action, last_action, reward, next_state, done])
+        assert all(state.shape[0] == x.shape[0] for x in [action, last_action, reward, next_state, done]), "Somethings wrong on dimension"
+        num_batch = state.shape[0]
+        hidden_in = hidden_in.view(num_batch,1,1,-1)
+        hidden_out = hidden_out.view(num_batch,1,1,-1)
+        self.buffer.extend([None]*int(min(num_batch,self.capacity-len(self.buffer))))
+        for hin, hout, s,a,la,r,ns,d,p,g in zip(hidden_in, hidden_out, state, action, last_action, reward, next_state, done,param, goal):
+            self.buffer[self.position] = (hin,hout,s,a,la,r,ns,d,p,g)
+            self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
 
     def sample(self, batch_size):
         s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ho_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[]
         batch = random.sample(self.buffer, batch_size)
         for sample in batch:
-            h_in, h_out, state, action, last_action, reward, next_state, done, param = sample
+            h_in, h_out, state, action, last_action, reward, next_state, done, param, _ = sample
             t = np.random.randint(0,state.shape[0]-self.sample_length)
-            s_lst.append(state[t:t+self.sample_length]) 
-            a_lst.append(action[t:t+self.sample_length])
-            la_lst.append(last_action[t:t+self.sample_length])
-            new_reward = -np.ones_like(reward[t:t+self.sample_length])
-            new_reward[-1] = 0
-            r_lst.append(new_reward)
-            ns_lst.append(next_state[t:t+self.sample_length])
-            d_lst.append(done[t:t+self.sample_length])
-            hi_lst.append(h_in)  # h_in: (1, batch_size=1, hidden_size)
-            ho_lst.append(h_out)
-            p_lst.append(param)
-            g_lst.append(state[t+self.sample_length-1:t+self.sample_length])
+            t0 = 0
+            # t0 = np.random.randint(0,state.shape[0]-self.sample_length)
+            s_lst.extend([state[t0:t0+self.sample_length], state[t:t+self.sample_length]]) 
+            a_lst.extend([action[t0:t0+self.sample_length],action[t:t+self.sample_length]])
+            la_lst.extend([last_action[t0:t0+self.sample_length],last_action[t:t+self.sample_length]])
+            r = -np.ones_like(reward[t:t+self.sample_length])
+            r[-1] = 0
+            r_lst.extend([self.gamma*reward[t0:t0+self.sample_length]+(1-self.gamma)*r,
+                        self.gamma*reward[t:t+self.sample_length]+(1-self.gamma)*r])
+            ns_lst.extend([next_state[t0:t0+self.sample_length],next_state[t:t+self.sample_length]])
+            d_lst.extend([done[t0:t0+self.sample_length],done[t:t+self.sample_length]])
+            hi_lst.extend([h_in,h_in])  # h_in: (1, batch_size=1, hidden_size)
+            ho_lst.extend([h_out, h_out])
+            p_lst.extend([param,param])
+            g_lst.extend([next_state[t0+self.sample_length-1:t0+self.sample_length],next_state[t+self.sample_length-1:t+self.sample_length]])
         hidden_in = torch.cat(hi_lst, dim=-2).detach() # cat along the batch dim
         hidden_out = torch.cat(ho_lst, dim=-2).detach()
 
         s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst = map(lambda x: np.stack(x,axis=0), [s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst])
 
-        return hidden_in, hidden_out, s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst
+        return hidden_in, hidden_out, s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst
+
+    def sample_original(self, batch_size):
+        s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ho_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[]
+        batch = random.sample(self.buffer, 2*batch_size)
+        for sample in batch:
+            h_in, h_out, state, action, last_action, reward, next_state, done, param, goal = sample
+            s_lst.append(state) 
+            a_lst.append(action)
+            la_lst.append(last_action)
+            r_lst.append(reward)
+            ns_lst.append(next_state)
+            d_lst.append(done)
+            hi_lst.append(h_in)  # h_in: (1, batch_size=1, hidden_size)
+            ho_lst.append(h_out)
+            p_lst.append(param)
+            g_lst.append(np.tile(goal, (state.shape[0],1)))
+        hidden_in = torch.cat(hi_lst, dim=-2).detach() # cat along the batch dim
+        hidden_out = torch.cat(ho_lst, dim=-2).detach()
+
+        s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst = map(lambda x: np.stack(x,axis=0), [s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst])
+
+        return hidden_in, hidden_out, s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst
 
 class HindsightReplayBuffer:
     """ 

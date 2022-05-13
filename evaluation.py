@@ -87,6 +87,17 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
 
             with torch.no_grad():
                 total_step, step, success = 0,0,0
+                if 'aviary' in env_name:
+                    theta = np.random.uniform(-np.pi,np.pi)
+                    goal = np.array([[0,0,0, # position
+                                    np.cos(theta),np.sin(theta),0, # rotation matrix
+                                    -np.sin(theta),np.cos(theta),0,
+                                    0,0,1,
+                                    0,0,0, # velocity
+                                    0,0,0]]) # angular velocity
+                else:
+                    goal = np.array([[1,0,0]])
+
                 for _ in range(max_steps):
                     if hasattr(agent, 'rnn_type'):
                         hidden_in = hidden_out
@@ -98,7 +109,6 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                                                                 deterministic=DETERMINISTIC, 
                                                                 explore_noise_scale=0.)
                         else:
-                            goal = np.zeros((1,goal_dim)) if 'aviary' in env_name else np.array([[1,0,0]])
                             action, hidden_out = \
                                 agent.policy_net.get_action(state, 
                                                                 last_action, 
@@ -128,12 +138,12 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                             break
                     elif "aviary" in env_name:
                         # 1/6 scaling ->  meter unit 
-                        if np.linalg.norm(6*state[0,:3]) < np.linalg.norm([0.2]*3) and\
+                        if np.linalg.norm(6*state[0,:3]) < np.linalg.norm([0.1]*3) and\
                             np.arccos(state[0,11]) < 10*np.pi/180:
                             step = step+1 
                         else:
                             step = 0
-                        if step > 50:
+                        if step > 100:
                             success = 1
                             break
 
@@ -221,15 +231,35 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
 
             total_step, step, success = 0,0,0
             frames = []
+            if 'aviary' in env_name:
+                theta = np.random.uniform(-np.pi,np.pi)
+                goal = np.array([[0,0,0, # position
+                                np.cos(theta),np.sin(theta),0, # rotation matrix
+                                -np.sin(theta),np.cos(theta),0,
+                                0,0,1,
+                                0,0,0, # velocity
+                                0,0,0]]) # angular velocity
+            else:
+                goal = np.array([[1,0,0]])
+
             for i_step in range(max_steps):
                 if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                     hidden_in = hidden_out
-                    action, hidden_out = \
-                        agent.policy_net.get_action(state, 
-                                                        last_action, 
-                                                        hidden_in, 
-                                                        deterministic=DETERMINISTIC, 
-                                                        explore_noise_scale=0.)
+                    if not hasattr(agent.q_net1, '_goal_dim'):
+                        action, hidden_out = \
+                            agent.policy_net.get_action(state, 
+                                                            last_action, 
+                                                            hidden_in, 
+                                                            deterministic=DETERMINISTIC, 
+                                                            explore_noise_scale=0.)
+                    else:
+                        action, hidden_out = \
+                            agent.policy_net.get_action(state, 
+                                                            last_action, 
+                                                            hidden_in, 
+                                                            goal=goal,
+                                                            deterministic=DETERMINISTIC, 
+                                                            explore_noise_scale=0.)
                     if hasattr(agent, 'param_net'):
                         predict_param = agent.predict_param(hidden_in).squeeze()
                         pd_param = pd_param.append([{"episode": i_eval,
@@ -256,9 +286,14 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                         break
                 elif "aviary" in env_name:
                     # print(state[0,:3], reward)
-                    step = step+1 if np.sum(state[0,:3]**2) < (0.1/6) else 0
+                    if np.linalg.norm(6*state[0,:3]) < np.linalg.norm([0.1]*3) and\
+                        np.arccos(state[0,11]) < 10*np.pi/180:
+                        step = step+1 
+                    else:
+                        step = 0
                     if step > 100:
                         success = 1
+                        break
 
                 total_rew += reward
             
