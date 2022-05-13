@@ -163,3 +163,5 @@ Device: cuda:3
 Episode 1500	Average Score: -18.17
 Episode 2000	Average Score: -16.68
 Episode 2500	Average Score: -22.49
+Episode 3000	Average Score: -50.19
+Episode 3500	Average Score: -38.30

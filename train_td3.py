@@ -192,15 +192,17 @@ def train(args, hparam):
                     policy_target_update_interval=policy_target_update_interval,
                     **hparam)
     elif args.rnn in ["RNNHER", "LSTMHER", "GRUHER"]:
-        batch_size = batch_size*int(max_steps//her_sample_length / 2)
+        # batch_size = batch_size*int(max_steps//her_sample_length / 2)
         if args.rnn=='LSTMHER':
             replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size, 
                                 sample_length=her_sample_length)
         else:
             replay_buffer = HindsightReplayBufferGRU(replay_buffer_size, 
-                                sample_length=her_sample_length)
+                                epsilon=np.sqrt(3*(0.1**2)))
+                                # sample_length=her_sample_length)
         # For aviary, it include the last action in the state
-        goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
+        # goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
+        goal_dim = 3 if 'aviary' in env_name else state_space.shape[0]
         td3_trainer = TD3HERRNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
@@ -258,12 +260,13 @@ def train(args, hparam):
         # Goal for HER
         if 'aviary' in env_name:
             thetas = [np.random.uniform(-np.pi,np.pi) for _ in range(nenvs)]
-            goal = np.array([[0,0,0, # position
-                            np.cos(theta),np.sin(theta),0, # rotation matrix
-                            -np.sin(theta),np.cos(theta),0,
-                            0,0,1,
-                            0,0,0, # velocity
-                            0,0,0] for theta in thetas]) # angular velocity
+            # goal = np.array([[0,0,0, # position
+            #                 np.cos(theta),np.sin(theta),0, # rotation matrix
+            #                 -np.sin(theta),np.cos(theta),0,
+            #                 0,0,1,
+            #                 0,0,0, # velocity
+            #                 0,0,0] for theta in thetas]) # angular velocity
+            goal = np.array([[0,0,0] for theta in thetas])
         else:
             goal = np.array([[1,0,0]]*nenvs)
 
@@ -329,8 +332,8 @@ def train(args, hparam):
                     #         if not td3_trainer.use_her:
                     #             td3_trainer.use_her = True
                     #             td3_trainer.reset_critic() # reset critic
-                    if "HER" in args.rnn:
-                        td3_trainer.replay_buffer.gamma = 1-i_episode/max_episodes
+                    # if "HER" in args.rnn:
+                    #     td3_trainer.replay_buffer.gamma = 1-i_episode/max_episodes
                     loss_dict = td3_trainer.update(batch_size, deterministic=DETERMINISTIC, eval_noise_scale=eval_noise_scale)
                     # policy_loss, q_loss_1, q_loss_2
                     policy_loss.append(loss_dict['policy_loss'])

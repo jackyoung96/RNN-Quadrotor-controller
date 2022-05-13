@@ -454,10 +454,10 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
     'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
 
     """
-    def __init__(self, capacity, sample_length):
+    def __init__(self, capacity, epsilon):
         super().__init__(capacity)
-        self.sample_length = sample_length
         self.gamma = 1
+        self.epsilon
 
     def push(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
         if len(self.buffer) < self.capacity:
@@ -483,28 +483,53 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
         batch = random.sample(self.buffer, batch_size)
         for sample in batch:
             h_in, h_out, state, action, last_action, reward, next_state, done, param, _ = sample
-            t = np.random.randint(0,state.shape[0]-self.sample_length)
-            t0 = 0
             # t0 = np.random.randint(0,state.shape[0]-self.sample_length)
-            s_lst.extend([state[t0:t0+self.sample_length], state[t:t+self.sample_length]]) 
-            a_lst.extend([action[t0:t0+self.sample_length],action[t:t+self.sample_length]])
-            la_lst.extend([last_action[t0:t0+self.sample_length],last_action[t:t+self.sample_length]])
-            r = -np.ones_like(reward[t:t+self.sample_length])
-            r[-1] = 0
-            r_lst.extend([self.gamma*reward[t0:t0+self.sample_length]+(1-self.gamma)*r,
-                        self.gamma*reward[t:t+self.sample_length]+(1-self.gamma)*r])
-            ns_lst.extend([next_state[t0:t0+self.sample_length],next_state[t:t+self.sample_length]])
-            d_lst.extend([done[t0:t0+self.sample_length],done[t:t+self.sample_length]])
-            hi_lst.extend([h_in,h_in])  # h_in: (1, batch_size=1, hidden_size)
-            ho_lst.extend([h_out, h_out])
-            p_lst.extend([param,param])
-            g_lst.extend([next_state[t0+self.sample_length-1:t0+self.sample_length],next_state[t+self.sample_length-1:t+self.sample_length]])
+            s_lst.append(state) 
+            a_lst.append(action)
+            la_lst.append(last_action)
+            goal = next_state[-1:,:3]
+            r = np.where(np.linalg.norm(next_state[:,:3]-goal,axis=-1,keepdims=True)<self.epsilon,0,-1)
+            r_lst.append(reward + r)
+            ns_lst.append(next_state)
+            d_lst.append(done)
+            hi_lst.append(h_in)  # h_in: (1, batch_size=1, hidden_size)
+            ho_lst.append(h_out)
+            p_lst.append(param)
+            g_lst.append(next_state)
         hidden_in = torch.cat(hi_lst, dim=-2).detach() # cat along the batch dim
         hidden_out = torch.cat(ho_lst, dim=-2).detach()
 
         s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst = map(lambda x: np.stack(x,axis=0), [s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst])
 
         return hidden_in, hidden_out, s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst
+
+    # def sample(self, batch_size):
+    #     s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ho_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[]
+    #     batch = random.sample(self.buffer, batch_size)
+    #     for sample in batch:
+    #         h_in, h_out, state, action, last_action, reward, next_state, done, param, _ = sample
+    #         t = np.random.randint(0,state.shape[0]-self.sample_length)
+    #         t0 = 0
+    #         # t0 = np.random.randint(0,state.shape[0]-self.sample_length)
+    #         s_lst.extend([state[t0:t0+self.sample_length], state[t:t+self.sample_length]]) 
+    #         a_lst.extend([action[t0:t0+self.sample_length],action[t:t+self.sample_length]])
+    #         la_lst.extend([last_action[t0:t0+self.sample_length],last_action[t:t+self.sample_length]])
+    #         r = -np.ones_like(reward[t:t+self.sample_length])
+    #         r[-1] = 0
+    #         r_lst.extend([self.gamma*reward[t0:t0+self.sample_length]+(1-self.gamma)*r,
+    #                     self.gamma*reward[t:t+self.sample_length]+(1-self.gamma)*r])
+    #         ns_lst.extend([next_state[t0:t0+self.sample_length],next_state[t:t+self.sample_length]])
+    #         d_lst.extend([done[t0:t0+self.sample_length],done[t:t+self.sample_length]])
+    #         hi_lst.extend([h_in,h_in])  # h_in: (1, batch_size=1, hidden_size)
+    #         ho_lst.extend([h_out, h_out])
+    #         p_lst.extend([param,param])
+    #         g_lst.extend([next_state[t0+self.sample_length-1:t0+self.sample_length],next_state[t+self.sample_length-1:t+self.sample_length]])
+    #     hidden_in = torch.cat(hi_lst, dim=-2).detach() # cat along the batch dim
+    #     hidden_out = torch.cat(ho_lst, dim=-2).detach()
+
+    #     s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst = map(lambda x: np.stack(x,axis=0), [s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, g_lst, p_lst])
+
+    #     return hidden_in, hidden_out, s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst
 
     def sample_original(self, batch_size):
         s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ho_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[]

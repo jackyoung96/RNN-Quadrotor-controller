@@ -1,0 +1,26 @@
+(base) [01;32mjaekyungcho@ubuntu[00m:[01;34m~/UMD/sim-to-real-TD3[00m$ conda activate crazyflie 
+(crazyflie) [01;32mjaekyungcho@ubuntu[00m:[01;34m~/UMD/sim-to-real-TD3[00m$ t[Kpython train_td3.py --en [Kv takeoff-aviary-v0 --^C
+(crazyflie) [01;32mjaekyungcho@ubuntu[00m:[01;34m~/UMD/sim-to-real-TD3[00m$ python train_td3.py --env takeoff-aviary-v0 --randomize --tb_log --rrnn RNNHER --gpu 2 --lr_scheduler
+pybullet build time: Apr 24 2022 23:58:36
+hyperparam set: {'q_lr': 0.0003, 'policy_lr': 3e-05, 'param_lr': 3e-05, 't_max': 50000, 'hidden_dim': 128, 'update_interval': 3, 'lr_scheduler': True}
+[Tensorboard log]: tb_log/takeoff-aviary-v0/TD3/randomize/RNNHER/22May13221815
+Device: cuda:2
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/gym/logger.py:34: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  warnings.warn(colorize("%s: %s" % ("WARN", msg % args), "yellow"))
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/numpy/core/shape_base.py:420: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  arrays = [asanyarray(arr) for arr in arrays]
+/home/jaekyungcho/UMD/gym-pybullet-drones/gym_pybullet_drones/envs/BaseAviary.py:733: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  physicsClientId=self.CLIENT
+/home/jaekyungcho/UMD/gym-pybullet-drones/gym_pybullet_drones/envs/BaseAviary.py:733: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  physicsClientId=self.CLIENT
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/numpy/core/fromnumeric.py:3441: RuntimeWarning: Mean of empty slice.
+  out=out, **kwargs)
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/numpy/core/_methods.py:189: RuntimeWarning: invalid value encountered in double_scalars
+  ret = ret.dtype.type(ret / rcount)
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/torch/nn/functional.py:1795: UserWarning: nn.functional.tanh is deprecated. Use torch.tanh instead.
+  warnings.warn("nn.functional.tanh is deprecated. Use torch.tanh instead.")
+/home/jaekyungcho/UMD/gym-pybullet-drones/gym_pybullet_drones/envs/BaseAviary.py:733: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  physicsClientId=self.CLIENT
+Episode 500	Average Score: -62.17
+Episode 1000	Average Score: -22.63
+Episode 1500	Average Score: -18.74
