@@ -579,6 +579,7 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
             self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=self.q_lr, step_size_up=self.t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
             self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=self.q_lr, step_size_up=self.t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
             self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=self.policy_lr, step_size_up=self.t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+            # self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=self.policy_lr, step_size_up=self.t_max//self.policy_target_update_interval, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
         self.use_her = True
     

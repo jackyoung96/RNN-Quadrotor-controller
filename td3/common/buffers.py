@@ -457,7 +457,7 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
     def __init__(self, capacity, epsilon):
         super().__init__(capacity)
         self.gamma = 1
-        self.epsilon
+        self.epsilon = epsilon
 
     def push(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
         if len(self.buffer) < self.capacity:
@@ -488,14 +488,14 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
             a_lst.append(action)
             la_lst.append(last_action)
             goal = next_state[-1:,:3]
-            r = np.where(np.linalg.norm(next_state[:,:3]-goal,axis=-1,keepdims=True)<self.epsilon,0,-1)
+            r = np.where(np.linalg.norm(next_state[:,:3]-goal,axis=-1)<self.epsilon,0,-1)
             r_lst.append(reward + r)
             ns_lst.append(next_state)
             d_lst.append(done)
             hi_lst.append(h_in)  # h_in: (1, batch_size=1, hidden_size)
             ho_lst.append(h_out)
             p_lst.append(param)
-            g_lst.append(next_state)
+            g_lst.append(next_state[-1:])
         hidden_in = torch.cat(hi_lst, dim=-2).detach() # cat along the batch dim
         hidden_out = torch.cat(ho_lst, dim=-2).detach()
 

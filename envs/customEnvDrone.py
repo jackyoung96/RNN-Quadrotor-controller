@@ -531,6 +531,7 @@ class domainRandomAviary(customAviary):
                             "BATTERY":1.0}
         self.random_urdf()
         self.env._housekeeping = self._housekeeping
+        self.goal = kwargs.get('goal', None)
 
     def test(self):
         self.train = False
@@ -660,7 +661,7 @@ class domainRandomAviary(customAviary):
                                 linearVelocity = vel.tolist(),\
                                 angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
-            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] + 0.5*vel 
+            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] + 0.5*vel if self.goal is None else self.goal
 
 
         for i in range(self.env.NUM_DRONES):

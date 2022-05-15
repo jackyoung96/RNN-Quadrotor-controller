@@ -18,7 +18,7 @@ import os
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 
-from evaluation import evaluation, generate_result
+from evaluation import evaluation, generate_result, drone_test
 import random
 import pickle as pkl
 import pandas as pd
@@ -34,11 +34,7 @@ def train(args, hparam):
 
     dtime = datetime.now()
 
-    tag = 'single'
-    if args.randomize:
-        tag = "randomize"
-    elif args.multitask:
-        tag = "multitask"
+    tag = "randomize"
 
     rnn_tag = args.rnn if args.rnn != "None" else 'FF'
 
@@ -55,47 +51,47 @@ def train(args, hparam):
         tbpath = os.path.join('tb_log', env_name, tbpath, dtime.strftime("%y%b%d%H%M%S"))
         print("[Tensorboard log]:", tbpath)
         writer = SummaryWriter(tbpath)
-    if args.randomize or args.multitask:
-        dyn_range = {
-            # cartpole
-            'masscart': 3, # 1/n ~ n
-            'masspole': 3, # 1/n ~ n
-            'length': 3, # 1/n ~ n
-            'force_mag': 3, # 1/n ~ n
+    # if args.randomize or args.multitask:
+    dyn_range = {
+        # cartpole
+        'masscart': 3, # 1/n ~ n
+        'masspole': 3, # 1/n ~ n
+        'length': 3, # 1/n ~ n
+        'force_mag': 3, # 1/n ~ n
 
-            # pendulum
-            'max_torque': 3, # 1/n ~ n
-            'm': 3, # 1/n ~ n
-            'l': 3, # 1/n ~ n
+        # pendulum
+        'max_torque': 3, # 1/n ~ n
+        'm': 3, # 1/n ~ n
+        'l': 3, # 1/n ~ n
 
-            # drones
-            'mass_range': 0.0, # (1-n) ~ (1+n)
-            'cm_range': 0.0, # (1-n) ~ (1+n)
-            'kf_range': 0.0, # (1-n) ~ (1+n)
-            'km_range': 0.0, # (1-n) ~ (1+n)
-            'i_range': 0.0,
-            'battery_range': 0.0 # (1-n) ~ (1)
-        }
-    else:
-        dyn_range = {
-            # cartpole
-            'masscart': 1, # 1/n ~ n
-            'masspole': 1, # 1/n ~ n
-            'length': 1, # 1/n ~ n
-            'force_mag': 1, # 1/n ~ n
+        # drones
+        'mass_range': 0.0, # (1-n) ~ (1+n)
+        'cm_range': 0.0, # (1-n) ~ (1+n)
+        'kf_range': 0.0, # (1-n) ~ (1+n)
+        'km_range': 0.0, # (1-n) ~ (1+n)
+        'i_range': 0.0,
+        'battery_range': 0.0 # (1-n) ~ (1)
+    }
+    # else:
+    #     dyn_range = {
+    #         # cartpole
+    #         'masscart': 1, # 1/n ~ n
+    #         'masspole': 1, # 1/n ~ n
+    #         'length': 1, # 1/n ~ n
+    #         'force_mag': 1, # 1/n ~ n
 
-            # pendulum
-            'max_torque': 1, # 1/n ~ n
-            'm': 1, # 1/n ~ n
-            'l': 1, # 1/n ~ n
+    #         # pendulum
+    #         'max_torque': 1, # 1/n ~ n
+    #         'm': 1, # 1/n ~ n
+    #         'l': 1, # 1/n ~ n
 
-            # drones
-            'mass_range': 0.3, # (1-n) ~ (1+n)
-            'cm_range': 0.3, # (1-n) ~ (1+n)
-            'kf_range': 0.3, # (1-n) ~ (1+n)
-            'km_range': 0.3, # (1-n) ~ (1+n)
-            'battery_range': 0.3 # (1-n) ~ (1) 
-        }
+    #         # drones
+    #         'mass_range': 0.3, # (1-n) ~ (1+n)
+    #         'cm_range': 0.3, # (1-n) ~ (1+n)
+    #         'kf_range': 0.3, # (1-n) ~ (1+n)
+    #         'km_range': 0.3, # (1-n) ~ (1+n)
+    #         'battery_range': 0.3 # (1-n) ~ (1) 
+    #     }
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     print("Device:",device)
@@ -140,7 +136,7 @@ def train(args, hparam):
     
 
     # Define environment
-    envs = domainRandeEnv(env_name=env_name, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), n=nenvs, randomize=args.randomize, seed=1000000, dyn_range=dyn_range)
+    envs = domainRandeEnv(env_name=env_name, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), n=nenvs, randomize=True, seed=1000000, dyn_range=dyn_range)
     action_space = envs.action_space
     state_space = envs.observation_space
     
@@ -475,7 +471,7 @@ def test(args):
     print("Device:",device)
 
     # hyper-parameters for RL training
-    hparam = {'hidden_dim': args.hidden_dim}
+    hparam = {'hidden_dim': 128}
 
     if 'Pendulum' in env_name:
         param_num = 3
@@ -534,13 +530,15 @@ def test(args):
                     **hparam)
     elif args.rnn in ["RNNHER", "LSTMHER", "GRUHER"]:
         if args.rnn=='LSTMHER':
-            replay_buffer = HindsightReplayBufferLSTM(1e6, 
-                                sample_length=100 if 'aviary' in env_name else 50)
+            replay_buffer = HindsightReplayBufferLSTM(1e5, 
+                                sample_length=100)
         else:
-            replay_buffer = HindsightReplayBufferGRU(1e6, 
-                                sample_length=100 if 'aviary' in env_name else 50)
+            replay_buffer = HindsightReplayBufferGRU(1e5, 
+                                epsilon=np.sqrt(3*(0.1**2)))
+                                # sample_length=her_sample_length)
         # For aviary, it include the last action in the state
-        goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
+        # goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
+        goal_dim = 3 if 'aviary' in env_name else state_space.shape[0]
         td3_trainer = TD3HERRNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
@@ -566,10 +564,17 @@ def test(args):
 
     td3_trainer.load_model(args.path)
     
-    eval_rew, eval_success = evaluation(env_name, agent=td3_trainer, dyn_range=dyn_range, eval_itr=5, seed=0)
-    print("EVALUATION REWARD:",eval_rew)
-    print("EVALUATION SUCCESS RATE:",eval_success)
-    generate_result(env_name, td3_trainer, dyn_range, test_itr=5, seed=0, record=args.record)
+    if 'aviary' in env_name:
+        eval_rew, eval_success, eval_position, eval_angle = drone_test(env_name, task=args.task, agent=td3_trainer, dyn_range=dyn_range, test_itr=10, seed=0, record=args.record)
+        print("EVALUATION REWARD:",eval_rew)
+        print("EVALUATION SUCCESS RATE:",eval_success)
+        print("EVALUATION POSITION ERROR[m]:",eval_position)
+        print("EVALUATION ANGLE ERROR[deg]:",np.rad2deg(eval_angle))
+    else:
+        eval_rew, eval_success = evaluation(env_name, agent=td3_trainer, dyn_range=dyn_range, eval_itr=5, seed=0)
+        print("EVALUATION REWARD:",eval_rew)
+        print("EVALUATION SUCCESS RATE:",eval_success)
+        generate_result(env_name, td3_trainer, dyn_range, test_itr=5, seed=0, record=args.record)
     # evaluation(env_name, td3_trainer, dyn_range, 1, 0)
 
 hparam_set = {
@@ -592,25 +597,25 @@ if __name__=='__main__':
     # train(1000, 'CartPole-v1')
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', required=True, choices=['Pendulum-v0','HalfCheetah-v2','takeoff-aviary-v0'])
-    parser.add_argument('--multitask',action='store_true', help="Multitask")
-    parser.add_argument('--randomize',action='store_true', help="Domain randomize")
+    parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--rnn', choices=['None','RNN','GRU','LSTM',
                                             'RNN2','GRU2','LSTM2',
                                             'RNN3','GRU3','LSTM3',
                                             'RNNHER','GRUHER','LSTMHER'], default='None', help='Use memory network (LSTM)')
+
     parser.add_argument('--tb_log', action='store_true', help="Tensorboard logging")
-    parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--hparam', action='store_true', help="find hparam set")
     parser.add_argument('--lr_scheduler', action='store_true', help="Use lr scheduler")
 
     parser.add_argument('--test', action='store_true')
-    parser.add_argument('--hidden_dim', type=int, default=None, help='only required at test phase')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
     parser.add_argument('--record', action='store_true', help='whether record or not')
+    parser.add_argument('--task', default='stabilize',choices=['stabilize','takeoff','waypoint'],
+                        help='For takeoff-aviary-v0 environment')
+
+
     args = parser.parse_args()
     if not args.test:
-        if args.multitask and args.randomize:
-            raise "Only give an option between multitask and randomize"
         if args.hparam:
             if not os.path.isdir('hparamDB'):
                 os.makedirs('hparamDB')
@@ -640,8 +645,6 @@ if __name__=='__main__':
             hparam['lr_scheduler'] = args.lr_scheduler
             train(args, hparam)
     else:
-        if args.hidden_dim is None:
-            assert "hidden_dim is required"
         if args.path is None:
             assert "model path is required"
         test(args)
