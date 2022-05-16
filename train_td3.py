@@ -191,7 +191,7 @@ def train(args, hparam):
         # batch_size = batch_size*int(max_steps//her_sample_length / 2)
         if args.rnn=='LSTMHER':
             replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size, 
-                                epsilon=np.sqrt(3*(0.1**2))
+                                epsilon=np.sqrt(3*(0.1**2)))
                                 # sample_length=her_sample_length)
         else:
             replay_buffer = HindsightReplayBufferGRU(replay_buffer_size, 
