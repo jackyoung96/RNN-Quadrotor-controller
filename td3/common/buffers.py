@@ -394,6 +394,7 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
             s_lst.append(state) 
             a_lst.append(action)
             la_lst.append(last_action)
+            goal = goal[None,:]
             if np.random.random()< (4/9):
                 goal = next_state[-1:,:3]
             r = np.where(np.linalg.norm(next_state[:,:3]-goal,axis=-1)<self.epsilon,0,-1)
@@ -405,7 +406,7 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
             ho_lst.append(h_out)
             co_lst.append(c_out)
             p_lst.append(param)
-            g_lst.append(next_state[-1:])
+            g_lst.append(goal)
         hi_lst = torch.cat(hi_lst, dim=-2).detach() # cat along the batch dim
         ho_lst = torch.cat(ho_lst, dim=-2).detach()
         ci_lst = torch.cat(ci_lst, dim=-2).detach()
@@ -519,6 +520,7 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
             s_lst.append(state) 
             a_lst.append(action)
             la_lst.append(last_action)
+            goal = goal[None,:]
             if np.random.random()< (4/9):
                 goal = next_state[-1:,:3]
             r = np.where(np.linalg.norm(next_state[:,:3]-goal,axis=-1)<self.epsilon,0,-1)
