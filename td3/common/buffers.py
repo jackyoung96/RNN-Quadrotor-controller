@@ -389,12 +389,13 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
         s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ci_lst, ho_lst, co_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[],[],[]
         batch = random.sample(self.buffer, batch_size)
         for sample in batch:
-            (h_in, c_in), (h_out, c_out), state, action, last_action, reward, next_state, done, param, _ = sample
+            (h_in, c_in), (h_out, c_out), state, action, last_action, reward, next_state, done, param, goal = sample
             # t0 = np.random.randint(0,state.shape[0]-self.sample_length)
             s_lst.append(state) 
             a_lst.append(action)
             la_lst.append(last_action)
-            goal = next_state[-1:,:3]
+            if np.random.random()< (4/9):
+                goal = next_state[-1:,:3]
             r = np.where(np.linalg.norm(next_state[:,:3]-goal,axis=-1)<self.epsilon,0,-1)
             r_lst.append(reward + r)
             ns_lst.append(next_state)
@@ -513,20 +514,21 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
         s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ho_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[]
         batch = random.sample(self.buffer, batch_size)
         for sample in batch:
-            h_in, h_out, state, action, last_action, reward, next_state, done, param, _ = sample
+            h_in, h_out, state, action, last_action, reward, next_state, done, param, goal = sample
             # t0 = np.random.randint(0,state.shape[0]-self.sample_length)
             s_lst.append(state) 
             a_lst.append(action)
             la_lst.append(last_action)
-            goal = next_state[-1:,:3]
+            if np.random.random()< (4/9):
+                goal = next_state[-1:,:3]
             r = np.where(np.linalg.norm(next_state[:,:3]-goal,axis=-1)<self.epsilon,0,-1)
-            r_lst.append(reward + r)
+            r_lst.append(r)
             ns_lst.append(next_state)
             d_lst.append(done)
             hi_lst.append(h_in)  # h_in: (1, batch_size=1, hidden_size)
             ho_lst.append(h_out)
             p_lst.append(param)
-            g_lst.append(next_state[-1:])
+            g_lst.append(goal)
         hidden_in = torch.cat(hi_lst, dim=-2).detach() # cat along the batch dim
         hidden_out = torch.cat(ho_lst, dim=-2).detach()
 
