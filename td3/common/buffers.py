@@ -397,7 +397,7 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
             if np.random.random()< (4/9):
                 goal = next_state[-1:,:3]
             r = np.where(np.linalg.norm(next_state[:,:3]-goal,axis=-1)<self.epsilon,0,-1)
-            r_lst.append(reward + r)
+            r_lst.append(r)
             ns_lst.append(next_state)
             d_lst.append(done)
             hi_lst.append(h_in)  # h_in: (1, batch_size=1, hidden_size)
