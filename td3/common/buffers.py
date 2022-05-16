@@ -3,6 +3,8 @@ import random
 import numpy as np
 import torch
 
+from .utils import rot_matrix_similarity
+
 
 
 class ReplayBuffer:
@@ -396,8 +398,10 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
             la_lst.append(last_action)
             goal = goal[None,:]
             if np.random.random()< (4/9):
-                goal = next_state[-1:,:3]
-            r = np.where(np.linalg.norm(next_state[:,:3]-goal,axis=-1)<self.epsilon,0,-1)
+                goal = next_state[-1:,:12]
+            pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
+            ang_achieve = rot_matrix_similarity(next_state[:,3:12]-goal[:,3:12])<self.epsilon_ang
+            r = np.where(pos_achieve and ang_achieve ,0.0,-1.0)
             r_lst.append(r)
             ns_lst.append(next_state)
             d_lst.append(done)
@@ -487,10 +491,11 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
     'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
 
     """
-    def __init__(self, capacity, epsilon):
+    def __init__(self, capacity, epsilon_pos, epsilon_ang):
         super().__init__(capacity)
         self.gamma = 1
-        self.epsilon = epsilon
+        self.epsilon_pos = epsilon_pos
+        self.epsilon_ang = epsilon_ang
 
     def push(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
         if len(self.buffer) < self.capacity:
@@ -522,8 +527,10 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
             la_lst.append(last_action)
             goal = goal[None,:]
             if np.random.random()< (4/9):
-                goal = next_state[-1:,:3]
-            r = np.where(np.linalg.norm(next_state[:,:3]-goal,axis=-1)<self.epsilon,0,-1)
+                goal = next_state[-1:,:12]
+            pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
+            ang_achieve = rot_matrix_similarity(next_state[:,3:12]-goal[:,3:12])<self.epsilon_ang
+            r = np.where(pos_achieve and ang_achieve ,0.0,-1.0)
             r_lst.append(r)
             ns_lst.append(next_state)
             d_lst.append(done)

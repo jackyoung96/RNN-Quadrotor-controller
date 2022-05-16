@@ -20,3 +20,12 @@ def plot_grad_flow(named_parameters):
     plt.title("Gradient flow")
     plt.grid(True)
     plt.savefig("gradient_flow.png")
+
+def rot_matrix_similarity(mat1, mat2):
+    """
+    similarity btw two rotation matrix
+    """
+    mat1 = mat1.reshape((3,3))
+    mat2 = np.transpose(mat2.reshape((3,3)))
+    R = np.matmul(mat1, mat2)
+    return np.arccos((np.trace(R)-1)/2)

@@ -191,15 +191,17 @@ def train(args, hparam):
         # batch_size = batch_size*int(max_steps//her_sample_length / 2)
         if args.rnn=='LSTMHER':
             replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size, 
-                                epsilon=np.sqrt(3*(0.1**2)))
+                                epsilon_pos=np.sqrt(3*(0.1**2)),
+                                epsilon_ang=np.deg2rad(10))
                                 # sample_length=her_sample_length)
         else:
             replay_buffer = HindsightReplayBufferGRU(replay_buffer_size, 
-                                epsilon=np.sqrt(3*(0.1**2)))
+                                epsilon_pos=np.sqrt(3*(0.1**2)),
+                                epsilon_ang=np.deg2rad(10))
                                 # sample_length=her_sample_length)
         # For aviary, it include the last action in the state
         # goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
-        goal_dim = 3 if 'aviary' in env_name else state_space.shape[0]
+        goal_dim = 12 if 'aviary' in env_name else state_space.shape[0]
         td3_trainer = TD3HERRNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
@@ -257,13 +259,17 @@ def train(args, hparam):
         # Goal for HER
         if 'aviary' in env_name:
             thetas = [np.random.uniform(-np.pi,np.pi) for _ in range(nenvs)]
+            goal = np.array([[0,0,0, # position
+                            np.cos(theta),np.sin(theta),0, # rotation matrix
+                            -np.sin(theta),np.cos(theta),0,
+                            0,0,1] for theta in thetas]) # angular velocity
             # goal = np.array([[0,0,0, # position
             #                 np.cos(theta),np.sin(theta),0, # rotation matrix
             #                 -np.sin(theta),np.cos(theta),0,
             #                 0,0,1,
             #                 0,0,0, # velocity
             #                 0,0,0] for theta in thetas]) # angular velocity
-            goal = np.array([[0,0,0] for theta in thetas])
+            # goal = np.array([[0,0,0] for theta in thetas])
         else:
             goal = np.array([[1,0,0]]*nenvs)
 
