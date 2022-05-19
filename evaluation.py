@@ -8,6 +8,7 @@ from envs.customEnvDrone import domainRandomAviary
 
 from td3.td3 import *
 from td3.common.buffers import *
+from td3.common.utils import rot_matrix_similarity
 
 import argparse
 import os
@@ -121,11 +122,12 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                                                             deterministic=DETERMINISTIC, 
                                                             explore_noise_scale=0.)
                     next_state, reward, done, _ = eval_env.step(action) 
-                    # print("DEBUG")
-                    # print("POS", state[0,:3])
-                    # print("VEL", state[0,12:15])
-                    # print("ANGVEL", state[0,15:18])
-                    # print("REW", reward)
+                    if not hasattr(agent.q_net1, '_goal_dim'):
+                        # Binary sparse reward
+                        pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<agent.replay_buffer.epsilon_pos
+                        ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<agent.replay_buffer.epsilon_pos
+                        reward = np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0,-1.0)
+
                     if not isinstance(action, np.ndarray):
                         action = np.array([action])
                     state, last_action = next_state[None,:], action[None,:]

@@ -25,7 +25,12 @@ def rot_matrix_similarity(mat1, mat2):
     """
     similarity btw two rotation matrix
     """
-    mat1 = mat1.reshape((3,3))
+    mat1 = mat1.reshape((-1,3,3))
     mat2 = np.transpose(mat2.reshape((3,3)))
-    R = np.matmul(mat1, mat2)
-    return np.arccos((np.trace(R)-1)/2)
+    result = np.zeros((mat1.shape[0],))
+    for i in range(mat1.shape[0]):
+        R = np.matmul(mat1[i], mat2)
+        cos = (np.trace(R)-1)/2
+        cos1 = np.clip(cos, -1, 1)
+        result[i] = np.arccos(cos1)
+    return result

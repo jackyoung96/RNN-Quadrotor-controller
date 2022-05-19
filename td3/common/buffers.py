@@ -400,8 +400,8 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
             if np.random.random()< (4/9):
                 goal = next_state[-1:,:12]
             pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
-            ang_achieve = rot_matrix_similarity(next_state[:,3:12]-goal[:,3:12])<self.epsilon_ang
-            r = np.where(pos_achieve and ang_achieve ,0.0,-1.0)
+            ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
+            r = np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0,-1.0)
             r_lst.append(r)
             ns_lst.append(next_state)
             d_lst.append(done)
@@ -528,9 +528,11 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
             goal = goal[None,:]
             if np.random.random()< (4/9):
                 goal = next_state[-1:,:12]
-            pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
-            ang_achieve = rot_matrix_similarity(next_state[:,3:12]-goal[:,3:12])<self.epsilon_ang
-            r = np.where(pos_achieve and ang_achieve ,0.0,-1.0)
+            pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)
+            pos_achieve = pos_achieve<self.epsilon_pos
+            ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])
+            ang_achieve = ang_achieve<self.epsilon_ang
+            r = np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0,-1.0)
             r_lst.append(r)
             ns_lst.append(next_state)
             d_lst.append(done)

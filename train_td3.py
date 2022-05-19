@@ -191,12 +191,12 @@ def train(args, hparam):
         # batch_size = batch_size*int(max_steps//her_sample_length / 2)
         if args.rnn=='LSTMHER':
             replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size, 
-                                epsilon_pos=np.sqrt(3*(0.1**2)),
+                                epsilon_pos=np.sqrt(3*(0.1**2))/6,
                                 epsilon_ang=np.deg2rad(10))
                                 # sample_length=her_sample_length)
         else:
             replay_buffer = HindsightReplayBufferGRU(replay_buffer_size, 
-                                epsilon_pos=np.sqrt(3*(0.1**2)),
+                                epsilon_pos=np.sqrt(3*(0.1**2))/6,
                                 epsilon_ang=np.deg2rad(10))
                                 # sample_length=her_sample_length)
         # For aviary, it include the last action in the state
