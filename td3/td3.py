@@ -366,7 +366,7 @@ class TD3RNN_Trainer():
         self.policy_net.eval()
 
 class TD3RNN_Trainer2(TD3RNN_Trainer):
-    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
+    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN2', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
         super().__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.strip('2'), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
         self.q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
         self.q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
@@ -455,7 +455,7 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
                 }
 
 class TD3RNN_Trainer3(TD3RNN_Trainer):
-    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
+    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN3', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
         super(TD3RNN_Trainer3, self).__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.strip('3'), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
         if rnn_type=='RNN3':
             self.q_net1 = QNetworkRNNParam(state_space, action_space, hidden_dim, param_num).to(self.device)
@@ -474,6 +474,21 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
             self.target_q_net2 = QNetworkGRUParam(state_space, action_space, hidden_dim, param_num).to(self.device)
         else:
             assert NotImplementedError
+        
+        self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
+        self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
+
+        q_lr = kwargs.get('q_lr',1e-3)
+        weight_decay = kwargs.get('weight_decay',1e-4)
+        t_max = kwargs.get('t_max', 1000)
+        self.lr_scheduler = kwargs.get('lr_scheduler', False)
+
+        self.q_optimizer1 = optim.Adam(self.q_net1.parameters(), lr=q_lr, weight_decay=weight_decay)
+        self.q_optimizer2 = optim.Adam(self.q_net2.parameters(), lr=q_lr, weight_decay=weight_decay)
+
+        if self.lr_scheduler:
+            self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+            self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
 
     def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
@@ -490,7 +505,7 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
         param      = torch.FloatTensor(param[:,None,:]).expand(B,L,-1).to(self.device)
  
         predicted_q_value1, _ = self.q_net1(state, action, last_action, hidden_in, param)
-        predicted_q_value2, _ = self.q_net1(state, action, last_action, hidden_in, param)
+        predicted_q_value2, _ = self.q_net2(state, action, last_action, hidden_in, param)
         new_action, hidden_out, hidden_all, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
         new_next_action, hidden_out, hidden_all, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
