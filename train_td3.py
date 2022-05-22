@@ -65,12 +65,12 @@ def train(args, hparam):
         'l': 3, # 1/n ~ n
 
         # drones
-        'mass_range': 0.0, # (1-n) ~ (1+n)
-        'cm_range': 0.0, # (1-n) ~ (1+n)
-        'kf_range': 0.0, # (1-n) ~ (1+n)
-        'km_range': 0.0, # (1-n) ~ (1+n)
-        'i_range': 0.0,
-        'battery_range': 0.0 # (1-n) ~ (1)
+        'mass_range': 0.3, # (1-n) ~ (1+n)
+        'cm_range': 0.3, # (1-n) ~ (1+n)
+        'kf_range': 0.3, # (1-n) ~ (1+n)
+        'km_range': 0.3, # (1-n) ~ (1+n)
+        'i_range': 0.3,
+        'battery_range': 0.3 # (1-n) ~ (1)
     }
     # else:
     #     dyn_range = {
@@ -98,39 +98,39 @@ def train(args, hparam):
 
     # hyper-parameters for RL training
     if 'Pendulum' in env_name:
-        max_episodes  = 3000
+        max_episodes  = 1000000
         hidden_dim = hparam['hidden_dim']
         max_steps = 150
-        batch_size  = 64 if args.rnn != "None" else 64 * max_steps
+        batch_size  = 256 if args.rnn != "None" else 256 * max_steps
         param_num = 3
         nenvs = 16
         explore_noise_scale = 0.5
         eval_noise_scale = 0.5
         her_pre_steps = 500
-        her_sample_length = 50
+        her_history_length = 50
     elif 'aviary' in env_name:
-        max_episodes  = 6000
+        max_episodes  = 1000000
         hidden_dim = 128
         max_steps = 300
-        batch_size  = 64 if args.rnn != "None" else 8 * max_steps
+        batch_size  = 256 if args.rnn != "None" else 256 * max_steps
         param_num = 14
         nenvs = 2
         explore_noise_scale = 0.25
         eval_noise_scale = 0.25
         her_pre_steps = 1e3
-        her_sample_length = 100
+        her_history_length = 50
     else:
         raise NotImplementedError
 
     best_score = -np.inf
     frame_idx   = 0
-    replay_buffer_size = int(1e6/max_steps) if args.rnn != "None" else 1e6
-    explore_steps = int(1e5/max_steps) if args.rnn != "None" else 1e5  # for random action sampling in the beginning of training
+    replay_buffer_size = 3e5 if args.rnn != "None" else 1e6
+    explore_episode = 200 if args.rnn != "None" else 1e5  # for random action sampling in the beginning of training
     update_itr = 1
     policy_target_update_interval = hparam['update_interval'] # delayed update for the policy network and target networks
     
-    eval_freq = 100
-    eval_itr = 50
+    eval_freq = 200
+    eval_itr = 20
 
     DETERMINISTIC=True  # DDPG: deterministic policy gradient
     
@@ -191,17 +191,23 @@ def train(args, hparam):
         # batch_size = batch_size*int(max_steps//her_sample_length / 2)
         if args.rnn=='LSTMHER':
             replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size, 
-                                epsilon_pos=np.sqrt(3*(0.1**2))/6,
-                                epsilon_ang=np.deg2rad(10))
+                                epsilon_pos=np.sqrt(3*(0.15**2))/6,
+                                epsilon_ang=np.deg2rad(20)/(5*np.pi),
+                                history_length=her_history_length,
+                                mode='end',
+                                env=env_name)
                                 # sample_length=her_sample_length)
         else:
             replay_buffer = HindsightReplayBufferGRU(replay_buffer_size, 
-                                epsilon_pos=np.sqrt(3*(0.1**2))/6,
-                                epsilon_ang=np.deg2rad(10))
+                                epsilon_pos=np.sqrt(3*(0.15**2))/6 if 'aviary' in env_name else 0.01,
+                                epsilon_ang=np.deg2rad(20)/(5*np.pi),
+                                history_length=her_history_length,
+                                mode='end',
+                                env=env_name)
                                 # sample_length=her_sample_length)
         # For aviary, it include the last action in the state
         # goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
-        goal_dim = 12 if 'aviary' in env_name else state_space.shape[0]
+        goal_dim = 18 if 'aviary' in env_name else 3
         td3_trainer = TD3HERRNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
@@ -259,16 +265,17 @@ def train(args, hparam):
         # Goal for HER
         if 'aviary' in env_name:
             thetas = [np.random.uniform(-np.pi,np.pi) for _ in range(nenvs)]
-            goal = np.array([[0,0,0, # position
-                            np.cos(theta),np.sin(theta),0, # rotation matrix
-                            -np.sin(theta),np.cos(theta),0,
-                            0,0,1] for theta in thetas]) # angular velocity
             # goal = np.array([[0,0,0, # position
             #                 np.cos(theta),np.sin(theta),0, # rotation matrix
             #                 -np.sin(theta),np.cos(theta),0,
-            #                 0,0,1,
-            #                 0,0,0, # velocity
-            #                 0,0,0] for theta in thetas]) # angular velocity
+            #                 0,0,1] for theta in thetas]) # angular velocity
+            goal = np.array([[0,0,0, # position
+                            np.cos(theta),np.sin(theta),0, # rotation matrix
+                            -np.sin(theta),np.cos(theta),0,
+                            0,0,1,
+                            0,0,0, # velocity
+                            0,0,0,# angular velocity
+                            0,0,0,0] for theta in thetas]) # dummy action goal
             # goal = np.array([[0,0,0] for theta in thetas])
         else:
             goal = np.array([[1,0,0]]*nenvs)
@@ -278,7 +285,7 @@ def train(args, hparam):
                 hidden_in = hidden_out
                 t_start = time()
                 if not "HER" in args.rnn:
-                    if len(replay_buffer) > explore_steps:
+                    if len(replay_buffer) > explore_episode:
                         action, hidden_out = \
                             td3_trainer.policy_net.get_action(state, 
                                                             last_action, 
@@ -288,16 +295,16 @@ def train(args, hparam):
                     else:
                         action = np.stack([envs.action_space.sample() for _ in range(nenvs)],axis=0).squeeze()
                 else:
-                    if len(replay_buffer) > explore_steps:
-                        action, hidden_out = \
-                            td3_trainer.policy_net.get_action(state, 
-                                                            last_action, 
-                                                            hidden_in,
-                                                            goal=goal,
-                                                            deterministic=DETERMINISTIC, 
-                                                            explore_noise_scale=explore_noise_scale)
-                    else:
-                        action = np.stack([envs.action_space.sample() for _ in range(nenvs)],axis=0).squeeze()
+                    # if len(replay_buffer) > explore_episode:
+                    action, hidden_out = \
+                        td3_trainer.policy_net.get_action(state, 
+                                                        last_action, 
+                                                        hidden_in,
+                                                        goal=goal,
+                                                        deterministic=DETERMINISTIC, 
+                                                        explore_noise_scale=explore_noise_scale)
+                    # else:
+                    #     action = np.stack([envs.action_space.sample() for _ in range(nenvs)],axis=0).squeeze()
                 time_test['get_action'].append(time()-t_start)
                 t_start = time()
                 next_state, reward, done, _ = envs.step(action) 
@@ -312,7 +319,7 @@ def train(args, hparam):
                 episode_next_state.append(next_state)
                 episode_done.append(done)
             else:
-                if len(replay_buffer) > explore_steps:
+                if len(replay_buffer) > explore_episode*max_steps:
                     action = \
                         td3_trainer.policy_net.get_action(state, 
                                                         deterministic=DETERMINISTIC, 
@@ -328,25 +335,18 @@ def train(args, hparam):
             last_action = action
             frame_idx += 1
             
-            if len(replay_buffer) > explore_steps:
-                for i in range(update_itr):
-                    # if "HER" in args.rnn:
-                    #     if i_episode >= her_pre_steps:
-                    #         if not td3_trainer.use_her:
-                    #             td3_trainer.use_her = True
-                    #             td3_trainer.reset_critic() # reset critic
-                    # if "HER" in args.rnn:
-                    #     td3_trainer.replay_buffer.gamma = 1-i_episode/max_episodes
-                    loss_dict = td3_trainer.update(batch_size, deterministic=DETERMINISTIC, eval_noise_scale=eval_noise_scale)
-                    # policy_loss, q_loss_1, q_loss_2
-                    policy_loss.append(loss_dict['policy_loss'])
-                    q_loss_1.append(loss_dict['q_loss_1'])
-                    q_loss_2.append(loss_dict['q_loss_2'])
-                    if 'fast' in args.rnn:
-                        param_loss.append(loss_dict['param_loss'])
+        if i_episode > explore_episode:
+            for i in range(update_itr):
+                loss_dict = td3_trainer.update(batch_size, deterministic=DETERMINISTIC, eval_noise_scale=eval_noise_scale)
+                # policy_loss, q_loss_1, q_loss_2
+                policy_loss.append(loss_dict['policy_loss'])
+                q_loss_1.append(loss_dict['q_loss_1'])
+                q_loss_2.append(loss_dict['q_loss_2'])
+                if 'fast' in args.rnn:
+                    param_loss.append(loss_dict['param_loss'])
         
         time_test = {k:"%.2f"%np.sum(v) for k,v in time_test.items()}
-        if len(replay_buffer) > explore_steps:
+        if len(replay_buffer) > explore_episode:
             time_test
         
         if args.rnn != "None": 
@@ -429,8 +429,9 @@ def train(args, hparam):
                 writer.add_scalar('loss/ang_velocity[deg/s]', np.linalg.norm((2*180*np.stack(episode_state)[:,:,15:18]), axis=-1).mean(), i_episode)
                 writer.add_scalar('loss/angle[deg]', 180/np.pi*np.arccos(np.stack(episode_state)[:,:,11].flatten()).mean(), i_episode)
 
-            if i_episode % eval_freq == 0 and i_episode != 0:
-                eval_rew, eval_success = evaluation(env_name, agent=td3_trainer, dyn_range=dyn_range, eval_itr=eval_itr, seed=i_episode)
+        if i_episode % eval_freq == 0 and i_episode != 0:
+            eval_rew, eval_success = evaluation(env_name, agent=td3_trainer, dyn_range=dyn_range, eval_itr=eval_itr, seed=i_episode)
+            if writer is not None:
                 writer.add_scalar('eval/reward', eval_rew, i_episode)
                 writer.add_scalar('eval/success_rate', eval_success, i_episode)
 
@@ -597,7 +598,7 @@ hparam_set = {
     "param_lr": [3e-5],
     "t_max": [50000, 30000, 100000],
     "hidden_dim": [128],
-    "update_interval": [3,2,4,5]
+    "update_interval": [2,3,2,4,5]
 }
 
 if __name__=='__main__':

@@ -275,7 +275,7 @@ class customAviary(gym.Wrapper):
         MAX_ROLL_YAW = np.pi
         MAX_PITCH = np.pi/2
 
-        MAX_RPY_RATE = 2*np.pi # temporary
+        MAX_RPY_RATE = 30*np.pi # temporary
 
         norm_state = state.copy()
 

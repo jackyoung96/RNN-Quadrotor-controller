@@ -332,6 +332,7 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         -eval_noise_clip,
         eval_noise_clip)
         action = action + noise.to(self.device)
+        action = torch.clamp(action,-1,1)
 
         return action, hidden_out, hidden_all, log_prob, z, mean, std
         
@@ -358,8 +359,14 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         # print("debug get action", mean.squeeze(), action)
 
         ''' add noise '''
+        eval_noise_clip = 2*explore_noise_scale
         noise = normal.sample(action.shape) * explore_noise_scale
+        noise = torch.clamp(
+        noise,
+        -eval_noise_clip,
+        eval_noise_clip)
         action = action + noise.numpy()
+        action = np.clip(action,-1,1)
 
         return action, hidden_out
 

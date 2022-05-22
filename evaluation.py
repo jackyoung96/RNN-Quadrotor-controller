@@ -122,11 +122,15 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                                                             deterministic=DETERMINISTIC, 
                                                             explore_noise_scale=0.)
                     next_state, reward, done, _ = eval_env.step(action) 
-                    if not hasattr(agent.q_net1, '_goal_dim'):
+                    if hasattr(agent.q_net1, '_goal_dim'):
                         # Binary sparse reward
-                        pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<agent.replay_buffer.epsilon_pos
-                        ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<agent.replay_buffer.epsilon_pos
-                        reward = np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0,-1.0)
+                        if 'aviary' in env_name:
+                            pos_achieve = np.linalg.norm(next_state[:3]-goal[0,:3],axis=-1)<agent.replay_buffer.epsilon_pos
+                            ang_achieve = rot_matrix_similarity(next_state[3:12],goal[0,3:12])<agent.replay_buffer.epsilon_pos
+                            reward = np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0,-1.0)
+                        else:
+                            pos_achieve = np.linalg.norm(next_state[:2]-goal[0,:2],axis=-1)<agent.replay_buffer.epsilon_pos
+                            reward = np.where(pos_achieve, 0.0,-1.0)
 
                     if not isinstance(action, np.ndarray):
                         action = np.array([action])
