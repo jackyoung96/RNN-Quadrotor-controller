@@ -289,7 +289,6 @@ class TD3RNN_Trainer():
         predicted_q_value2, _ = self.q_net2(state, action, last_action, hidden_in)
         time_test['q'] = time()-t_start
         t_start = time()
-        new_action, hidden_out, hidden_all, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
         new_next_action, hidden_out, hidden_all, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
         time_test['p'] = time()-t_start
         # reward = (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6) # normalize with batch mean and std; plus a small number to prevent numerical problem
@@ -329,6 +328,7 @@ class TD3RNN_Trainer():
             ''' implementation 1 '''
             # predicted_new_q_value = torch.min(self.q_net1(state, new_action),self.q_net2(state, new_action))
             ''' implementation 2 '''
+            new_action, hidden_out, hidden_all, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
             predicted_new_q_value, _ = self.q_net1(state, new_action, last_action, hidden_in)
 
             policy_loss = - predicted_new_q_value.mean()
@@ -579,6 +579,9 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
         self.target_policy_net = self.target_ini(self.policy_net, self.target_policy_net)
+        self.target_q_net1.eval()
+        self.target_q_net2.eval()
+        self.target_policy_net.eval()
         
         self.q_lr = kwargs.get('q_lr',1e-3)
         self.policy_lr = kwargs.get('policy_lr',1e-4)
@@ -611,7 +614,7 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
             self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=self.q_lr, step_size_up=self.t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
             self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=self.q_lr, step_size_up=self.t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
-    def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
+    def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=5e-3):
         if self.use_her:
             hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal = self.replay_buffer.sample(batch_size)
         else:
@@ -630,8 +633,8 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
  
         predicted_q_value1 = self.q_net1(state, action, param, goal)
         predicted_q_value2 = self.q_net2(state, action, param, goal)
-        new_action, hidden_out, hidden_all, *_= self.policy_net.evaluate(state, last_action, hidden_in, goal, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
-        new_next_action, hidden_out, hidden_all, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, goal, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
+        new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, goal, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
+        new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, goal, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
         # Training Q Function
         predicted_target_q1 = self.target_q_net1(next_state, new_next_action, param, goal)
@@ -655,6 +658,10 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         if self.lr_scheduler:
             self.scheduler_q2.step()
         
+        # Soft update the target nets
+        self.target_q_net1=self.target_soft_update(self.q_net1, self.target_q_net1, soft_tau)
+        self.target_q_net2=self.target_soft_update(self.q_net2, self.target_q_net2, soft_tau)
+
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
             # Training Policy Function
@@ -670,9 +677,8 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
             self.policy_optimizer.step()
             if self.lr_scheduler:
                 self.scheduler_policy.step()
+                
             # Soft update the target nets
-            self.target_q_net1=self.target_soft_update(self.q_net1, self.target_q_net1, soft_tau)
-            self.target_q_net2=self.target_soft_update(self.q_net2, self.target_q_net2, soft_tau)
             self.target_policy_net=self.target_soft_update(self.policy_net, self.target_policy_net, soft_tau)
 
         self.update_cnt+=1

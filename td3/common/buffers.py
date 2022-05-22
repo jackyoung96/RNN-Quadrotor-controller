@@ -1,6 +1,7 @@
 import math
 import random
 import numpy as np
+from pkg_resources import Environment
 import torch
 
 from .utils import rot_matrix_similarity
@@ -364,28 +365,56 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
     'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
 
     """
-    def __init__(self, capacity, epsilon):
+    def __init__(self, capacity, epsilon_pos, epsilon_ang, history_length=50, mode='end',env='takeoff-aviary-v0'):
         super().__init__(capacity)
-        self.epsilon = epsilon
+        self.history_length = history_length
+        self.epsilon_pos = epsilon_pos
+        self.epsilon_ang = epsilon_ang
+        self.mode = mode
+        self.env = env
+        if not self.mode in ['end','episode','future']:
+            assert "mode should be choosen among [end, episode, future]"
+        if not self.env in ['takeoff-aviary-v0', 'Pendulum-v0']:
+            assert "env should be choosen among ['takeoff-aviary-v0', 'Pendulum-v0']"
     
     def push(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
-        if len(self.buffer) < self.capacity:
-            self.buffer.append(None)
-        self.buffer[self.position] = (hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal)
-        self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
+        if np.random.random()<0.8:
+            if self.mode=='end':
+                gs = [next_state[-1:,:]]
+            elif self.mode=='episode':
+                idxs = list(np.random.randint(0,state.shape[0], size=4))
+                gs = [next_state[idx:idx+1,:] for idx in idxs]
+        else:
+            gs = [goal[None,:]]
+
+        for goal in gs:
+            if len(self.buffer) < self.capacity:
+                self.buffer.append(None)
+            if self.env == 'takeoff-aviary-v0':
+                pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
+                ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
+                reward = np.where(np.logical_and(pos_achieve, ang_achieve) ,1.0, 0.0)
+                done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
+            elif self.env == 'Pendulum-v0':
+                pos_achieve = np.linalg.norm(next_state[:,:2]-goal[:,:2],axis=-1)<self.epsilon_pos
+                reward = np.where(pos_achieve, 0.0, -1.0)
+                done = np.where(pos_achieve , 1.0, 0.0)
+            # ang_achieve = np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)<self.epsilon_ang
+            self.buffer[self.position] = (hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal)
+            self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
 
     def push_batch(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
-        np.stack(last_action,axis=1)
+        B,L = state[0].shape[0], len(state)
         state, action, last_action, reward, next_state, done = \
             map(lambda x: np.stack(x, axis=1),[state, action, last_action, reward, next_state, done])
         assert all(state.shape[0] == x.shape[0] for x in [action, last_action, reward, next_state, done]), "Somethings wrong on dimension"
-        num_batch = state.shape[0]
-        hidden_in = (hidden_in[0].view(num_batch,1,1,-1), hidden_in[1].view(num_batch,1,1,-1))
-        hidden_out = (hidden_out[0].view(num_batch,1,1,-1), hidden_out[1].view(num_batch,1,1,-1))
-        self.buffer.extend([None]*int(min(num_batch,self.capacity-len(self.buffer))))
+        hidden_in = (hidden_in[0].view(B,1,1,-1), hidden_in[1].view(B,1,1,-1))
+        hidden_out = (hidden_out[0].view(B,1,1,-1), hidden_out[1].view(B,1,1,-1))
+
         for hin_h,hin_c, hout_h,hout_c, s,a,la,r,ns,d,p,g in zip(*hidden_in, *hidden_out, state, action, last_action, reward, next_state, done,param, goal):
-            self.buffer[self.position] = ((hin_h,hin_c),(hout_h,hout_c),s,a,la,r,ns,d,p,g)
-            self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
+            hin, hout = (hin_h,hin_c), (hout_h,hout_c)
+            for i in range(0,L,self.history_length):
+                self.push(hin,hout,*map(lambda x:x[i:i+self.history_length],[s,a,la,r,ns,d]),p,g)
 
     def sample(self, batch_size):
         s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ci_lst, ho_lst, co_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[],[],[]
@@ -396,13 +425,7 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
             s_lst.append(state) 
             a_lst.append(action)
             la_lst.append(last_action)
-            goal = goal[None,:]
-            if np.random.random()< (4/9):
-                goal = next_state[-1:,:12]
-            pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
-            ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
-            r = np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0,-1.0)
-            r_lst.append(r)
+            r_lst.append(reward)
             ns_lst.append(next_state)
             d_lst.append(done)
             hi_lst.append(h_in)  # h_in: (1, batch_size=1, hidden_size)
@@ -491,49 +514,66 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
     'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
 
     """
-    def __init__(self, capacity, epsilon_pos, epsilon_ang):
+    def __init__(self, capacity, epsilon_pos, epsilon_ang, history_length=50, mode='end', env='takeoff-aviary-v0'):
         super().__init__(capacity)
-        self.gamma = 1
+        self.history_length = history_length
         self.epsilon_pos = epsilon_pos
         self.epsilon_ang = epsilon_ang
+        self.mode = mode
+        self.env = env
+        if not self.mode in ['end','episode','future']:
+            assert "mode should be choosen among [end, episode, future]"
+        if not self.env in ['takeoff-aviary-v0', 'Pendulum-v0']:
+            assert "env should be choosen among ['takeoff-aviary-v0', 'Pendulum-v0']"
 
     def push(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
-        if len(self.buffer) < self.capacity:
-            self.buffer.append(None)
-        self.buffer[self.position] = (hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal)
-        self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
+        if np.random.random()<0.8:
+            if self.mode=='end':
+                gs = [next_state[-1:,:]]
+            elif self.mode=='episode':
+                idxs = list(np.random.randint(0,state.shape[0], size=4))
+                gs = [next_state[idx:idx+1,:] for idx in idxs]
+        else:
+            gs = [goal[None,:]]
+        for goal in gs:
+            if len(self.buffer) < self.capacity:
+                self.buffer.append(None)
+            if self.env == 'takeoff-aviary-v0':
+                pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
+                ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
+                reward = np.where(np.logical_and(pos_achieve, ang_achieve) ,1.0, 0.0)
+                done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
+            elif self.env == 'Pendulum-v0':
+                pos_achieve = np.linalg.norm(next_state[:,:2]-goal[:,:2],axis=-1)<self.epsilon_pos
+                reward = np.where(pos_achieve, 0.0, -1.0)
+                done = np.where(pos_achieve , 1.0, 0.0)
+            # ang_achieve = np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)<self.epsilon_ang
+            
+            
+            self.buffer[self.position] = (hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal)
+            self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
 
     def push_batch(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
-        np.stack(last_action,axis=1)
+        B,L = state[0].shape[0], len(state)
         state, action, last_action, reward, next_state, done = \
             map(lambda x: np.stack(x, axis=1),[state, action, last_action, reward, next_state, done])
         assert all(state.shape[0] == x.shape[0] for x in [action, last_action, reward, next_state, done]), "Somethings wrong on dimension"
-        num_batch = state.shape[0]
-        hidden_in = hidden_in.view(num_batch,1,1,-1)
-        hidden_out = hidden_out.view(num_batch,1,1,-1)
-        self.buffer.extend([None]*int(min(num_batch,self.capacity-len(self.buffer))))
-        for hin, hout, s,a,la,r,ns,d,p,g in zip(hidden_in, hidden_out, state, action, last_action, reward, next_state, done,param, goal):
-            self.buffer[self.position] = (hin,hout,s,a,la,r,ns,d,p,g)
-            self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
+        hidden_in = hidden_in.view(B,1,1,-1)
+        hidden_out = hidden_out.view(B,1,1,-1)
+
+        for hin,hout,s,a,la,r,ns,d,p,g in zip(hidden_in, hidden_out, state, action, last_action, reward, next_state, done,param, goal):
+            for i in range(0,L,self.history_length):
+                self.push(hin,hout,*map(lambda x:x[i:i+self.history_length],[s,a,la,r,ns,d]),p,g)
 
     def sample(self, batch_size):
         s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ho_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[]
         batch = random.sample(self.buffer, batch_size)
         for sample in batch:
             h_in, h_out, state, action, last_action, reward, next_state, done, param, goal = sample
-            # t0 = np.random.randint(0,state.shape[0]-self.sample_length)
             s_lst.append(state) 
             a_lst.append(action)
             la_lst.append(last_action)
-            goal = goal[None,:]
-            if np.random.random()< (4/9):
-                goal = next_state[-1:,:12]
-            pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)
-            pos_achieve = pos_achieve<self.epsilon_pos
-            ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])
-            ang_achieve = ang_achieve<self.epsilon_ang
-            r = np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0,-1.0)
-            r_lst.append(r)
+            r_lst.append(reward)
             ns_lst.append(next_state)
             d_lst.append(done)
             hi_lst.append(h_in)  # h_in: (1, batch_size=1, hidden_size)
