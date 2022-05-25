@@ -379,23 +379,29 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
             assert "env should be choosen among ['takeoff-aviary-v0', 'Pendulum-v0']"
     
     def push(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
+        gs = [goal[None,:]]
         if np.random.random()<0.8:
             if self.mode=='end':
-                gs = [next_state[-1:,:]]
+                gs.append(next_state[-1:,:])
             elif self.mode=='episode':
                 idxs = list(np.random.randint(0,state.shape[0], size=4))
-                gs = [next_state[idx:idx+1,:] for idx in idxs]
-        else:
-            gs = [goal[None,:]]
+                gs.extend([next_state[idx:idx+1,:] for idx in idxs])
 
-        for goal in gs:
+        for i,goal in enumerate(gs):
             if len(self.buffer) < self.capacity:
                 self.buffer.append(None)
             if self.env == 'takeoff-aviary-v0':
+                if i!=0:
+                    ####### Distribution mean -> 0 #################
+                    state[:,:3] = state[:,:3] - goal[:,:3]
+                    next_state[:,:3] = next_state[:,:3] - goal[:,:3]
+                    goal[:,:3] = 0
+                    ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
                 ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
                 reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
                 done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
+                done[:-1] = 0.0
             elif self.env == 'Pendulum-v0':
                 pos_achieve = np.linalg.norm(next_state[:,:2]-goal[:,:2],axis=-1)<self.epsilon_pos
                 reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
@@ -414,7 +420,7 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
 
         for hin_h,hin_c, hout_h,hout_c, s,a,la,r,ns,d,p,g in zip(*hidden_in, *hidden_out, state, action, last_action, reward, next_state, done,param, goal):
             hin, hout = (hin_h,hin_c), (hout_h,hout_c)
-            for i in range(0,L,self.history_length):
+            for i in range(0,L+1-self.history_length,self.history_length):
                 self.push(hin,hout,*map(lambda x:x[i:i+self.history_length],[s,a,la,r,ns,d]),p,g)
 
     def sample(self, batch_size):
@@ -529,27 +535,29 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
             assert "env should be choosen among ['takeoff-aviary-v0', 'Pendulum-v0']"
 
     def push(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
+        gs = [goal[None,:]]
         if np.random.random()<0.8:
             if self.mode=='end':
-                gs = [next_state[-1:,:]]
+                gs.append(next_state[-1:,:])
             elif self.mode=='episode':
                 idxs = list(np.random.randint(0,state.shape[0], size=4))
-                gs = [next_state[idx:idx+1,:] for idx in idxs]
-        else:
-            gs = [goal[None,:]]
-        for goal in gs:
+                gs.extend([next_state[idx:idx+1,:] for idx in idxs])
+
+        for i,goal in enumerate(gs):
             if len(self.buffer) < self.capacity:
                 self.buffer.append(None)
             if self.env == 'takeoff-aviary-v0':
-                ####### Distribution mean -> 0 #################
-                state[:,:3] = state[:,:3] - goal[:,:3]
-                next_state[:,:3] = next_state[:,:3] - goal[:,:3]
-                goal[:,:3] = 0
-                ################################################
+                if i!=0:
+                    ####### Distribution mean -> 0 #################
+                    state[:,:3] = state[:,:3] - goal[:,:3]
+                    next_state[:,:3] = next_state[:,:3] - goal[:,:3]
+                    goal[:,:3] = 0
+                    ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
                 ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
                 reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
                 done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
+                done[:-1] = 0.0
             elif self.env == 'Pendulum-v0':
                 pos_achieve = np.linalg.norm(next_state[:,:2]-goal[:,:2],axis=-1)<self.epsilon_pos
                 reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward

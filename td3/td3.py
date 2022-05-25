@@ -642,6 +642,8 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         done       = torch.FloatTensor(np.float32(done)).unsqueeze(-1).to(self.device)
         param      = torch.FloatTensor(param[:,None,:]).expand(B,L,-1).to(self.device)
         goal       = torch.FloatTensor(goal).expand(B,L,-1).to(self.device)
+
+        reward = (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6)
  
         predicted_q_value1 = self.q_net1(state, action, param, goal)
         predicted_q_value2 = self.q_net2(state, action, param, goal)

@@ -119,7 +119,7 @@ def train(args, hparam):
         explore_noise_scale = 0.5
         eval_noise_scale = 0.5
         her_pre_steps = 1e3
-        her_history_length = 8
+        her_history_length = 100
         her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
     else:
         raise NotImplementedError
@@ -194,8 +194,8 @@ def train(args, hparam):
         if args.rnn=='LSTMHER':
             replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size,
                                 gamma=her_gamma, 
-                                epsilon_pos=np.sqrt(3*(0.15**2))/6,
-                                epsilon_ang=np.deg2rad(20),
+                                epsilon_pos=np.sqrt(3*(0.5**2))/6 if 'aviary' in env_name else 0.00025,
+                                epsilon_ang=np.deg2rad(10),
                                 history_length=her_history_length,
                                 mode='end',
                                 env=env_name)
@@ -224,7 +224,7 @@ def train(args, hparam):
                     policy_target_update_interval=policy_target_update_interval,
                     **hparam)
         # Using pre-trained policy
-        td3_trainer.load_lstm("save/TD3/randomize/RNN2/takeoff-aviary-v0/22May05045746/best")
+        # td3_trainer.load_lstm("save/TD3/randomize/RNN2/takeoff-aviary-v0/22May05045746/best")
     elif args.rnn == "None":
         replay_buffer = ReplayBuffer(replay_buffer_size)
         td3_trainer = TD3_Trainer(replay_buffer,
