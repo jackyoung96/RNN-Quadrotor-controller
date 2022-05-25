@@ -356,14 +356,13 @@ class TD3RNN_Trainer():
         torch.save(self.policy_net.state_dict(), path+'_policy.pt')
 
     def load_model(self, path):
-        import os
-        print(os.getcwd())
         self.q_net1.load_state_dict(torch.load(path+'_q1.pt', map_location=self.device))
         self.q_net2.load_state_dict(torch.load(path+'_q2.pt', map_location=self.device))
         self.policy_net.load_state_dict(torch.load(path+'_policy.pt', map_location=self.device))
-        self.q_net1.eval()
-        self.q_net2.eval()
-        self.policy_net.eval()
+        self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
+        self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
+        self.target_policy_net = self.target_ini(self.policy_net, self.target_policy_net)
+
 
 class TD3RNN_Trainer2(TD3RNN_Trainer):
     def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN2', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
@@ -613,6 +612,19 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         if self.lr_scheduler:
             self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=self.q_lr, step_size_up=self.t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
             self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=self.q_lr, step_size_up=self.t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+
+    def load_lstm(self, path):
+        model_dict = self.policy_net.state_dict()
+        pre_dict = torch.load(path+'_policy.pt', map_location=self.device)
+        lstm_dict = {k:v for k,v in pre_dict.items() if 'rnn' in k}
+        print(lstm_dict.keys())
+        model_dict.update(lstm_dict)
+        self.policy_net.load_state_dict(model_dict)
+        for name,param in self.policy_net.named_parameters():
+            if 'rnn' in name:
+                param.requires_grad = False
+        self.target_policy_net = self.target_ini(self.policy_net, self.target_policy_net)
+        self.target_policy_net.eval()
 
     def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=5e-3):
         if self.use_her:

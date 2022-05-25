@@ -107,7 +107,8 @@ def train(args, hparam):
         explore_noise_scale = 0.5
         eval_noise_scale = 0.5
         her_pre_steps = 500
-        her_history_length = 50
+        her_history_length = 150
+        her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
     elif 'aviary' in env_name:
         max_episodes  = 1000000
         hidden_dim = 128
@@ -118,7 +119,8 @@ def train(args, hparam):
         explore_noise_scale = 0.25
         eval_noise_scale = 0.25
         her_pre_steps = 1e3
-        her_history_length = 50
+        her_history_length = 8
+        her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
     else:
         raise NotImplementedError
 
@@ -190,17 +192,19 @@ def train(args, hparam):
     elif args.rnn in ["RNNHER", "LSTMHER", "GRUHER"]:
         # batch_size = batch_size*int(max_steps//her_sample_length / 2)
         if args.rnn=='LSTMHER':
-            replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size, 
+            replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size,
+                                gamma=her_gamma, 
                                 epsilon_pos=np.sqrt(3*(0.15**2))/6,
-                                epsilon_ang=np.deg2rad(20)/(5*np.pi),
+                                epsilon_ang=np.deg2rad(20),
                                 history_length=her_history_length,
                                 mode='end',
                                 env=env_name)
                                 # sample_length=her_sample_length)
         else:
             replay_buffer = HindsightReplayBufferGRU(replay_buffer_size, 
+                                gamma=her_gamma,
                                 epsilon_pos=np.sqrt(3*(0.15**2))/6 if 'aviary' in env_name else 0.01,
-                                epsilon_ang=np.deg2rad(20)/(5*np.pi),
+                                epsilon_ang=np.deg2rad(20),
                                 history_length=her_history_length,
                                 mode='end',
                                 env=env_name)
@@ -219,6 +223,8 @@ def train(args, hparam):
                     device=device, 
                     policy_target_update_interval=policy_target_update_interval,
                     **hparam)
+        # Using pre-trained policy
+        td3_trainer.load_lstm("save/TD3/randomize/RNN2/takeoff-aviary-v0/22May05045746/best")
     elif args.rnn == "None":
         replay_buffer = ReplayBuffer(replay_buffer_size)
         td3_trainer = TD3_Trainer(replay_buffer,
@@ -593,12 +599,13 @@ hparam_set = {
     # "hidden_dim": [64,128,256],
     # "update_interval": [2,5,10]
 
-    "q_lr": [3e-4],
-    "policy_lr": [3e-5],
+    "q_lr": [1e-3, 3e-4],
+    "policy_lr": [1e-3, 3e-5],
     "param_lr": [3e-5],
     "t_max": [50000, 30000, 100000],
     "hidden_dim": [128],
-    "update_interval": [2,3,2,4,5]
+    "update_interval": [2,3,2,4,5],
+    "her_gamma": [0.0, 0.25, 0.5, 0.75, 1.0]
 }
 
 if __name__=='__main__':

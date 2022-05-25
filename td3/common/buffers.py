@@ -365,8 +365,9 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
     'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
 
     """
-    def __init__(self, capacity, epsilon_pos, epsilon_ang, history_length=50, mode='end',env='takeoff-aviary-v0'):
+    def __init__(self, capacity, gamma, epsilon_pos, epsilon_ang, history_length=50, mode='end',env='takeoff-aviary-v0'):
         super().__init__(capacity)
+        self.gamma = gamma
         self.history_length = history_length
         self.epsilon_pos = epsilon_pos
         self.epsilon_ang = epsilon_ang
@@ -393,11 +394,11 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
             if self.env == 'takeoff-aviary-v0':
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
                 ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
-                reward = np.where(np.logical_and(pos_achieve, ang_achieve) ,1.0, 0.0)
+                reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
                 done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
             elif self.env == 'Pendulum-v0':
                 pos_achieve = np.linalg.norm(next_state[:,:2]-goal[:,:2],axis=-1)<self.epsilon_pos
-                reward = np.where(pos_achieve, 0.0, -1.0)
+                reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
                 done = np.where(pos_achieve , 1.0, 0.0)
             # ang_achieve = np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)<self.epsilon_ang
             self.buffer[self.position] = (hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal)
@@ -514,8 +515,9 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
     'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
 
     """
-    def __init__(self, capacity, epsilon_pos, epsilon_ang, history_length=50, mode='end', env='takeoff-aviary-v0'):
+    def __init__(self, capacity, gamma, epsilon_pos, epsilon_ang, history_length=50, mode='end', env='takeoff-aviary-v0'):
         super().__init__(capacity)
+        self.gamma = gamma
         self.history_length = history_length
         self.epsilon_pos = epsilon_pos
         self.epsilon_ang = epsilon_ang
@@ -541,11 +543,11 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
             if self.env == 'takeoff-aviary-v0':
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
                 ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
-                reward = np.where(np.logical_and(pos_achieve, ang_achieve) ,1.0, 0.0)
+                reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
                 done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
             elif self.env == 'Pendulum-v0':
                 pos_achieve = np.linalg.norm(next_state[:,:2]-goal[:,:2],axis=-1)<self.epsilon_pos
-                reward = np.where(pos_achieve, 0.0, -1.0)
+                reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
                 done = np.where(pos_achieve , 1.0, 0.0)
             # ang_achieve = np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)<self.epsilon_ang
             
@@ -562,7 +564,7 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
         hidden_out = hidden_out.view(B,1,1,-1)
 
         for hin,hout,s,a,la,r,ns,d,p,g in zip(hidden_in, hidden_out, state, action, last_action, reward, next_state, done,param, goal):
-            for i in range(0,L,self.history_length):
+            for i in range(0,L+1-self.history_length,self.history_length):
                 self.push(hin,hout,*map(lambda x:x[i:i+self.history_length],[s,a,la,r,ns,d]),p,g)
 
     def sample(self, batch_size):
