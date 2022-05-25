@@ -107,7 +107,7 @@ def train(args, hparam):
         explore_noise_scale = 0.5
         eval_noise_scale = 0.5
         her_pre_steps = 500
-        her_history_length = 50
+        her_history_length = 150
     elif 'aviary' in env_name:
         max_episodes  = 1000000
         hidden_dim = 128
@@ -115,8 +115,8 @@ def train(args, hparam):
         batch_size  = 256 if args.rnn != "None" else 256 * max_steps
         param_num = 14
         nenvs = 2
-        explore_noise_scale = 0.25
-        eval_noise_scale = 0.25
+        explore_noise_scale = 0.5
+        eval_noise_scale = 0.5
         her_pre_steps = 1e3
         her_history_length = 50
     else:
@@ -199,7 +199,7 @@ def train(args, hparam):
                                 # sample_length=her_sample_length)
         else:
             replay_buffer = HindsightReplayBufferGRU(replay_buffer_size, 
-                                epsilon_pos=np.sqrt(3*(0.15**2))/6 if 'aviary' in env_name else 0.01,
+                                epsilon_pos=np.sqrt(3*(0.15**2))/6 if 'aviary' in env_name else 0.00025,
                                 epsilon_ang=np.deg2rad(20)/(5*np.pi),
                                 history_length=her_history_length,
                                 mode='end',
@@ -207,7 +207,7 @@ def train(args, hparam):
                                 # sample_length=her_sample_length)
         # For aviary, it include the last action in the state
         # goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
-        goal_dim = 18 if 'aviary' in env_name else 3
+        goal_dim = 12 if 'aviary' in env_name else 3
         td3_trainer = TD3HERRNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
@@ -593,12 +593,12 @@ hparam_set = {
     # "hidden_dim": [64,128,256],
     # "update_interval": [2,5,10]
 
-    "q_lr": [3e-4],
-    "policy_lr": [3e-5],
+    "q_lr": [1e-3, 3e-4],
+    "policy_lr": [1e-3, 3e-5],
     "param_lr": [3e-5],
     "t_max": [50000, 30000, 100000],
     "hidden_dim": [128],
-    "update_interval": [2,3,2,4,5]
+    "update_interval": [2,2,3,2,4,5]
 }
 
 if __name__=='__main__':
