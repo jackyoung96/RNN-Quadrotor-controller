@@ -541,6 +541,11 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
             if len(self.buffer) < self.capacity:
                 self.buffer.append(None)
             if self.env == 'takeoff-aviary-v0':
+                ####### Distribution mean -> 0 #################
+                state[:,:3] = state[:,:3] - goal[:,:3]
+                next_state[:,:3] = next_state[:,:3] - goal[:,:3]
+                goal[:,:3] = 0
+                ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
                 ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
                 reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
