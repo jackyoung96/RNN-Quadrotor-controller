@@ -20,6 +20,7 @@ import pandas as pd
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
+import time
 
 
 def evaluation(env_name, agent, dyn_range, eval_itr, seed):
@@ -52,7 +53,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                     record=False, 
                     obs=ObservationType.KIN,
                     act=ActionType.RPM)
-                eval_env = domainRandomAviary(eval_env, 'test', 0, seed+i_eval,
+                eval_env = domainRandomAviary(eval_env, str(time.time_ns()), 0, seed+i_eval,
                     observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
                     frame_stack=1,
                     task='stabilize2',
@@ -201,7 +202,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                     record=record, 
                     obs=ObservationType.KIN,
                     act=ActionType.RPM)
-                eval_env = domainRandomAviary(eval_env, 'test', 0, seed+i_eval,
+                eval_env = domainRandomAviary(eval_env, str(time.time_ns()), 0, seed+i_eval,
                     observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
                     frame_stack=1,
                     task='stabilize2',

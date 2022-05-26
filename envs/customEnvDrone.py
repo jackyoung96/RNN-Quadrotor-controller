@@ -669,4 +669,10 @@ class domainRandomAviary(customAviary):
             #### It severly slows down the GUI #########################
             if self.env.GUI and self.env.USER_DEBUG:
                 self.env._showDroneLocalAxes(i)
- 
+    
+    def close(self):
+        super().close()
+        file_name = os.path.join(os.path.dirname(os.path.abspath(__file__)),self.URDF)
+        file_path = file_name.strip(os.path.basename(file_name))
+        if os.path.isdir(file_path):
+            os.removedirs(file_path)
