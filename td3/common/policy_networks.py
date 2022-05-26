@@ -245,7 +245,7 @@ class PolicyNetworkGRU(PolicyNetworkRNN):
 
 
 class PolicyNetworkGoalRNN(PolicyNetworkBase):
-    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, actf=F.relu ,out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
         super().__init__(state_space, action_space, device)
         self._goal_dim = goal_dim
         
@@ -267,6 +267,7 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         self.log_std_linear.weight.data.uniform_(-init_w, init_w)
         self.log_std_linear.bias.data.uniform_(-init_w, init_w)
 
+        self.actf = actf
         self.out_actf = out_actf
         self.action_scale = action_scale
         
@@ -287,15 +288,15 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         elif len(goal.shape)==3:
             goal = goal[:,:,:self._goal_dim]
         sg_cat = torch.cat([state,goal], dim=-1)
-        fc_x = F.relu(self.linear1(sg_cat))  
+        fc_x = self.actf(self.linear1(sg_cat))  
         # fc_x = F.relu(self.linear2(fc_x)) 
         sa_cat = torch.cat([state,last_action], dim=-1)
-        rnn_x = F.relu(self.linear_rnn(sa_cat)).view(B,L,-1)
+        rnn_x = self.actf(self.linear_rnn(sa_cat)).view(B,L,-1)
         rnn_out, rnn_hidden = self.rnn(rnn_x, hidden_in)
         rnn_x = rnn_out.contiguous().view(*fc_x.shape)
         merged_x = torch.cat([fc_x, rnn_x],dim=-1)
-        x = F.relu(self.linear3(merged_x))
-        x = F.relu(self.linear4(x))
+        x = self.actf(self.linear3(merged_x))
+        x = self.actf(self.linear4(x))
         mean = self.mean_linear(x)
         if not self.out_actf is None:
             mean = self.out_actf(mean)

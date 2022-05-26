@@ -566,14 +566,14 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         self.target_q_net1 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim).to(self.device)
         self.target_q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim).to(self.device)
         if rnn_type=='RNNHER':
-            self.policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
-            self.target_policy_net = PolicyNetworkGoalRNN(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
+            policy = PolicyNetworkGoalRNN
         elif rnn_type=='LSTMHER':
-            self.policy_net = PolicyNetworkGoalLSTM(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
-            self.target_policy_net = PolicyNetworkGoalLSTM(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
+            policy = PolicyNetworkGoalLSTM
         elif rnn_type=='GRUHER':
-            self.policy_net = PolicyNetworkGoalGRU(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
-            self.target_policy_net = PolicyNetworkGoalGRU(state_space, action_space, hidden_dim, goal_dim, device, out_actf, action_scale).to(self.device)
+            policy = PolicyNetworkGoalGRU
+        policy_actf = kwargs.get('policy_actf', F.relu)
+        self.policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
+        self.target_policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
@@ -598,7 +598,8 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
             self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=self.policy_lr, step_size_up=self.t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
             # self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=self.policy_lr, step_size_up=self.t_max//self.policy_target_update_interval, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
-        self.use_her = True
+        self.use_her = kwargs.get('use_her', True)
+        self.reward_norm = kwargs.get('reward_norm', True)
     
     def reset_critic(self):
         self.q_net1 = QNetworkGoalParam(self.state_space, self.action_space, self.param_num, self.hidden_dim, self.goal_dim).to(self.device)

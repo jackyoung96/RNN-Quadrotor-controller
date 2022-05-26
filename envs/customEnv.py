@@ -9,6 +9,7 @@ from .customEnvDrone import customAviary, domainRandomAviary
 from gym_pybullet_drones.envs.BaseAviary import DroneModel, Physics
 from gym_pybullet_drones.envs.single_agent_rl.BaseSingleAgentAviary import ActionType, ObservationType, BaseSingleAgentAviary
 import gym_pybullet_drones
+import time
 
 class CloudpickleWrapper(object):
     """
@@ -302,6 +303,7 @@ class domainRandeEnv(parallelEnv):
                     record=False, 
                     obs=ObservationType.KIN,
                     act=ActionType.RPM)
+                tag = tag+str(time.time_ns())
                 env = domainRandomAviary(env, tag, idx, seed,
                     observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
                     frame_stack=1,

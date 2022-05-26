@@ -109,6 +109,8 @@ def train(args, hparam):
         her_pre_steps = 500
         her_history_length = 150
         her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
+        epsilon_pos = 0.00025
+        epsilon_ang = np.deg2rad(5)
     elif 'aviary' in env_name:
         max_episodes  = 1000000
         hidden_dim = 128
@@ -121,20 +123,23 @@ def train(args, hparam):
         her_pre_steps = 1e3
         her_history_length = 100
         her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
-    else:
+        epsilon_pos = np.sqrt(3*(0.05**2))/6 # 5 cm error
+        epsilon_ang = np.deg2rad(5) # 5 deg error
+    else: 
         raise NotImplementedError
 
     best_score = -np.inf
     frame_idx   = 0
     replay_buffer_size = 3e5 if args.rnn != "None" else 1e6
-    explore_episode = 200 if args.rnn != "None" else 1e5  # for random action sampling in the beginning of training
+    explore_episode = 500 if args.rnn != "None" else 1e5  # for random action sampling in the beginning of training
     update_itr = 1
     policy_target_update_interval = hparam['update_interval'] # delayed update for the policy network and target networks
-    
-    eval_freq = 200
+    writer_interval = 100
+    eval_freq = 1000
     eval_itr = 20
 
     DETERMINISTIC=True  # DDPG: deterministic policy gradient
+    
     
 
     # Define environment
@@ -194,8 +199,8 @@ def train(args, hparam):
         if args.rnn=='LSTMHER':
             replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size,
                                 gamma=her_gamma, 
-                                epsilon_pos=np.sqrt(3*(0.5**2))/6 if 'aviary' in env_name else 0.00025,
-                                epsilon_ang=np.deg2rad(10),
+                                epsilon_pos=epsilon_pos,
+                                epsilon_ang=epsilon_ang,
                                 history_length=her_history_length,
                                 mode='end',
                                 env=env_name)
@@ -203,8 +208,8 @@ def train(args, hparam):
         else:
             replay_buffer = HindsightReplayBufferGRU(replay_buffer_size, 
                                 gamma=her_gamma,
-                                epsilon_pos=np.sqrt(3*(0.15**2))/6 if 'aviary' in env_name else 0.00025,
-                                epsilon_ang=np.deg2rad(20),
+                                epsilon_pos=epsilon_pos,
+                                epsilon_ang=epsilon_ang,
                                 history_length=her_history_length,
                                 mode='end',
                                 env=env_name)
@@ -397,13 +402,12 @@ def train(args, hparam):
         mean_rewards.append(rewards)
         scores_window.append(rewards)
 
-        writer_iterval = 10
-        if writer is not None and i_episode%writer_iterval == 0:
-            writer.add_scalar('loss/loss_p', np.mean(loss_storage['policy_loss'][-writer_iterval:]), i_episode)
-            writer.add_scalar('loss/loss_q_1', np.mean(loss_storage['q_loss_1'][-writer_iterval:]), i_episode)
-            writer.add_scalar('loss/loss_q_2', np.mean(loss_storage['q_loss_2'][-writer_iterval:]), i_episode)
+        if writer is not None and i_episode%writer_interval == 0:
+            writer.add_scalar('loss/loss_p', np.mean(loss_storage['policy_loss'][-writer_interval:]), i_episode)
+            writer.add_scalar('loss/loss_q_1', np.mean(loss_storage['q_loss_1'][-writer_interval:]), i_episode)
+            writer.add_scalar('loss/loss_q_2', np.mean(loss_storage['q_loss_2'][-writer_interval:]), i_episode)
             if 'fast' in args.rnn:
-                writer.add_scalar('loss/loss_param', np.mean(loss_storage['param_loss'][-writer_iterval:]), i_episode)
+                writer.add_scalar('loss/loss_param', np.mean(loss_storage['param_loss'][-writer_interval:]), i_episode)
             writer.add_scalar('rewards', scores_window[-1], i_episode)
             
             if args.lr_scheduler:
@@ -564,6 +568,8 @@ def test(args):
                     device=device, 
                     policy_target_update_interval=1,
                     **hparam)
+        if args.rnn_pretrained:
+            td3_trainer.load_lstm("save/TD3/randomize/RNN2/takeoff-aviary-v0/22May05045746/best")
     elif args.rnn == "None":
         replay_buffer = ReplayBuffer(1e6)
         td3_trainer = TD3_Trainer(replay_buffer,
@@ -621,6 +627,9 @@ if __name__=='__main__':
     parser.add_argument('--tb_log', action='store_true', help="Tensorboard logging")
     parser.add_argument('--hparam', action='store_true', help="find hparam set")
     parser.add_argument('--lr_scheduler', action='store_true', help="Use lr scheduler")
+    parser.add_argument('--reward_norm', action='store_true', help="reward normalization")
+    parser.add_argument('--policy_actf', type=str, default='relu', help="policy activation function")
+    parser.add_argument('--rnn_pretrained', action='store_true', help="use pretrained rnn layer")
 
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
@@ -658,6 +667,10 @@ if __name__=='__main__':
         else:
             hparam = dict([(k,v[0]) for k,v in hparam_set.items()])
             hparam['lr_scheduler'] = args.lr_scheduler
+            hparam['policy_actf'] = getattr(F,args.policy_actf)
+            hparam['reward_norm'] = args.reward_norm
+            hparam['rnn_pretrained'] = args.rnn_pretrained
+
             train(args, hparam)
     else:
         if args.path is None:
