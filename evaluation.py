@@ -126,8 +126,8 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                     if hasattr(agent.q_net1, '_goal_dim'):
                         # Binary sparse reward
                         if 'aviary' in env_name:
-                            pos_achieve = np.linalg.norm(next_state[:3]-goal[0,:3],axis=-1)<agent.replay_buffer.epsilon_pos
-                            ang_achieve = rot_matrix_similarity(next_state[3:12],goal[0,3:12])<agent.replay_buffer.epsilon_pos
+                            pos_achieve = np.linalg.norm(next_state[:3]-goal[0,:3],axis=-1) < np.sqrt(3*(0.1**2))/6
+                            ang_achieve = rot_matrix_similarity(next_state[3:12],goal[0,3:12]) < np.deg2rad(10)
                             reward = np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0,-1.0)
                         else:
                             pos_achieve = np.linalg.norm(next_state[:2]-goal[0,:2],axis=-1)<agent.replay_buffer.epsilon_pos
@@ -140,7 +140,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
 
                     if "Pendulum" in env_name:
                         step = step+1 if state[0,0] > np.cos(5 * np.pi/180) else 0
-                        if step > 100:
+                        if step > 50:
                             success = 1
                             break
                     elif "aviary" in env_name:
@@ -150,7 +150,7 @@ def evaluation(env_name, agent, dyn_range, eval_itr, seed):
                             step = step+1 
                         else:
                             step = 0
-                        if step > 100:
+                        if step > 50:
                             success = 1
                             break
 
@@ -176,7 +176,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
     if 'Pendulum' in env_name:
         max_steps = 1000
     elif 'aviary' in env_name:
-        max_steps = 400
+        max_steps = 500
     else:
         raise NotImplementedError
 
@@ -288,7 +288,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
 
                 if "Pendulum" in env_name:
                     step = step+1 if state[0,0] > np.cos(5 * np.pi/180) else 0
-                    if step > 100:
+                    if step > 50:
                         success = 1
                         break
                 elif "aviary" in env_name:
@@ -298,7 +298,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
                         step = step+1 
                     else:
                         step = 0
-                    if step > 100:
+                    if step > 50:
                         success = 1
                         break
 
@@ -348,7 +348,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
         # hyper-parameters for RL training
     DETERMINISTIC=True  # DDPG: deterministic policy gradient      
     
-    max_steps = 2000
+    max_steps = 1000
 
     device = agent.device
     eval_success = 0
@@ -381,21 +381,21 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                 rpy_noise=0
                 vel_noise=0
                 angvel_noise=0
-                goals = [[0.0,0.0,1.0]]
+                goals = [[0.0,0.0,1.0]+[1,0,0,0,1,0,0,0,1]]
                 goal = np.array(goals[0:1])
             elif task == 'waypoint':
                 initial_xyzs = [[0.0,0.0,0.025]]
                 rpy_noise=0
                 vel_noise=0
                 angvel_noise=0
-                goals = [[0.0,0.0,1.0],
-                        [1.0,0.0,1.0],
-                        [1.0,1.0,1.0],
-                        [0.0,1.0,1.0],
-                        [0.0,0.0,1.0],
-                        [0.0,0.0,0.025]]
+                goals = [[0.0,0.0,1.0]+[1,0,0,0,1,0,0,0,1],
+                        [1.0,0.0,1.0]+[1,0,0,0,1,0,0,0,1],
+                        [1.0,1.0,1.0]+[1,0,0,0,1,0,0,0,1],
+                        [0.0,1.0,1.0]+[1,0,0,0,1,0,0,0,1],
+                        [0.0,0.0,1.0]+[1,0,0,0,1,0,0,0,1],
+                        [0.0,0.0,0.025]+[1,0,0,0,1,0,0,0,1]]
                 goal = np.array(goals[0:1])
-            eval_env = domainRandomAviary(eval_env, 'test', 0, seed+i_eval,
+            eval_env = domainRandomAviary(eval_env, 'test'+str(time.time_ns()), 0, seed+i_eval,
                 observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
                 frame_stack=1,
                 task='stabilize2',
@@ -431,6 +431,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
             goal_idx = 0
             frames = []
             e_ps, e_as = [],[]
+            state_buffer = []
 
             for i_step in range(max_steps):
                 if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
@@ -447,7 +448,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                             agent.policy_net.get_action(state, 
                                                             last_action, 
                                                             hidden_in, 
-                                                            goal=np.array([[0,0,0]]),
+                                                            goal=np.array([[0,0,0]+[1,0,0,0,1,0,0,0,1]]),
                                                             deterministic=DETERMINISTIC, 
                                                             explore_noise_scale=0.)
                 else:
@@ -456,6 +457,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                                                         explore_noise_scale=0.)
 
                 next_state, reward, done, _ = eval_env.step(action) 
+                state_buffer.append(state)
                 if not isinstance(action, np.ndarray):
                     action = np.array([action])
                 state, last_action = next_state[None,:], action[None,:]
@@ -480,6 +482,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                     else:
                         eval_env.goal_pos = np.array(goals[goal_idx:goal_idx+1])
 
+            state_buffer = np.stack(state_buffer)
             eval_env.close()
 
             eval_success += success

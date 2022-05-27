@@ -229,7 +229,8 @@ def train(args, hparam):
                     policy_target_update_interval=policy_target_update_interval,
                     **hparam)
         # Using pre-trained policy
-        # td3_trainer.load_lstm("save/TD3/randomize/RNN2/takeoff-aviary-v0/22May05045746/best")
+        if args.rnn_pretrained:
+            td3_trainer.load_lstm("save/TD3/randomize/RNN2/takeoff-aviary-v0/22May05045746/best")
     elif args.rnn == "None":
         replay_buffer = ReplayBuffer(replay_buffer_size)
         td3_trainer = TD3_Trainer(replay_buffer,
@@ -461,7 +462,7 @@ def train(args, hparam):
     
     return mean_rewards, loss_storage, eval_rew, eval_success, dtime
 
-def test(args):
+def test(args, hparam):
     env_name = args.env
 
     dyn_range = {
@@ -477,19 +478,19 @@ def test(args):
         'l': 3, # 1/n ~ n
 
         # drones
-        'mass_range': 0.0, # (1-n) ~ (1+n)
-        'cm_range': 0.0, # (1-n) ~ (1+n)
-        'kf_range': 0.0, # (1-n) ~ (1+n)
-        'km_range': 0.0, # (1-n) ~ (1+n)
-        'i_range': 0.0,
-        'battery_range': 0.0 # (1-n) ~ (1)
+        'mass_range': 0.3, # (1-n) ~ (1+n)
+        'cm_range': 0.3, # (1-n) ~ (1+n)
+        'kf_range': 0.3, # (1-n) ~ (1+n)
+        'km_range': 0.3, # (1-n) ~ (1+n)
+        'i_range': 0.3,
+        'battery_range': 0.3 # (1-n) ~ (1)
     }
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     print("Device:",device)
 
     # hyper-parameters for RL training
-    hparam = {'hidden_dim': 128}
+    hparam.update({'hidden_dim': 128})
 
     if 'Pendulum' in env_name:
         param_num = 3
@@ -548,15 +549,12 @@ def test(args):
                     **hparam)
     elif args.rnn in ["RNNHER", "LSTMHER", "GRUHER"]:
         if args.rnn=='LSTMHER':
-            replay_buffer = HindsightReplayBufferLSTM(1e5, 
-                                sample_length=100)
+            replay_buffer = HindsightReplayBufferLSTM(1e5)        
         else:
-            replay_buffer = HindsightReplayBufferGRU(1e5, 
-                                epsilon=np.sqrt(3*(0.1**2)))
-                                # sample_length=her_sample_length)
+            replay_buffer = HindsightReplayBufferGRU(1e5) 
         # For aviary, it include the last action in the state
         # goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
-        goal_dim = 3 if 'aviary' in env_name else state_space.shape[0]
+        goal_dim = 12 if 'aviary' in env_name else state_space.shape[0]
         td3_trainer = TD3HERRNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
@@ -568,8 +566,6 @@ def test(args):
                     device=device, 
                     policy_target_update_interval=1,
                     **hparam)
-        if args.rnn_pretrained:
-            td3_trainer.load_lstm("save/TD3/randomize/RNN2/takeoff-aviary-v0/22May05045746/best")
     elif args.rnn == "None":
         replay_buffer = ReplayBuffer(1e6)
         td3_trainer = TD3_Trainer(replay_buffer,
@@ -677,4 +673,9 @@ if __name__=='__main__':
     else:
         if args.path is None:
             assert "model path is required"
-        test(args)
+        hparam = dict([(k,v[0]) for k,v in hparam_set.items()])
+        hparam['lr_scheduler'] = args.lr_scheduler
+        hparam['policy_actf'] = getattr(F,args.policy_actf)
+        hparam['reward_norm'] = args.reward_norm
+        hparam['rnn_pretrained'] = args.rnn_pretrained
+        test(args, hparam)

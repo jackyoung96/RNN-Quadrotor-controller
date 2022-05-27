@@ -365,7 +365,7 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
     'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
 
     """
-    def __init__(self, capacity, gamma, epsilon_pos, epsilon_ang, history_length=50, mode='end',env='takeoff-aviary-v0'):
+    def __init__(self, capacity, gamma=0.0, epsilon_pos=0.0, epsilon_ang=0.0, history_length=50, mode='end',env='takeoff-aviary-v0'):
         super().__init__(capacity)
         self.gamma = gamma
         self.history_length = history_length
@@ -521,7 +521,7 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
     'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
 
     """
-    def __init__(self, capacity, gamma, epsilon_pos, epsilon_ang, history_length=50, mode='end', env='takeoff-aviary-v0'):
+    def __init__(self, capacity, gamma=0.0, epsilon_pos=0.0, epsilon_ang=0.0, history_length=50, mode='end', env='takeoff-aviary-v0'):
         super().__init__(capacity)
         self.gamma = gamma
         self.history_length = history_length
