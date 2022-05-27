@@ -372,11 +372,11 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         return action, hidden_out
 
 class PolicyNetworkGoalLSTM(PolicyNetworkGoalRNN):
-    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
-        super().__init__(state_space, action_space, hidden_size, goal_dim, device, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, actf=F.relu, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+        super().__init__(state_space, action_space, hidden_size, goal_dim, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
         self.rnn = nn.LSTM(hidden_size, hidden_size, batch_first=True)
 
 class PolicyNetworkGoalGRU(PolicyNetworkGoalRNN):
-    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
-        super().__init__(state_space, action_space, hidden_size, goal_dim, device, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, actf=F.relu, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+        super().__init__(state_space, action_space, hidden_size, goal_dim, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
         self.rnn = nn.GRU(hidden_size, hidden_size, batch_first=True)
