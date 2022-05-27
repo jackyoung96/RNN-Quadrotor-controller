@@ -630,6 +630,7 @@ if __name__=='__main__':
     parser.add_argument('--reward_norm', action='store_true', help="reward normalization")
     parser.add_argument('--policy_actf', type=str, default='relu', help="policy activation function")
     parser.add_argument('--rnn_pretrained', action='store_true', help="use pretrained rnn layer")
+    parser.add_argument('--her_gamma', default=0.0, type=float)
 
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
@@ -670,6 +671,7 @@ if __name__=='__main__':
             hparam['policy_actf'] = getattr(F,args.policy_actf)
             hparam['reward_norm'] = args.reward_norm
             hparam['rnn_pretrained'] = args.rnn_pretrained
+            hparam['her_gamma'] = args.her_gamma
 
             train(args, hparam)
     else:
