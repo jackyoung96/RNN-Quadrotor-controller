@@ -206,28 +206,24 @@ class TD3RNN_Trainer():
         self.rnn_type = rnn_type
         
         if rnn_type=='RNN':
-            self.q_net1 = QNetworkRNN(state_space, action_space, hidden_dim).to(self.device)
-            self.q_net2 = QNetworkRNN(state_space, action_space, hidden_dim).to(self.device)
-            self.target_q_net1 = QNetworkRNN(state_space, action_space, hidden_dim).to(self.device)
-            self.target_q_net2 = QNetworkRNN(state_space, action_space, hidden_dim).to(self.device)
-            self.policy_net = PolicyNetworkRNN(state_space, action_space, hidden_dim, device, out_actf, action_scale).to(self.device)
-            self.target_policy_net = PolicyNetworkRNN(state_space, action_space, hidden_dim, device, out_actf, action_scale).to(self.device)
+            qnet = QNetworkRNN
+            policy = PolicyNetworkRNN
         elif rnn_type=='LSTM':
-            self.q_net1 = QNetworkLSTM(state_space, action_space, hidden_dim).to(self.device)
-            self.q_net2 = QNetworkLSTM(state_space, action_space, hidden_dim).to(self.device)
-            self.target_q_net1 = QNetworkLSTM(state_space, action_space, hidden_dim).to(self.device)
-            self.target_q_net2 = QNetworkLSTM(state_space, action_space, hidden_dim).to(self.device)
-            self.policy_net = PolicyNetworkLSTM(state_space, action_space, hidden_dim, device, out_actf, action_scale).to(self.device)
-            self.target_policy_net = PolicyNetworkLSTM(state_space, action_space, hidden_dim, device, out_actf, action_scale).to(self.device)
+            qnet = QNetworkLSTM
+            policy = PolicyNetworkLSTM
         elif rnn_type=='GRU':
-            self.q_net1 = QNetworkGRU(state_space, action_space, hidden_dim).to(self.device)
-            self.q_net2 = QNetworkGRU(state_space, action_space, hidden_dim).to(self.device)
-            self.target_q_net1 = QNetworkGRU(state_space, action_space, hidden_dim).to(self.device)
-            self.target_q_net2 = QNetworkGRU(state_space, action_space, hidden_dim).to(self.device)
-            self.policy_net = PolicyNetworkGRU(state_space, action_space, hidden_dim, device, out_actf, action_scale).to(self.device)
-            self.target_policy_net = PolicyNetworkGRU(state_space, action_space, hidden_dim, device, out_actf, action_scale).to(self.device)
+            qnet = QNetworkGRU
+            policy = PolicyNetworkGRU
         else:
             assert NotImplementedError
+        self.q_net1 = qnet(state_space, action_space, hidden_dim).to(self.device)
+        self.q_net2 = qnet(state_space, action_space, hidden_dim).to(self.device)
+        self.target_q_net1 = qnet(state_space, action_space, hidden_dim).to(self.device)
+        self.target_q_net2 = qnet(state_space, action_space, hidden_dim).to(self.device)
+        
+        policy_actf = kwargs.get('policy_actf', F.relu)
+        self.policy_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
+        self.target_policy_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
