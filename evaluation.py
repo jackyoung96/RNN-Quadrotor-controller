@@ -348,7 +348,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
         # hyper-parameters for RL training
     DETERMINISTIC=True  # DDPG: deterministic policy gradient      
     
-    max_steps = 1000
+    max_steps = 300
 
     device = agent.device
     eval_success = 0
@@ -374,33 +374,33 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                 rpy_noise=np.pi/4
                 vel_noise=2.0
                 angvel_noise=np.pi/2
-                goals = None
-                goal = None
+                goals = [[0.0,0.0,1.5]]
+                goal = np.array(goals[0:1])
             elif task == 'takeoff':
                 initial_xyzs = [[0.0,0.0,0.025]]
                 rpy_noise=0
                 vel_noise=0
                 angvel_noise=0
-                goals = [[0.0,0.0,1.0]+[1,0,0,0,1,0,0,0,1]]
+                goals = [[0.0,0.0,1.0]]
                 goal = np.array(goals[0:1])
             elif task == 'waypoint':
                 initial_xyzs = [[0.0,0.0,0.025]]
                 rpy_noise=0
                 vel_noise=0
                 angvel_noise=0
-                goals = [[0.0,0.0,1.0]+[1,0,0,0,1,0,0,0,1],
-                        [1.0,0.0,1.0]+[1,0,0,0,1,0,0,0,1],
-                        [1.0,1.0,1.0]+[1,0,0,0,1,0,0,0,1],
-                        [0.0,1.0,1.0]+[1,0,0,0,1,0,0,0,1],
-                        [0.0,0.0,1.0]+[1,0,0,0,1,0,0,0,1],
-                        [0.0,0.0,0.025]+[1,0,0,0,1,0,0,0,1]]
+                goals = [[0.0,0.0,1.0],
+                        [1.0,0.0,1.0],
+                        [1.0,1.0,1.0],
+                        [0.0,1.0,1.0],
+                        [0.0,0.0,1.0],
+                        [0.0,0.0,0.025]]
                 goal = np.array(goals[0:1])
             eval_env = domainRandomAviary(eval_env, 'test'+str(time.time_ns()), 0, seed+i_eval,
                 observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
                 frame_stack=1,
                 task='stabilize2',
                 reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
-                episode_len_sec=max_steps/200,
+                episode_len_sec=2,
                 max_rpm=66535,
                 initial_xyzs=initial_xyzs, # Far from the ground
                 freq=200,
@@ -431,7 +431,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
             goal_idx = 0
             frames = []
             e_ps, e_as = [],[]
-            state_buffer = []
+            state_buffer, action_buffer = [],[]
 
             for i_step in range(max_steps):
                 if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
@@ -448,7 +448,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                             agent.policy_net.get_action(state, 
                                                             last_action, 
                                                             hidden_in, 
-                                                            goal=np.array([[0,0,0]+[1,0,0,0,1,0,0,0,1]]),
+                                                            goal=np.array([[0,0,1]+[1,0,0,0,1,0,0,0,1]]),
                                                             deterministic=DETERMINISTIC, 
                                                             explore_noise_scale=0.)
                 else:
@@ -458,6 +458,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
 
                 next_state, reward, done, _ = eval_env.step(action) 
                 state_buffer.append(state)
+                action_buffer.append(action)
                 if not isinstance(action, np.ndarray):
                     action = np.array([action])
                 state, last_action = next_state[None,:], action[None,:]

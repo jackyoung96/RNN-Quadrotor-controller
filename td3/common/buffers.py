@@ -399,7 +399,10 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
                     ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
                 ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
-                reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
+                if self.positive_rew:
+                    reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,1.0, 0.0)+self.gamma*reward
+                else:
+                    reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
                 done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
                 done[:-1] = 0.0
             elif self.env == 'Pendulum-v0':
@@ -521,8 +524,9 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
     'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
 
     """
-    def __init__(self, capacity, gamma=0.0, epsilon_pos=0.0, epsilon_ang=0.0, history_length=50, mode='end', env='takeoff-aviary-v0'):
+    def __init__(self, capacity, positive_rew=False, gamma=0.0, epsilon_pos=0.0, epsilon_ang=0.0, history_length=50, mode='end', env='takeoff-aviary-v0'):
         super().__init__(capacity)
+        self.positive_rew = positive_rew
         self.gamma = gamma
         self.history_length = history_length
         self.epsilon_pos = epsilon_pos
@@ -555,7 +559,10 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
                     ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
                 ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
-                reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
+                if self.positive_rew:
+                    reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,1.0, 0.0)+self.gamma*reward
+                else:
+                    reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
                 done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
                 done[:-1] = 0.0
             elif self.env == 'Pendulum-v0':

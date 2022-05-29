@@ -123,8 +123,12 @@ def train(args, hparam):
         her_pre_steps = 1e3
         her_history_length = 100
         her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
-        epsilon_pos = np.sqrt(3*(0.05**2))/6 # 5 cm error
-        epsilon_ang = np.deg2rad(5) # 5 deg error
+        if args.large_eps:
+            epsilon_pos = np.sqrt(3*(0.20**2))/6 # 5 cm error
+            epsilon_ang = np.deg2rad(10)
+        else:
+            epsilon_pos = np.sqrt(3*(0.05**2))/6 # 5 cm error
+            epsilon_ang = np.deg2rad(5) # 5 deg error
     else: 
         raise NotImplementedError
 
@@ -198,6 +202,7 @@ def train(args, hparam):
         # batch_size = batch_size*int(max_steps//her_sample_length / 2)
         if args.rnn=='LSTMHER':
             replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size,
+                                positive_rew=args.positive_rew,
                                 gamma=her_gamma, 
                                 epsilon_pos=epsilon_pos,
                                 epsilon_ang=epsilon_ang,
@@ -207,6 +212,7 @@ def train(args, hparam):
                                 # sample_length=her_sample_length)
         else:
             replay_buffer = HindsightReplayBufferGRU(replay_buffer_size, 
+                                positive_rew=args.positive_rew,
                                 gamma=her_gamma,
                                 epsilon_pos=epsilon_pos,
                                 epsilon_ang=epsilon_ang,
@@ -446,9 +452,9 @@ def train(args, hparam):
                 writer.add_scalar('eval/reward', eval_rew, i_episode)
                 writer.add_scalar('eval/success_rate', eval_success, i_episode)
 
-        if i_episode % 500 == 0:
+        if i_episode % 10000 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
-            td3_trainer.save_model(os.path.join(savepath,"iter%05d"%i_episode))
+            td3_trainer.save_model(os.path.join(savepath,"iter%07d"%i_episode))
 
         if np.mean(scores_window)>=best_score: 
             td3_trainer.save_model(os.path.join(savepath,"best"))
@@ -566,6 +572,9 @@ def test(args, hparam):
                     device=device, 
                     policy_target_update_interval=1,
                     **hparam)
+        # batch_size = batch_size*int(max_steps//her_sample_length / 2)                   # sample_length=her_sample_length)
+        # For aviary, it include the last action in the state
+        # goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
     elif args.rnn == "None":
         replay_buffer = ReplayBuffer(1e6)
         td3_trainer = TD3_Trainer(replay_buffer,
@@ -627,6 +636,8 @@ if __name__=='__main__':
     parser.add_argument('--policy_actf', type=str, default='relu', help="policy activation function")
     parser.add_argument('--rnn_pretrained', action='store_true', help="use pretrained rnn layer")
     parser.add_argument('--her_gamma', default=0.0, type=float)
+    parser.add_argument('--positive_rew', action='store_true', help="use [0,1] reward instead of [-1,0]")
+    parser.add_argument('--large_eps', action='store_true', help="use large epsilon")
 
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
@@ -668,7 +679,8 @@ if __name__=='__main__':
             hparam['reward_norm'] = args.reward_norm
             hparam['rnn_pretrained'] = args.rnn_pretrained
             hparam['her_gamma'] = args.her_gamma
-
+            hparam['positive_rew'] = args.positive_rew
+            hparam['large_eps'] = args.large_eps
             train(args, hparam)
     else:
         if args.path is None:
