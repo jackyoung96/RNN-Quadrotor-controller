@@ -365,8 +365,10 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
     'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
 
     """
-    def __init__(self, capacity, gamma=0.0, epsilon_pos=0.0, epsilon_ang=0.0, history_length=50, mode='end',env='takeoff-aviary-v0'):
+    def __init__(self, capacity, positive_rew=False, angvel_goal=False, gamma=0.0, epsilon_pos=0.0, epsilon_ang=0.0, history_length=50, mode='end',env='takeoff-aviary-v0'):
         super().__init__(capacity)
+        self.positive_rew = positive_rew
+        self.angvel_goal = angvel_goal
         self.gamma = gamma
         self.history_length = history_length
         self.epsilon_pos = epsilon_pos
@@ -398,7 +400,10 @@ class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
                     goal[:,:3] = 0
                     ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
-                ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
+                if self.angvel_goal:
+                    ang_achieve = np.linlag.norm(next_state[:,15:18]-goal[:,15:18])<self.epsilon_ang
+                else:
+                    ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
                 if self.positive_rew:
                     reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,1.0, 0.0)+self.gamma*reward
                 else:
@@ -524,9 +529,10 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
     'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
 
     """
-    def __init__(self, capacity, positive_rew=False, gamma=0.0, epsilon_pos=0.0, epsilon_ang=0.0, history_length=50, mode='end', env='takeoff-aviary-v0'):
+    def __init__(self, capacity, positive_rew=False, angvel_goal=False, gamma=0.0, epsilon_pos=0.0, epsilon_ang=0.0, history_length=50, mode='end', env='takeoff-aviary-v0'):
         super().__init__(capacity)
         self.positive_rew = positive_rew
+        self.angvel_goal=False
         self.gamma = gamma
         self.history_length = history_length
         self.epsilon_pos = epsilon_pos
@@ -558,7 +564,10 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
                     goal[:,:3] = 0
                     ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
-                ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
+                if self.angvel_goal:
+                    ang_achieve = np.linlag.norm(next_state[:,15:18]-goal[:,15:18])<self.epsilon_ang
+                else:
+                    ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
                 if self.positive_rew:
                     reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,1.0, 0.0)+self.gamma*reward
                 else:

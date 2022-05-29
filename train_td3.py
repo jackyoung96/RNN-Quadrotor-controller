@@ -125,10 +125,16 @@ def train(args, hparam):
         her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
         if args.large_eps:
             epsilon_pos = np.sqrt(3*(0.20**2))/6 # 5 cm error
-            epsilon_ang = np.deg2rad(10)
+            if args.angvel_goal:
+                epsilon_ang = np.sqrt(3*((np.deg2rad(40))**2))/(30*np.pi)
+            else:
+                epsilon_ang = np.deg2rad(10)
         else:
             epsilon_pos = np.sqrt(3*(0.05**2))/6 # 5 cm error
-            epsilon_ang = np.deg2rad(5) # 5 deg error
+            if args.angvel_goal:
+                epsilon_ang = np.sqrt(3*((np.deg2rad(20))**2))/(30*np.pi)
+            else:
+                epsilon_ang = np.deg2rad(5) # 5 deg error
     else: 
         raise NotImplementedError
 
@@ -203,6 +209,7 @@ def train(args, hparam):
         if args.rnn=='LSTMHER':
             replay_buffer = HindsightReplayBufferLSTM(replay_buffer_size,
                                 positive_rew=args.positive_rew,
+                                angvel_goal=args.angvel_goal,
                                 gamma=her_gamma, 
                                 epsilon_pos=epsilon_pos,
                                 epsilon_ang=epsilon_ang,
@@ -213,6 +220,7 @@ def train(args, hparam):
         else:
             replay_buffer = HindsightReplayBufferGRU(replay_buffer_size, 
                                 positive_rew=args.positive_rew,
+                                angvel_goal=args.angvel_goal,
                                 gamma=her_gamma,
                                 epsilon_pos=epsilon_pos,
                                 epsilon_ang=epsilon_ang,
@@ -222,7 +230,7 @@ def train(args, hparam):
                                 # sample_length=her_sample_length)
         # For aviary, it include the last action in the state
         # goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
-        goal_dim = 12 if 'aviary' in env_name else 3
+        goal_dim = 18 if 'aviary' in env_name else 3
         td3_trainer = TD3HERRNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
@@ -638,6 +646,7 @@ if __name__=='__main__':
     parser.add_argument('--her_gamma', default=0.0, type=float)
     parser.add_argument('--positive_rew', action='store_true', help="use [0,1] reward instead of [-1,0]")
     parser.add_argument('--large_eps', action='store_true', help="use large epsilon")
+    parser.add_argument('--angvel_goal', action='store_true', help='use angular velocity instead of angle as the goal')
 
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
@@ -681,6 +690,7 @@ if __name__=='__main__':
             hparam['her_gamma'] = args.her_gamma
             hparam['positive_rew'] = args.positive_rew
             hparam['large_eps'] = args.large_eps
+            hparam['angvel_goal'] = args.angvel_goal
             train(args, hparam)
     else:
         if args.path is None:
