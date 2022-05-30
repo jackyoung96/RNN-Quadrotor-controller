@@ -348,7 +348,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
         # hyper-parameters for RL training
     DETERMINISTIC=True  # DDPG: deterministic policy gradient      
     
-    max_steps = 1000
+    max_steps = 300
 
     device = agent.device
     eval_success = 0
@@ -444,6 +444,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                                                             deterministic=DETERMINISTIC, 
                                                             explore_noise_scale=0.0)
                     else:
+                        state[:,15:18] = state[:,15:18] * 2 / 30
                         action, hidden_out = \
                             agent.policy_net.get_action(state, 
                                                             last_action, 

@@ -246,12 +246,17 @@ class PolicyNetworkGRU(PolicyNetworkRNN):
 
 
 class PolicyNetworkGoalRNN(PolicyNetworkBase):
-    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, actf=F.relu ,out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.relu ,out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
         super().__init__(state_space, action_space, device)
         self._goal_dim = goal_dim
         
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
+
+        self.batchnorm = batchnorm
+        if self.batchnorm:
+            self.bm_s = nn.BatchNorm1d(self._state_dim)
+            self.bm_g = nn.BatchNorm1d(self._goal_dim)
         
         self.linear1 = nn.Linear(self._state_dim+self._goal_dim, hidden_size)
         # self.linear2 = nn.Linear(hidden_size, hidden_size)
@@ -288,6 +293,11 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
             goal = goal[:,:self._goal_dim]
         elif len(goal.shape)==3:
             goal = goal[:,:,:self._goal_dim]
+
+        if self.batchnorm:
+            state = self.bm_s(state)
+            goal = self.bm_g(goal)
+            
         sg_cat = torch.cat([state,goal], dim=-1)
         fc_x = self.actf(self.linear1(sg_cat))  
         # fc_x = F.relu(self.linear2(fc_x)) 
@@ -344,6 +354,7 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         '''
         generate action for interaction with env
         '''
+        self.eval()
         num_batch = 1 if len(state.shape) < 2 else state.shape[0]
         state = torch.FloatTensor(state).to(self.device)
         last_action = torch.FloatTensor(last_action).to(self.device)
@@ -369,15 +380,16 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         eval_noise_clip)
         action = action + noise.numpy()
         action = np.clip(action,-1,1)
+        self.train()
 
         return action, hidden_out
 
 class PolicyNetworkGoalLSTM(PolicyNetworkGoalRNN):
-    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, actf=F.relu, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
-        super().__init__(state_space, action_space, hidden_size, goal_dim, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.relu, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+        super().__init__(state_space, action_space, hidden_size, goal_dim, device, batchnorm=batchnorm, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
         self.rnn = nn.LSTM(hidden_size, hidden_size, batch_first=True)
 
 class PolicyNetworkGoalGRU(PolicyNetworkGoalRNN):
-    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, actf=F.relu, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
-        super().__init__(state_space, action_space, hidden_size, goal_dim, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.relu, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+        super().__init__(state_space, action_space, hidden_size, goal_dim, device, batchnorm=batchnorm, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
         self.rnn = nn.GRU(hidden_size, hidden_size, batch_first=True)

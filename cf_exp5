@@ -38,3 +38,6 @@ Device: cuda:0
 Episode 30000	Average Score: -23.85
 Episode 40000	Average Score: -25.02
 Episode 50000	Average Score: -26.69
+Episode 60000	Average Score: -33.48
+Episode 70000	Average Score: -35.94
+Episode 80000	Average Score: -39.13

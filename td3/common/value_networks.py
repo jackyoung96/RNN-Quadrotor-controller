@@ -104,10 +104,14 @@ class QNetworkParam(QNetworkBase):
         return x    
 
 class QNetworkGoalParam(QNetworkBase):
-    def __init__(self, state_space, action_space, param_dim, hidden_dim, goal_dim, activation=F.relu, output_activation=None):
+    def __init__(self, state_space, action_space, param_dim, hidden_dim, goal_dim, batchnorm=False, activation=F.relu, output_activation=None):
         super().__init__(state_space, action_space, activation)
         self._param_dim = param_dim
         self._goal_dim = goal_dim
+        self.batchnorm = batchnorm
+        if self.batchnorm:
+            self.bm_s = nn.BatchNorm1d(self._state_dim)
+            self.bm_g = nn.BatchNorm1d(self._goal_dim)
 
         self.linear1 = nn.Linear(self._state_dim+self._action_dim+self._param_dim+self._goal_dim, hidden_dim)
         self.linear2 = nn.Linear(hidden_dim, hidden_dim)
@@ -121,6 +125,9 @@ class QNetworkGoalParam(QNetworkBase):
         if len(state.shape)==len(action.shape)+1:
             action = action.unsqueeze(-1)
         goal = goal[:,:,:self._goal_dim]
+        if self.batchnorm:
+            state = self.bm_s(state)
+            goal = self.bm_g(goal)
         x = torch.cat([state, action, param, goal], -1) # the dim 0 is number of samples
         x = self.activation(self.linear1(x))
         x = self.activation(self.linear2(x))

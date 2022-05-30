@@ -119,20 +119,20 @@ def train(args, hparam):
         param_num = 14
         nenvs = 2
         explore_noise_scale = 0.5
-        eval_noise_scale = 0.5
+        eval_noise_scale = 0.25
         her_pre_steps = 1e3
         her_history_length = args.her_length
         her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
         if args.large_eps:
             epsilon_pos = np.sqrt(3*(0.20**2))/6 # 5 cm error
             if args.angvel_goal:
-                epsilon_ang = np.sqrt(3*((np.deg2rad(40))**2))/(30*np.pi)
+                epsilon_ang = np.sqrt(3*((np.deg2rad(40)/(2*np.pi))**2))
             else:
                 epsilon_ang = np.deg2rad(10)
         else:
             epsilon_pos = np.sqrt(3*(0.05**2))/6 # 5 cm error
             if args.angvel_goal:
-                epsilon_ang = np.sqrt(3*((np.deg2rad(20))**2))/(30*np.pi)
+                epsilon_ang = np.sqrt(3*((np.deg2rad(20)/(2*np.pi))**2))
             else:
                 epsilon_ang = np.deg2rad(5) # 5 deg error
     else: 
@@ -596,6 +596,7 @@ def test(args, hparam):
         raise "Something wrong!!"
 
     td3_trainer.load_model(args.path)
+    td3_trainer.eval()
     
     if 'aviary' in env_name:
         eval_rew, eval_success, eval_position, eval_angle = drone_test(env_name, task=args.task, agent=td3_trainer, dyn_range=dyn_range, test_itr=10, seed=0, record=args.record)
@@ -648,6 +649,7 @@ if __name__=='__main__':
     parser.add_argument('--large_eps', action='store_true', help="use large epsilon")
     parser.add_argument('--angvel_goal', action='store_true', help='use angular velocity instead of angle as the goal')
     parser.add_argument('--her_length', type=int, default=100, help='sequence length for her')
+    parser.add_argument('--batch_norm', action='store_true', help='use batchnorm for input normalization')
 
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
@@ -693,6 +695,7 @@ if __name__=='__main__':
             hparam['large_eps'] = args.large_eps
             hparam['angvel_goal'] = args.angvel_goal
             hparam['her_length'] = args.her_length
+            hparam['batch_norm'] = args.batch_norm
             train(args, hparam)
     else:
         if args.path is None:
@@ -702,4 +705,5 @@ if __name__=='__main__':
         hparam['policy_actf'] = getattr(F,args.policy_actf)
         hparam['reward_norm'] = args.reward_norm
         hparam['rnn_pretrained'] = args.rnn_pretrained
+        hparam['batch_norm'] = args.batch_norm
         test(args, hparam)

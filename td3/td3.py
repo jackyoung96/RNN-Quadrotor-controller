@@ -562,10 +562,12 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         super().__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.replace('HER',''), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
         self.state_space, self.action_space, self.param_num, self.hidden_dim, self.goal_dim = \
             state_space, action_space, param_num, hidden_dim, goal_dim
-        self.q_net1 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim).to(self.device)
-        self.q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim).to(self.device)
-        self.target_q_net1 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim).to(self.device)
-        self.target_q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim).to(self.device)
+
+        batchnorm = kwargs.get('batch_norm', False)
+        self.q_net1 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
+        self.q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
+        self.target_q_net1 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
+        self.target_q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
         if rnn_type=='RNNHER':
             policy = PolicyNetworkGoalRNN
         elif rnn_type=='LSTMHER':
@@ -573,8 +575,8 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         elif rnn_type=='GRUHER':
             policy = PolicyNetworkGoalGRU
         policy_actf = kwargs.get('policy_actf', F.relu)
-        self.policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
-        self.target_policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
+        self.policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
+        self.target_policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
