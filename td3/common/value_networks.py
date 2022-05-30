@@ -124,10 +124,19 @@ class QNetworkGoalParam(QNetworkBase):
     def forward(self, state, action, param, goal):
         if len(state.shape)==len(action.shape)+1:
             action = action.unsqueeze(-1)
+
+        if len(state.shape)==2:
+            B,L=state.shape[0],1
+        elif len(state.shape)==3:
+            B,L = state.shape[:2]
+        else:
+            assert True, "Something wrong"
+
         goal = goal[:,:,:self._goal_dim]
         if self.batchnorm:
-            state = self.bm_s(state)
-            goal = self.bm_g(goal)
+            s_shape, g_shape = state.shape, goal.shape
+            state = self.bm_s(state.view(B*L,-1)).view(*s_shape)
+            goal = self.bm_g(goal.view(B*L,-1)).view(*g_shape)
         x = torch.cat([state, action, param, goal], -1) # the dim 0 is number of samples
         x = self.activation(self.linear1(x))
         x = self.activation(self.linear2(x))

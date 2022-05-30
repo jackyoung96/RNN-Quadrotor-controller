@@ -293,11 +293,12 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
             goal = goal[:,:self._goal_dim]
         elif len(goal.shape)==3:
             goal = goal[:,:,:self._goal_dim]
-
+        
         if self.batchnorm:
-            state = self.bm_s(state)
-            goal = self.bm_g(goal)
-            
+            s_shape, g_shape = state.shape, goal.shape
+            state = self.bm_s(state.view(B*L,-1)).view(*s_shape)
+            goal = self.bm_g(goal.view(B*L,-1)).view(*g_shape)
+
         sg_cat = torch.cat([state,goal], dim=-1)
         fc_x = self.actf(self.linear1(sg_cat))  
         # fc_x = F.relu(self.linear2(fc_x)) 

@@ -41,3 +41,106 @@ Device: cuda:0
 Episode 60000	Average Score: -33.48
 Episode 70000	Average Score: -35.94
 Episode 80000	Average Score: -39.13
+^CProcess Process-2:
+Process Process-1:
+Traceback (most recent call last):
+  File "train_td3.py", line 696, in <module>
+    hparam['angvel_goal'] = args.angvel_goal
+  File "train_td3.py", line 336, in train
+    next_state, reward, done, _ = envs.step(action) 
+  File "/home/jaekyungcho/UMD/world-model-td3/envs/customEnv.py", line 382, in step
+    return obs, reward, is_done, info
+  File "/home/jaekyungcho/UMD/world-model-td3/envs/customEnv.py", line 88, in step
+    return self.step_wait()
+  File "/home/jaekyungcho/UMD/world-model-td3/envs/customEnv.py", line 164, in step_wait
+    results = [remote.recv() for remote in self.remotes]
+  File "/home/jaekyungcho/UMD/world-model-td3/envs/customEnv.py", line 164, in <listcomp>
+    results = [remote.recv() for remote in self.remotes]
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/multiprocessing/connection.py", line 250, in recv
+    buf = self._recv_bytes()
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/multiprocessing/connection.py", line 407, in _recv_bytes
+    buf = self._recv(4)
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/multiprocessing/connection.py", line 379, in _recv
+    chunk = read(handle, remaining)
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/multiprocessing/process.py", line 297, in _bootstrap
+    self.run()
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/multiprocessing/process.py", line 99, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/jaekyungcho/UMD/world-model-td3/envs/customEnv.py", line 239, in workerDomainRand
+    cmd, data = remote.recv()
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/multiprocessing/connection.py", line 250, in recv
+    buf = self._recv_bytes()
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/multiprocessing/connection.py", line 411, in _recv_bytes
+    return self._recv(size)
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/multiprocessing/connection.py", line 381, in _recv
+    if n == 0:
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/multiprocessing/process.py", line 297, in _bootstrap
+    self.run()
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/multiprocessing/process.py", line 99, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/jaekyungcho/UMD/world-model-td3/envs/customEnv.py", line 239, in workerDomainRand
+    cmd, data = remote.recv()
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/multiprocessing/connection.py", line 251, in recv
+    return _ForkingPickler.loads(buf.getbuffer())
+KeyboardInterrupt
+(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ ^C
+(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ python train_td3.py --env takeoff-aviary-v0 ---gpu 0 --tb_log --rnn RNNHER --policy_actf tanh --reward_norm --her_length 10 --batchn[K[K[K[K[K[K[K[K[K[K[K[K[K[K[K[K[K[K[K[K[K[K[K[K--angvel_goal =[K--batchno[K[K_norm
+pybullet build time: Dec  1 2021 18:33:04
+hyperparam set: {'q_lr': 0.001, 'policy_lr': 0.001, 'param_lr': 3e-05, 't_max': 50000, 'hidden_dim': 128, 'update_interval': 2, 'her_gamma': 0.0, 'lr_scheduler': False, 'policy_actf': <function tanh at 0x7f3df45e4200>, 'reward_norm': True, 'rnn_pretrained': False, 'positive_rew': False, 'large_eps': False, 'angvel_goal': True, 'her_length': 100, 'batch_norm': True}
+[Tensorboard log]: tb_log/takeoff-aviary-v0/TD3/randomize/RNNHER/22May30154017
+Device: cuda:0
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/gym/logger.py:34: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  warnings.warn(colorize("%s: %s" % ("WARN", msg % args), "yellow"))
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/numpy/core/shape_base.py:420: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  arrays = [asanyarray(arr) for arr in arrays]
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/torch/nn/functional.py:1933: UserWarning: nn.functional.tanh is deprecated. Use torch.tanh instead.
+  warnings.warn("nn.functional.tanh is deprecated. Use torch.tanh instead.")
+/home/jaekyungcho/UMD/gym-pybullet-drones/gym_pybullet_drones/envs/BaseAviary.py:733: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  physicsClientId=self.CLIENT
+/home/jaekyungcho/UMD/gym-pybullet-drones/gym_pybullet_drones/envs/BaseAviary.py:733: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  physicsClientId=self.CLIENT
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/numpy/core/fromnumeric.py:3441: RuntimeWarning: Mean of empty slice.
+  out=out, **kwargs)
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/numpy/core/_methods.py:189: RuntimeWarning: invalid value encountered in double_scalars
+  ret = ret.dtype.type(ret / rcount)
+Traceback (most recent call last):
+  File "train_td3.py", line 699, in <module>
+    train(args, hparam)
+  File "train_td3.py", line 366, in train
+    loss_dict = td3_trainer.update(batch_size, deterministic=DETERMINISTIC, eval_noise_scale=eval_noise_scale)
+  File "/home/jaekyungcho/UMD/world-model-td3/td3/td3.py", line 653, in update
+    predicted_q_value1 = self.q_net1(state, action, param, goal)
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/torch/nn/modules/module.py", line 1110, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/jaekyungcho/UMD/world-model-td3/td3/common/value_networks.py", line 129, in forward
+    state = self.bm_s(state)
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/torch/nn/modules/module.py", line 1110, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/torch/nn/modules/batchnorm.py", line 179, in forward
+    self.eps,
+  File "/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/torch/nn/functional.py", line 2422, in batch_norm
+    input, weight, bias, running_mean, running_var, training, momentum, eps, torch.backends.cudnn.enabled
+RuntimeError: running_mean should contain 100 elements not 22
+(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ [K(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ [K(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ [K(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ [K(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ [K(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ [K(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ python train_td3.py --env takeoff-aviary-v0 ---gpu 0 --tb_log --rnn RNNHER --policy_actf tanh --reward_norm --angvel_goal --batch_norm
+pybullet build time: Dec  1 2021 18:33:04
+hyperparam set: {'q_lr': 0.001, 'policy_lr': 0.001, 'param_lr': 3e-05, 't_max': 50000, 'hidden_dim': 128, 'update_interval': 2, 'her_gamma': 0.0, 'lr_scheduler': False, 'policy_actf': <function tanh at 0x7f38451b8200>, 'reward_norm': True, 'rnn_pretrained': False, 'positive_rew': False, 'large_eps': False, 'angvel_goal': True, 'her_length': 100, 'batch_norm': True}
+[Tensorboard log]: tb_log/takeoff-aviary-v0/TD3/randomize/RNNHER/22May30160132
+Device: cuda:0
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/gym/logger.py:34: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  warnings.warn(colorize("%s: %s" % ("WARN", msg % args), "yellow"))
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/numpy/core/shape_base.py:420: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  arrays = [asanyarray(arr) for arr in arrays]
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/torch/nn/functional.py:1933: UserWarning: nn.functional.tanh is deprecated. Use torch.tanh instead.
+  warnings.warn("nn.functional.tanh is deprecated. Use torch.tanh instead.")
+/home/jaekyungcho/UMD/gym-pybullet-drones/gym_pybullet_drones/envs/BaseAviary.py:733: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  physicsClientId=self.CLIENT
+/home/jaekyungcho/UMD/gym-pybullet-drones/gym_pybullet_drones/envs/BaseAviary.py:733: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  physicsClientId=self.CLIENT
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/numpy/core/fromnumeric.py:3441: RuntimeWarning: Mean of empty slice.
+  out=out, **kwargs)
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/numpy/core/_methods.py:189: RuntimeWarning: invalid value encountered in double_scalars
+  ret = ret.dtype.type(ret / rcount)
