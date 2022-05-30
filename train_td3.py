@@ -121,7 +121,7 @@ def train(args, hparam):
         explore_noise_scale = 0.5
         eval_noise_scale = 0.5
         her_pre_steps = 1e3
-        her_history_length = 100
+        her_history_length = args.her_length
         her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
         if args.large_eps:
             epsilon_pos = np.sqrt(3*(0.20**2))/6 # 5 cm error
@@ -568,7 +568,7 @@ def test(args, hparam):
             replay_buffer = HindsightReplayBufferGRU(1e5) 
         # For aviary, it include the last action in the state
         # goal_dim = state_space.shape[0]-4 if 'aviary' in env_name else state_space.shape[0]
-        goal_dim = 12 if 'aviary' in env_name else state_space.shape[0]
+        goal_dim = 18 if 'aviary' in env_name else state_space.shape[0]
         td3_trainer = TD3HERRNN_Trainer(replay_buffer,
                     state_space, 
                     action_space, 
@@ -636,17 +636,18 @@ if __name__=='__main__':
                                             'RNN2','GRU2','LSTM2',
                                             'RNN3','GRU3','LSTM3',
                                             'RNNHER','GRUHER','LSTMHER'], default='None', help='Use memory network (LSTM)')
+    parser.add_argument('--policy_actf', type=str, default='relu', help="policy activation function")
 
     parser.add_argument('--tb_log', action='store_true', help="Tensorboard logging")
     parser.add_argument('--hparam', action='store_true', help="find hparam set")
     parser.add_argument('--lr_scheduler', action='store_true', help="Use lr scheduler")
     parser.add_argument('--reward_norm', action='store_true', help="reward normalization")
-    parser.add_argument('--policy_actf', type=str, default='relu', help="policy activation function")
     parser.add_argument('--rnn_pretrained', action='store_true', help="use pretrained rnn layer")
     parser.add_argument('--her_gamma', default=0.0, type=float)
     parser.add_argument('--positive_rew', action='store_true', help="use [0,1] reward instead of [-1,0]")
     parser.add_argument('--large_eps', action='store_true', help="use large epsilon")
     parser.add_argument('--angvel_goal', action='store_true', help='use angular velocity instead of angle as the goal')
+    parser.add_argument('--her_length', type=int, default=100, help='sequence length for her')
 
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
@@ -691,6 +692,7 @@ if __name__=='__main__':
             hparam['positive_rew'] = args.positive_rew
             hparam['large_eps'] = args.large_eps
             hparam['angvel_goal'] = args.angvel_goal
+            hparam['her_length'] = args.her_length
             train(args, hparam)
     else:
         if args.path is None:

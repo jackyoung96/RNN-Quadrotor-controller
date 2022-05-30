@@ -303,8 +303,7 @@ class domainRandeEnv(parallelEnv):
                     record=False, 
                     obs=ObservationType.KIN,
                     act=ActionType.RPM)
-                tag = tag+str(time.time_ns())
-                env = domainRandomAviary(env, tag, idx, seed,
+                env = domainRandomAviary(env, tag+str(time.time_ns()), idx, seed,
                     observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
                     frame_stack=1,
                     task='stabilize2',

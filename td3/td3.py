@@ -383,6 +383,8 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
             self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
             self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
         
+        self.reward_norm = kwargs.get('reward_norm', False)
+
     def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
         hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param = self.replay_buffer.sample(batch_size)
         # print('sample:', state, action,  reward, done)
@@ -396,10 +398,13 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
         done       = torch.FloatTensor(np.float32(done)).unsqueeze(-1).to(self.device)
         param      = torch.FloatTensor(param[:,None,:]).expand(B,L,-1).to(self.device)
  
+        if self.reward_norm:
+            reward = (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6)
+
         predicted_q_value1 = self.q_net1(state, action, param)
         predicted_q_value2 = self.q_net2(state, action, param)
-        new_action, hidden_out, hidden_all, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
-        new_next_action, hidden_out, hidden_all, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
+        new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
+        new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
         # Training Q Function
         predicted_target_q1 = self.target_q_net1(next_state, new_next_action, param)

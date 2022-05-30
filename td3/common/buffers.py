@@ -534,6 +534,7 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
         self.positive_rew = positive_rew
         self.angvel_goal=False
         self.gamma = gamma
+        self.her = True if self.gamma != 1.0 else False
         self.history_length = history_length
         self.epsilon_pos = epsilon_pos
         self.epsilon_ang = epsilon_ang
@@ -546,7 +547,7 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
 
     def push(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
         gs = [goal[None,:]]
-        if np.random.random()<0.8:
+        if np.random.random()<0.8 and self.her:
             if self.mode=='end':
                 gs.append(next_state[-1:,:])
             elif self.mode=='episode':

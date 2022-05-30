@@ -1,0 +1,40 @@
+(base) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ conda activate crazyflie
+(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ python train_td3.py --env takeoff-e[Kaviary --gpu 0 --tb_log --rnn RNNHER --policy_ac tf tanh --reward_normaliza[K[K[K[K[K --her_length 10 
+pybullet build time: Dec  1 2021 18:33:04
+usage: train_td3.py [-h] --env {Pendulum-v0,HalfCheetah-v2,takeoff-aviary-v0}
+                    [--gpu GPU]
+                    [--rnn {None,RNN,GRU,LSTM,RNN2,GRU2,LSTM2,RNN3,GRU3,LSTM3,RNNHER,GRUHER,LSTMHER}]
+                    [--tb_log] [--hparam] [--lr_scheduler] [--reward_norm]
+                    [--policy_actf POLICY_ACTF] [--rnn_pretrained]
+                    [--her_gamma HER_GAMMA] [--positive_rew] [--large_eps]
+                    [--angvel_goal] [--her_length HER_LENGTH] [--test]
+                    [--path PATH] [--record]
+                    [--task {stabilize,takeoff,waypoint}]
+train_td3.py: error: argument --env: invalid choice: 'takeoff-aviary' (choose from 'Pendulum-v0', 'HalfCheetah-v2', 'takeoff-aviary-v0')
+(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ python train_td3.py --env takeoff-aviary --gpu 0 --tb_log --rnn RNNHER --policy_acttf tanh --reward_norm --her_length 10 [A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C- --gpu 0 --tb_log --rnn RNNHER --policy_ac[1@t[A(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ [C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[Cv --gpu 0 --tb_log --rnn RNNHER --policy_a[1@c[A(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ [C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C0 --gpu 0 --tb_log --rnn RNNHER --policy_[1@a[A(crazyflie) [01;32mjaekyungcho@snu-aril-1[00m:[01;34m~/UMD/world-model-td3[00m$ [C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+
+pybullet build time: Dec  1 2021 18:33:04
+hyperparam set: {'q_lr': 0.001, 'policy_lr': 0.001, 'param_lr': 3e-05, 't_max': 50000, 'hidden_dim': 128, 'update_interval': 2, 'her_gamma': 0.0, 'lr_scheduler': False, 'policy_actf': <function tanh at 0x7fac1c0f6200>, 'reward_norm': True, 'rnn_pretrained': False, 'positive_rew': False, 'large_eps': False, 'angvel_goal': False, 'her_length': 10}
+[Tensorboard log]: tb_log/takeoff-aviary-v0/TD3/randomize/RNNHER/22May29215510
+Device: cuda:0
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/gym/logger.py:34: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  warnings.warn(colorize("%s: %s" % ("WARN", msg % args), "yellow"))
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/numpy/core/shape_base.py:420: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  arrays = [asanyarray(arr) for arr in arrays]
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/torch/nn/functional.py:1933: UserWarning: nn.functional.tanh is deprecated. Use torch.tanh instead.
+  warnings.warn("nn.functional.tanh is deprecated. Use torch.tanh instead.")
+/home/jaekyungcho/UMD/gym-pybullet-drones/gym_pybullet_drones/envs/BaseAviary.py:733: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  physicsClientId=self.CLIENT
+/home/jaekyungcho/UMD/gym-pybullet-drones/gym_pybullet_drones/envs/BaseAviary.py:733: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  physicsClientId=self.CLIENT
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/numpy/core/fromnumeric.py:3441: RuntimeWarning: Mean of empty slice.
+  out=out, **kwargs)
+/home/jaekyungcho/anaconda3/envs/crazyflie/lib/python3.7/site-packages/numpy/core/_methods.py:189: RuntimeWarning: invalid value encountered in double_scalars
+  ret = ret.dtype.type(ret / rcount)
+/home/jaekyungcho/UMD/gym-pybullet-drones/gym_pybullet_drones/envs/BaseAviary.py:733: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  physicsClientId=self.CLIENT
+Episode 10000	Average Score: -43.64
+Episode 20000	Average Score: -28.18
+Episode 30000	Average Score: -23.85
+Episode 40000	Average Score: -25.02
+Episode 50000	Average Score: -26.69

@@ -348,7 +348,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
         # hyper-parameters for RL training
     DETERMINISTIC=True  # DDPG: deterministic policy gradient      
     
-    max_steps = 300
+    max_steps = 1000
 
     device = agent.device
     eval_success = 0
@@ -360,12 +360,12 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
         for i_eval in range(test_itr):
             eval_env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
                 drone_model=DroneModel.CF2X,
-                initial_xyzs=np.array([[0.0,0.0,1.5]]),
+                initial_xyzs=np.array([[0.0,0.0,10000.0]]),
                 initial_rpys=np.array([[0.0,0.0,0.0]]),
                 physics=Physics.PYB_GND_DRAG_DW,
-                freq=240,
+                freq=200,
                 aggregate_phy_steps=1,
-                gui=False,
+                gui=record if i_eval==test_itr-1 else False,
                 record=record if i_eval==test_itr-1 else False, 
                 obs=ObservationType.KIN,
                 act=ActionType.RPM)
@@ -431,7 +431,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
             goal_idx = 0
             frames = []
             e_ps, e_as = [],[]
-            state_buffer, action_buffer = [],[]
+            state_buffer, action_buffer, reward_buffer = [],[],[]
 
             for i_step in range(max_steps):
                 if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
@@ -442,23 +442,24 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                                                             last_action, 
                                                             hidden_in, 
                                                             deterministic=DETERMINISTIC, 
-                                                            explore_noise_scale=0.)
+                                                            explore_noise_scale=0.0)
                     else:
                         action, hidden_out = \
                             agent.policy_net.get_action(state, 
                                                             last_action, 
                                                             hidden_in, 
-                                                            goal=np.array([[0,0,1]+[1,0,0,0,1,0,0,0,1]]),
+                                                            goal=np.array([[0,0,0]+[1,0,0,0,1,0,0,0,1]+[0,0,0,0,0,0]]),
                                                             deterministic=DETERMINISTIC, 
-                                                            explore_noise_scale=0.)
+                                                            explore_noise_scale=0.0)
                 else:
                     action = agent.policy_net.get_action(state, 
                                                         deterministic=DETERMINISTIC, 
-                                                        explore_noise_scale=0.)
+                                                        explore_noise_scale=0.0)
 
                 next_state, reward, done, _ = eval_env.step(action) 
                 state_buffer.append(state)
                 action_buffer.append(action)
+                reward_buffer.append(reward)
                 if not isinstance(action, np.ndarray):
                     action = np.array([action])
                 state, last_action = next_state[None,:], action[None,:]
@@ -482,7 +483,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                         success = 1
                     else:
                         eval_env.goal_pos = np.array(goals[goal_idx:goal_idx+1])
-
+        
             state_buffer = np.stack(state_buffer)
             eval_env.close()
 
