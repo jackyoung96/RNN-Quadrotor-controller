@@ -1,16 +1,21 @@
 tb_log/
+tb_log_v0/
 tb_log_backup/
 gif/
 evaluation/
 
 screen_log/
+screen_log_v0/
 screen_log_backup/
 save/
+save_v0/
 hparamDB/
 gifs/
 figs/
 paperutils/
 videos/
+
+wandb/
 
 envs/assets/
 !envs/assets/cf2x_default.urdf

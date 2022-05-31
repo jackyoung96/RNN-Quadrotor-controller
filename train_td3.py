@@ -28,16 +28,16 @@ from time import time
 
 def train(args, hparam):
     
+    #########################################
+    ### Path, Basic variable setting ########
+    #########################################
+
     print("hyperparam set:",hparam)
     algorithm_name = 'TD3'
     env_name = args.env
-
     dtime = datetime.now()
-
     tag = "randomize"
-
     rnn_tag = args.rnn if args.rnn != "None" else 'FF'
-
     savepath = "save/%s/%s/%s/%s/%s"%(algorithm_name,tag,rnn_tag,env_name, dtime.strftime("%y%b%d%H%M%S"))
 
     if not os.path.isdir(savepath):
@@ -72,26 +72,6 @@ def train(args, hparam):
         'i_range': 0.3,
         'battery_range': 0.3 # (1-n) ~ (1)
     }
-    # else:
-    #     dyn_range = {
-    #         # cartpole
-    #         'masscart': 1, # 1/n ~ n
-    #         'masspole': 1, # 1/n ~ n
-    #         'length': 1, # 1/n ~ n
-    #         'force_mag': 1, # 1/n ~ n
-
-    #         # pendulum
-    #         'max_torque': 1, # 1/n ~ n
-    #         'm': 1, # 1/n ~ n
-    #         'l': 1, # 1/n ~ n
-
-    #         # drones
-    #         'mass_range': 0.3, # (1-n) ~ (1+n)
-    #         'cm_range': 0.3, # (1-n) ~ (1+n)
-    #         'kf_range': 0.3, # (1-n) ~ (1+n)
-    #         'km_range': 0.3, # (1-n) ~ (1+n)
-    #         'battery_range': 0.3 # (1-n) ~ (1) 
-    #     }
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     print("Device:",device)

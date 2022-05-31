@@ -341,84 +341,35 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
     
     return eval_reward / test_itr, eval_success / test_itr
 
-def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=False):
+def drone_test(eval_env, agent, test_itr=10, record=False):
     if record:
         disp = Display(visible=False, size=(100, 60))
         disp.start()
         # hyper-parameters for RL training
     DETERMINISTIC=True  # DDPG: deterministic policy gradient      
     
-    max_steps = 300
-
     device = agent.device
     eval_success = 0
     eval_reward = 0
     eval_position = 0 
     eval_angle = 0
+    max_steps = 500
+
+    goal = np.array([[0,0,0, # pos
+                    1,0,0,
+                    0,1,0,
+                    0,0,1, # rotation matrix
+                    0,0,0, # vel
+                    0,0,0, # ang vel
+                    0,0,0,0]]) # dummy action
+    goal = eval_env.unnormalize_obs(goal)
 
     with torch.no_grad():
         for i_eval in range(test_itr):
-            eval_env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
-                drone_model=DroneModel.CF2X,
-                initial_xyzs=np.array([[0.0,0.0,10000.0]]),
-                initial_rpys=np.array([[0.0,0.0,0.0]]),
-                physics=Physics.PYB_GND_DRAG_DW,
-                freq=200,
-                aggregate_phy_steps=1,
-                gui=record if i_eval==test_itr-1 else False,
-                record=record if i_eval==test_itr-1 else False, 
-                obs=ObservationType.KIN,
-                act=ActionType.RPM)
-            if task == 'stabilize':
-                initial_xyzs = [[0.0,0.0,1.5]]
-                rpy_noise=np.pi/4
-                vel_noise=2.0
-                angvel_noise=np.pi/2
-                goals = [[0.0,0.0,1.5]]
-                goal = np.array(goals[0:1])
-            elif task == 'takeoff':
-                initial_xyzs = [[0.0,0.0,0.025]]
-                rpy_noise=0
-                vel_noise=0
-                angvel_noise=0
-                goals = [[0.0,0.0,1.0]]
-                goal = np.array(goals[0:1])
-            elif task == 'waypoint':
-                initial_xyzs = [[0.0,0.0,0.025]]
-                rpy_noise=0
-                vel_noise=0
-                angvel_noise=0
-                goals = [[0.0,0.0,1.0],
-                        [1.0,0.0,1.0],
-                        [1.0,1.0,1.0],
-                        [0.0,1.0,1.0],
-                        [0.0,0.0,1.0],
-                        [0.0,0.0,0.025]]
-                goal = np.array(goals[0:1])
-            eval_env = domainRandomAviary(eval_env, 'test'+str(time.time_ns()), 0, seed+i_eval,
-                observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
-                frame_stack=1,
-                task='stabilize2',
-                reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
-                episode_len_sec=2,
-                max_rpm=66535,
-                initial_xyzs=initial_xyzs, # Far from the ground
-                freq=200,
-                rpy_noise=rpy_noise,
-                vel_noise=vel_noise,
-                angvel_noise=angvel_noise,
-                mass_range=dyn_range.get('mass_range', 0.0),
-                cm_range=dyn_range.get('cm_range', 0.0),
-                kf_range=dyn_range.get('kf_range', 0.0),
-                km_range=dyn_range.get('km_range', 0.0),
-                i_range=dyn_range.get('i_range', 0.0),
-                battery_range=dyn_range.get('battery_range', 0.0),
-                goal = goal)
-            setattr(eval_env,'env_name', env_name)
-            param = domainRandomize(eval_env, dyn_range=dyn_range, seed=seed+i_eval)
-            state = eval_env.reset()[None,:]
+
+            state, param = eval_env.reset()
             total_rew = 0
-            last_action = eval_env.action_space.sample()[None,:]
+            last_action = eval_env.env.action_space.sample()[None,:]
             last_action = np.zeros_like(last_action)
             if hasattr(agent, 'rnn_type'):
                 if 'LSTM' == agent.rnn_type:
@@ -428,8 +379,6 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                     hidden_out = torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device)
 
             step, success = 0,0
-            goal_idx = 0
-            frames = []
             e_ps, e_as = [],[]
             state_buffer, action_buffer, reward_buffer = [],[],[]
 
@@ -444,12 +393,11 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                                                             deterministic=DETERMINISTIC, 
                                                             explore_noise_scale=0.0)
                     else:
-                        state[:,15:18] = state[:,15:18] * 2 / 30
                         action, hidden_out = \
                             agent.policy_net.get_action(state, 
                                                             last_action, 
                                                             hidden_in, 
-                                                            goal=np.array([[0,0,0]+[1,0,0,0,1,0,0,0,1]+[0,0,0,0,0,0]]),
+                                                            goal=goal,
                                                             deterministic=DETERMINISTIC, 
                                                             explore_noise_scale=0.0)
                 else:
@@ -458,35 +406,34 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                                                         explore_noise_scale=0.0)
 
                 next_state, reward, done, _ = eval_env.step(action) 
+                
+                # Metric (position, angle error)
+                unnormed_state = eval_env.unnormalize_obs(next_state)
+                e_p = np.linalg.norm(6*unnormed_state[0,:3]) # position (m)
+                e_a = np.clip(np.arccos(unnormed_state[0,11]), -1.0, 1.0) # angle (rad)
+                e_ps.append(e_p)
+                e_as.append(e_a)
+                pos_achieve = e_p < np.linalg.norm([0.1]*3)
+                ang_achieve = e_a < np.deg2rad(10)
+                if not hasattr(agent.q_net1, '_goal_dim'):
+                    reward = 0.0 if pos_achieve and ang_achieve else -1.0
+
+                # Success test
+                if pos_achieve and ang_achieve:
+                    step = step+1 
+                else:
+                    step = 0
+                if step > 100: # 0.5 second
+                    success = 1
+                    break
+                
                 state_buffer.append(state)
                 action_buffer.append(action)
                 reward_buffer.append(reward)
                 if not isinstance(action, np.ndarray):
                     action = np.array([action])
-                state, last_action = next_state[None,:], action[None,:]
+                state, last_action = next_state, action
                 total_rew += reward
-
-                # Metric (position, angle error)
-                e_p = np.linalg.norm(6*state[0,:3]) # position (m)
-                e_a = np.arccos(state[0,11]) # angle (rad)
-                e_ps.append(e_p)
-                e_as.append(e_a)
-
-                # Success test
-                if np.linalg.norm(6*state[0,:3]) < np.linalg.norm([0.1]*3) and\
-                    np.arccos(state[0,11]) < 10*np.pi/180:
-                    step = step+1 
-                else:
-                    step = 0
-                if step > 100: # 0.5 second
-                    goal_idx += 1
-                    if goals is None or goal_idx >= len(goals):
-                        success = 1
-                    else:
-                        eval_env.goal_pos = np.array(goals[goal_idx:goal_idx+1])
-        
-            state_buffer = np.stack(state_buffer)
-            eval_env.close()
 
             eval_success += success
             eval_reward += total_rew
@@ -498,7 +445,6 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
                     success %d\n\
                     position error[m] %.3f\n\
                     angle error[deg] %.3f"%(i_eval,total_rew,success, np.mean(e_ps[-100:]), np.rad2deg(np.mean(e_as[-100:]))))
-
     
     if record:
         disp.stop()
@@ -506,4 +452,7 @@ def drone_test(env_name, task, agent, dyn_range, test_itr=10, seed=0, record=Fal
     print("total average reward %.3f success rate %.2f"%(eval_reward / test_itr,eval_success / test_itr))
     print("position error[m] %.3f angle error[deg] %.3f"%(eval_position / test_itr, np.rad2deg(eval_angle / test_itr)))
     
-    return eval_reward / test_itr, eval_success / test_itr, eval_position / test_itr, eval_angle / test_itr
+    return eval_reward / test_itr, \
+            eval_success / test_itr, \
+            eval_position / test_itr, \
+            eval_angle / test_itr
