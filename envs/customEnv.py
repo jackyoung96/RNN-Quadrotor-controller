@@ -471,7 +471,7 @@ class dynRandeEnv:
             frame_stack=1,
             task='stabilize2',
             # reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
-            reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.002},
+            reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.002},
             episode_len_sec=2,
             max_rpm=66535,
             initial_xyzs=initial_xyzs, # Far from the ground

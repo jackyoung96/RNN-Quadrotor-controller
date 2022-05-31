@@ -16,3 +16,5 @@
 
 > ```python train_drone_td3.py --rnn=RNNHER --policy_actf tanh --reward_norm  --her_gamma 0.0 --her_length 100 --tb_log --gpu 3```
 > ```python train_drone_td3.py --rnn=RNNHER --policy_actf tanh --reward_norm  --her_gamma 0.0 --positive_rew --her_length 100 --tb_log --gpu 2```
+
+python train_drone_td3.py --rnn=RNNHER --policy_actf tanh --reward_norm --obs_norm --her_gamma 1.0 --her_length 100 --tb_log --gpu 2
