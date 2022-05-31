@@ -124,6 +124,7 @@ def train(args, hparam):
         wandb.run.name = "%s_%s_%s"%(env_name, rnn_tag, now)
         wandb.run.save()
         artifact = wandb.Artifact('agent', type='model')
+        artifact.add_dir(savepath)
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     print("Device:",device)
@@ -139,8 +140,7 @@ def train(args, hparam):
                 device=device,
                 hparam=hparam,
                 replay_buffer_size=replay_buffer_size)
-    wandb.watch(td3_trainer.q_net1, log="all")
-    wandb.watch(td3_trainer.policy_net, log="all")
+    wandb.watch([td3_trainer.q_net1,td3_trainer.policy_net], log="parameters")
 
     # keep track of progress
     mean_rewards = []
@@ -187,29 +187,26 @@ def train(args, hparam):
 
         for step in range(max_steps):
             hidden_in = hidden_out
-            if i_episode < explore_episode:
-                action = np.stack([envs.env.action_space.sample() for _ in range(nenvs)],axis=0).squeeze()
-            else:
-                if args.rnn == "None":
-                    action = \
-                        td3_trainer.policy_net.get_action(state, 
-                                                        deterministic=DETERMINISTIC, 
-                                                        explore_noise_scale=explore_noise_scale)
-                    hidden_in = hidden_out = None
-                elif "HER" in args.rnn:
-                    action, hidden_out = \
-                            td3_trainer.policy_net.get_action(state, 
-                                                            last_action, 
-                                                            hidden_in,
-                                                            goal=goal,
-                                                            deterministic=DETERMINISTIC, 
-                                                            explore_noise_scale=explore_noise_scale)
-                else:
-                    action, hidden_out = \
+            if args.rnn == "None":
+                action = \
+                    td3_trainer.policy_net.get_action(state, 
+                                                    deterministic=DETERMINISTIC, 
+                                                    explore_noise_scale=explore_noise_scale)
+                hidden_in = hidden_out = None
+            elif "HER" in args.rnn:
+                action, hidden_out = \
                         td3_trainer.policy_net.get_action(state, 
                                                         last_action, 
-                                                        hidden_in, 
+                                                        hidden_in,
+                                                        goal=goal,
                                                         deterministic=DETERMINISTIC, 
+                                                        explore_noise_scale=explore_noise_scale)
+            else:
+                action, hidden_out = \
+                    td3_trainer.policy_net.get_action(state, 
+                                                    last_action, 
+                                                    hidden_in, 
+                                                    deterministic=DETERMINISTIC, 
                                                         explore_noise_scale=explore_noise_scale)
             next_state, reward, done, _ = envs.step(action) 
             if step == 0:
@@ -316,13 +313,17 @@ def train(args, hparam):
             eval_env.load(os.path.join(savepath+"eval"))
             eval_env.env.training = False
             td3_trainer.policy_net.eval()
-            eval_rew, eval_success = drone_test(eval_env, agent=td3_trainer, test_itr=eval_itr, record=False)
+            eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, test_itr=eval_itr, record=False)
             td3_trainer.policy_net.train()
             if writer is not None:
                 writer.add_scalar('eval/reward', eval_rew, i_episode)
                 writer.add_scalar('eval/success_rate', eval_success, i_episode)
+                writer.add_scalar('eval/position', eval_position, i_episode)
+                writer.add_scalar('eval/angle', np.rad2deg(eval_angle), i_episode)
                 wandb.log({'eval/reward':eval_rew,
-                            'eval/success_rate':eval_success},
+                            'eval/success_rate':eval_success,
+                            'eval/position': eval_position,
+                            'eval/angle': np.rad2deg(eval_angle)},
                             step=i_episode)
 
         ########################################
@@ -333,7 +334,7 @@ def train(args, hparam):
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
             td3_trainer.save_model(os.path.join(savepath,"iter%07d"%i_episode))
             envs.save(os.path.join(savepath,"iter%07d"%i_episode))
-            artifact.add_dir(savepath)
+            wandb.log_artifact(artifact, step=i_episode)
 
         if np.mean(scores_window)>=best_score: 
             td3_trainer.save_model(os.path.join(savepath,"best"))
@@ -342,7 +343,7 @@ def train(args, hparam):
         
     td3_trainer.save_model(os.path.join(savepath,"final"))
     print('\rFinal\tAverage Score: {:.2f}'.format(np.mean(scores_window)))
-    artifact.add_dir(savepath)
+    wandb.log_artifact(artifact)
 
     envs.close()
     del envs
@@ -371,7 +372,7 @@ def test(args, hparam):
     td3_trainer.load_model(args.path)
     td3_trainer.eval()
     
-    eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, test_itr=5, record=args.record)
+    eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, test_itr=5, record=args.record, log=True)
     print("EVALUATION REWARD:",eval_rew)
     print("EVALUATION SUCCESS RATE:",eval_success)
     print("EVALUATION POSITION ERROR[m]:",eval_position)

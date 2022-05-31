@@ -341,7 +341,7 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
     
     return eval_reward / test_itr, eval_success / test_itr
 
-def drone_test(eval_env, agent, test_itr=10, record=False):
+def drone_test(eval_env, agent, test_itr=10, record=False, log=False):
     if record:
         disp = Display(visible=False, size=(100, 60))
         disp.start()
@@ -404,18 +404,18 @@ def drone_test(eval_env, agent, test_itr=10, record=False):
                     action = agent.policy_net.get_action(state, 
                                                         deterministic=DETERMINISTIC, 
                                                         explore_noise_scale=0.0)
-
+                action = action[None,:]
                 next_state, reward, done, _ = eval_env.step(action) 
                 
                 # Metric (position, angle error)
                 unnormed_state = eval_env.unnormalize_obs(next_state)
                 e_p = np.linalg.norm(6*unnormed_state[0,:3]) # position (m)
-                e_a = np.clip(np.arccos(unnormed_state[0,11]), -1.0, 1.0) # angle (rad)
+                e_a = np.arccos(np.clip(unnormed_state[0,11], -1.0, 1.0)) # angle (rad)
                 e_ps.append(e_p)
                 e_as.append(e_a)
                 pos_achieve = e_p < np.linalg.norm([0.1]*3)
                 ang_achieve = e_a < np.deg2rad(10)
-                if not hasattr(agent.q_net1, '_goal_dim'):
+                if hasattr(agent.q_net1, '_goal_dim'):
                     reward = 0.0 if pos_achieve and ang_achieve else -1.0
 
                 # Success test
@@ -440,17 +440,19 @@ def drone_test(eval_env, agent, test_itr=10, record=False):
             eval_position += np.mean(e_ps[-100:])
             eval_angle += np.mean(e_as[-100:])
 
-            print("%d iteration \n\
-                    reward %.3f\n\
-                    success %d\n\
-                    position error[m] %.3f\n\
-                    angle error[deg] %.3f"%(i_eval,total_rew,success, np.mean(e_ps[-100:]), np.rad2deg(np.mean(e_as[-100:]))))
+            if log:
+                print("%d iteration \n\
+                        reward %.3f\n\
+                        success %d\n\
+                        position error[m] %.3f\n\
+                        angle error[deg] %.3f"%(i_eval,total_rew,success, np.mean(e_ps[-100:]), np.rad2deg(np.mean(e_as[-100:]))))
     
     if record:
         disp.stop()
     
-    print("total average reward %.3f success rate %.2f"%(eval_reward / test_itr,eval_success / test_itr))
-    print("position error[m] %.3f angle error[deg] %.3f"%(eval_position / test_itr, np.rad2deg(eval_angle / test_itr)))
+    if log:
+        print("total average reward %.3f success rate %.2f"%(eval_reward / test_itr,eval_success / test_itr))
+        print("position error[m] %.3f angle error[deg] %.3f"%(eval_position / test_itr, np.rad2deg(eval_angle / test_itr)))
     
     return eval_reward / test_itr, \
             eval_success / test_itr, \
