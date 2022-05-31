@@ -385,9 +385,11 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
         
         self.reward_norm = kwargs.get('reward_norm', False)
 
-    def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
+    def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
         hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param = self.replay_buffer.sample(batch_size)
         # print('sample:', state, action,  reward, done)
+
+        state, next_state = norm_ftn(state), norm_ftn(next_state)
 
         B,L        = state.shape[:2]
         state      = torch.FloatTensor(state).to(self.device)
@@ -630,12 +632,14 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         self.target_policy_net = self.target_ini(self.policy_net, self.target_policy_net)
         self.target_policy_net.eval()
 
-    def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=5e-3):
+    def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99, soft_tau=5e-3):
         if self.use_her:
             hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal = self.replay_buffer.sample(batch_size)
         else:
             hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal = self.replay_buffer.sample_original(batch_size)
         # print('sample:', state, action,  reward, done)
+        state, next_state, goal = map(norm_ftn, [state, next_state, goal])
+
 
         B,L        = state.shape[:2]
         state      = torch.FloatTensor(state).to(self.device)

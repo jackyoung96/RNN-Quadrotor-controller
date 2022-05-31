@@ -120,7 +120,7 @@ def train(args, hparam):
         writer = SummaryWriter(tbpath)
 
         # wandb
-        wandb.init(project="TD3-drone-%s"%rnn_tag, config=hparam)
+        wandb.init(project="TD3-drone", config=hparam)
         wandb.run.name = "%s_%s_%s"%(env_name, rnn_tag, now)
         wandb.run.save()
         artifact = wandb.Artifact('agent', type='model')
@@ -181,7 +181,6 @@ def train(args, hparam):
                             0,0,0, # velocity
                             0,0,0,# angular velocity
                             0,0,0,0] for theta in thetas]) # dummy action goal
-            goal = envs.normalize_obs(goal) # Normalize goal
         else:
             goal = np.array([[1,0,0]]*nenvs)
 
@@ -198,7 +197,7 @@ def train(args, hparam):
                         td3_trainer.policy_net.get_action(state, 
                                                         last_action, 
                                                         hidden_in,
-                                                        goal=goal,
+                                                        goal=envs.normalize_obs(goal),
                                                         deterministic=DETERMINISTIC, 
                                                         explore_noise_scale=explore_noise_scale)
             else:
@@ -212,11 +211,11 @@ def train(args, hparam):
             if step == 0:
                 ini_hidden_in = hidden_in
                 ini_hidden_out = hidden_out
-            episode_state.append(state)
+            episode_state.append(envs.unnormalize_obs(state))
             episode_action.append(action)
             episode_last_action.append(last_action)
             episode_reward.append(reward)
-            episode_next_state.append(next_state)
+            episode_next_state.append(envs.unnormalize_obs(next_state))
             episode_done.append(done)
 
             state = next_state
@@ -249,7 +248,7 @@ def train(args, hparam):
         # Update TD3 trainer
         if i_episode > explore_episode:
             for i in range(update_itr):
-                loss_dict = td3_trainer.update(batch_size, deterministic=DETERMINISTIC, eval_noise_scale=eval_noise_scale)
+                loss_dict = td3_trainer.update(batch_size, norm_ftn=envs.normalize_obs, deterministic=DETERMINISTIC, eval_noise_scale=eval_noise_scale)
                 policy_loss.append(loss_dict['policy_loss'])
                 q_loss_1.append(loss_dict['q_loss_1'])
                 q_loss_2.append(loss_dict['q_loss_2'])
@@ -334,7 +333,7 @@ def train(args, hparam):
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
             td3_trainer.save_model(os.path.join(savepath,"iter%07d"%i_episode))
             envs.save(os.path.join(savepath,"iter%07d"%i_episode))
-            wandb.log_artifact(artifact, step=i_episode)
+            wandb.log_artifact(artifact, description=str(i_episode))
 
         if np.mean(scores_window)>=best_score: 
             td3_trainer.save_model(os.path.join(savepath,"best"))
@@ -343,7 +342,7 @@ def train(args, hparam):
         
     td3_trainer.save_model(os.path.join(savepath,"final"))
     print('\rFinal\tAverage Score: {:.2f}'.format(np.mean(scores_window)))
-    wandb.log_artifact(artifact)
+    wandb.log_artifact(artifact, description="final")
 
     envs.close()
     del envs
