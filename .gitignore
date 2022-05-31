@@ -17,10 +17,11 @@ videos/
 
 wandb/
 
-envs/assets/
+envs/assets/**
 !envs/assets/cf2x_default.urdf
 !envs/assets/quad.obj
 !envs/assets/cf2.dae
+!envs/assets/random_urdf.py
 
 __pycache__/
 envs/__pycache__/
