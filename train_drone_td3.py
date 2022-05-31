@@ -123,8 +123,6 @@ def train(args, hparam):
         wandb.init(project="TD3-drone", config=hparam)
         wandb.run.name = "%s_%s"%(rnn_tag, now)
         wandb.run.save()
-        artifact = wandb.Artifact('agent', type='model')
-        artifact.add_dir(savepath)
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     print("Device:",device)
@@ -333,6 +331,8 @@ def train(args, hparam):
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
             td3_trainer.save_model(os.path.join(savepath,"iter%07d"%i_episode))
             envs.save(os.path.join(savepath,"iter%07d"%i_episode))
+            artifact = wandb.Artifact('agent-%s'%now, type='model')
+            artifact.add_dir(savepath+"/")
             wandb.log_artifact(artifact)
 
         if np.mean(scores_window)>=best_score: 
@@ -342,6 +342,8 @@ def train(args, hparam):
         
     td3_trainer.save_model(os.path.join(savepath,"final"))
     print('\rFinal\tAverage Score: {:.2f}'.format(np.mean(scores_window)))
+    artifact = wandb.Artifact('agent-%s'%now, type='model')
+    artifact.add_dir(savepath+"/")
     wandb.log_artifact(artifact)
 
     envs.close()
