@@ -413,6 +413,7 @@ class dynRandeEnv:
                 env_name='takeoff-aviary-v0',
                 tag='randomize',
                 task='stabilize',
+                obs_norm=False,
                 nenvs=4, seed=0,
                 load_path=None,
                 dyn_range=dict(), # physical properties range
@@ -426,6 +427,8 @@ class dynRandeEnv:
         self.dyn_range = dyn_range
         self.record = record
 
+        self.obs_norm = obs_norm
+
         envs = []
         for idx in range(nenvs):
             env = self.drone_env(idx)
@@ -434,7 +437,7 @@ class dynRandeEnv:
         if load_path is not None:
             self.env = VecNormalize.load(os.path.join(load_path,'env.pkl'), self.env)
         else:
-            self.env = VecNormalize(self.env, norm_obs=True, norm_reward=False)
+            self.env = VecNormalize(self.env, norm_obs=self.obs_norm, norm_reward=False)
         self.env = VecDynRandEnv(self.env)
 
     def drone_env(self, idx):  
@@ -467,7 +470,8 @@ class dynRandeEnv:
             observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
             frame_stack=1,
             task='stabilize2',
-            reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
+            # reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
+            reward_coeff={'xyz':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.002},
             episode_len_sec=2,
             max_rpm=66535,
             initial_xyzs=initial_xyzs, # Far from the ground

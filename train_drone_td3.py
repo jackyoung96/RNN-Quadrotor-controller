@@ -45,8 +45,7 @@ hparam_set = {
 
     "q_lr": [1e-3, 3e-4],
     "policy_lr": [1e-3, 3e-5],
-    "t_max": [50000, 30000, 100000],
-    "policy_target_update_interval": [2,3,2,4,5],
+    "policy_target_update_interval": [2,3],
 }
 
 def train(args, hparam):
@@ -131,8 +130,8 @@ def train(args, hparam):
     # Define environment and agent #####
     ####################################
 
-    envs = dynRandeEnv(env_name=env_name, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=nenvs, dyn_range=dyn_range, seed=0)
-    eval_env = dynRandeEnv(env_name=env_name, tag="%s%s%seval"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=1, dyn_range=dyn_range, seed=1234567)
+    envs = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=nenvs, dyn_range=dyn_range, seed=0)
+    eval_env = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%seval"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=1, dyn_range=dyn_range, seed=1234567)
     td3_trainer = td3_agent(env=envs,
                 rnn=args.rnn,
                 device=device,
@@ -300,6 +299,8 @@ def train(args, hparam):
                         'loss/ang_velocity[deg_s]': np.linalg.norm((2*180*np.stack(unnormed_state)[:,:,15:18]), axis=-1).mean(),
                         'loss/angle[deg]': 180/np.pi*np.arccos(np.clip(np.stack(unnormed_state)[:,:,11].flatten(),-1.0,1.0)).mean()},
                          step=i_episode)
+                
+
 
         ######################################
         ### Evaluation #######################
@@ -397,7 +398,8 @@ if __name__=='__main__':
     parser.add_argument('--large_eps', action='store_true', help="use large epsilon")
     parser.add_argument('--angvel_goal', action='store_true', help='use angular velocity instead of angle as the goal')
     parser.add_argument('--her_length', type=int, default=100, help='sequence length for her')
-    parser.add_argument('--batch_norm', action='store_true', help='use batchnorm for input normalization')
+    parser.add_argument('--obs_norm', action='store_true', help='use batchnorm for input normalization')
+    parser.add_argument('--small_lr', action='store_true', help='use small lr')
 
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
@@ -433,7 +435,10 @@ if __name__=='__main__':
                 df_hparam = df_hparam.append([hparam])
                 df_hparam.to_csv("hparamDB/hparam_test_%s.csv"%args.rnn)
         else:
-            hparam = dict([(k,v[0]) for k,v in hparam_set.items()])
+            if args.small_lr:
+                hparam = dict([(k,v[-1]) for k,v in hparam_set.items()])
+            else:
+                hparam = dict([(k,v[0]) for k,v in hparam_set.items()])
             hparam.update(vars(args))
             hparam['policy_actf'] = getattr(F,args.policy_actf)
             train(args, hparam)
