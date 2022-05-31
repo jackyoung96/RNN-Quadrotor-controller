@@ -3,13 +3,20 @@ import gym
 
 import numpy as np
 import gym
+import os
 from multiprocessing import Process, Pipe
 from abc import ABC, abstractmethod
+
+from redis import SentinelManagedSSLConnection
 from .customEnvDrone import customAviary, domainRandomAviary
 from gym_pybullet_drones.envs.BaseAviary import DroneModel, Physics
 from gym_pybullet_drones.envs.single_agent_rl.BaseSingleAgentAviary import ActionType, ObservationType, BaseSingleAgentAviary
 import gym_pybullet_drones
 import time
+
+from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env.vec_normalize import VecNormalize
+from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvStepReturn, VecEnvWrapper
 
 class CloudpickleWrapper(object):
     """
@@ -382,3 +389,124 @@ class domainRandeEnv(parallelEnv):
             return obs, reward, is_done, info
         else:
             raise NotImplementedError
+
+class VecDynRandEnv(VecEnvWrapper):
+    def __init__(self, venv: VecEnv):
+        super().__init__(venv=venv, observation_space=venv.observation_space)
+
+    def reset(self) -> np.ndarray:
+        params = []
+        for env in self.venv.venv.envs:
+            params.append(env.random_urdf())
+        params = np.stack(params, axis=0)
+        obs = self.venv.reset()
+        return obs, params
+
+    def step_async(self, actions: np.ndarray) -> None:
+        self.venv.step_async(actions)
+
+    def step_wait(self) -> VecEnvStepReturn:
+        obs, reward, done, info = self.venv.step_wait()
+        return obs, reward, done, info
+
+class dynRandeEnv:
+    def __init__(self, 
+                env_name='takeoff-aviary-v0',
+                tag='randomize',
+                task='stabilize',
+                nenvs=4, seed=0,
+                load_path=None,
+                dyn_range=dict(), # physical properties range
+                record=False):
+        self.env_name = env_name
+        self.tag = tag
+        self.task = task
+        self.seed = seed
+        self.dyn_range = dyn_range
+        self.nenvs = nenvs
+        self.dyn_range = dyn_range
+        self.record = record
+
+        envs = []
+        for idx in range(nenvs):
+            env = self.drone_env(idx)
+            envs.append(env)
+        self.env = DummyVecEnv([lambda: env for env in envs])
+        if load_path is not None:
+            self.env = VecNormalize.load(os.path.join(load_path,'env.pkl'), self.env)
+        else:
+            self.env = VecNormalize(self.env, norm_obs=True, norm_reward=False)
+        self.env = VecDynRandEnv(self.env)
+
+    def drone_env(self, idx):  
+        if self.task == 'stabilize':
+            initial_xyzs = [[0.0,0.0,10000.0]]
+            rpy_noise=np.pi/4
+            vel_noise=2.0
+            angvel_noise=np.pi/2
+            goal = None
+        elif self.task == 'takeoff':
+            initial_xyzs = [[0.0,0.0,0.025]]
+            rpy_noise=0
+            vel_noise=0
+            angvel_noise=0
+            goal = np.array([[0.0,0.0,1.0]])
+        else:
+            raise NotImplementedError("please choose task among [stabilize, takeoff]")
+        env = gym.make(id=self.env_name, # arbitrary environment that has state normalization and clipping
+            drone_model=DroneModel.CF2X,
+            initial_xyzs=np.array(initial_xyzs),
+            initial_rpys=np.array([[0.0,0.0,0.0]]),
+            physics=Physics.PYB_GND_DRAG_DW,
+            freq=200,
+            aggregate_phy_steps=1,
+            gui=self.record,
+            record=self.record, 
+            obs=ObservationType.KIN,
+            act=ActionType.RPM)
+        env = domainRandomAviary(env, self.tag+str(time.time_ns()), idx, self.seed+idx,
+            observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
+            frame_stack=1,
+            task='stabilize2',
+            reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
+            episode_len_sec=2,
+            max_rpm=66535,
+            initial_xyzs=initial_xyzs, # Far from the ground
+            freq=200,
+            rpy_noise=rpy_noise,
+            vel_noise=vel_noise,
+            angvel_noise=angvel_noise,
+            mass_range=self.dyn_range.get('mass_range', 0.0),
+            cm_range=self.dyn_range.get('cm_range', 0.0),
+            kf_range=self.dyn_range.get('kf_range', 0.0),
+            km_range=self.dyn_range.get('km_range', 0.0),
+            i_range=self.dyn_range.get('i_range', 0.0),
+            battery_range=self.dyn_range.get('battery_range', 0.0),
+            goal=goal)
+        setattr(env, 'env_name', self.env_name)
+
+        return env
+
+    def reset(self):
+        return self.env.reset()
+
+    def step(self, action):
+        return self.env.step(action)
+    
+    def normalize_obs(self, obs):
+        return self.env.normalize_obs(obs)
+
+    def unnormalize_obs(self, obs):
+        return self.env.unnormalize_obs(obs)
+
+    def save(self, path):
+        self.env.save(path+'env.pkl')
+    
+    def load(self,path):
+        envs = []
+        for idx in range(self.nenvs):
+            env = self.drone_env(idx)
+            envs.append(env)
+        self.env = DummyVecEnv([lambda: env for env in envs])
+        self.env = VecNormalize.load(path+'env.pkl', self.env)
+        self.env = VecDynRandEnv(self.env)

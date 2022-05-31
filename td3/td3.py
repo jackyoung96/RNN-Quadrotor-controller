@@ -648,12 +648,13 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         goal       = torch.FloatTensor(goal).expand(B,L,-1).to(self.device)
 
         if self.reward_norm:
-            reward = (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6)
+            # Normalize regard to episode axis (clipped by 10.0)
+            reward = torch.clamp((reward - reward.mean(dim=1, keepdim=True)) / (reward.std(dim=1, keepdim=True) + 1e-8), -10.0, 10.0)
  
         predicted_q_value1 = self.q_net1(state, action, param, goal)
         predicted_q_value2 = self.q_net2(state, action, param, goal)
-        new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, goal, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
-        new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, goal, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
+        new_action, hidden_out, *_= self.policy_net.evaluate(state, last_action, hidden_in, goal, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
+        new_next_action, hidden_out, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, goal, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
         # Training Q Function
         predicted_target_q1 = self.target_q_net1(next_state, new_next_action, param, goal)
