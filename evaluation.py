@@ -362,7 +362,7 @@ def drone_test(eval_env, agent, test_itr=10, record=False, log=False):
                     0,0,0, # vel
                     0,0,0, # ang vel
                     0,0,0,0]]) # dummy action
-    goal = eval_env.unnormalize_obs(goal)
+    goal = eval_env.normalize_obs(goal)
 
     with torch.no_grad():
         for i_eval in range(test_itr):
