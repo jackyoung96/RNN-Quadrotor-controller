@@ -121,7 +121,7 @@ def train(args, hparam):
 
         # wandb
         wandb.init(project="TD3-drone", config=hparam)
-        wandb.run.name = "%s_%s_%s"%(env_name, rnn_tag, now)
+        wandb.run.name = "%s_%s"%(rnn_tag, now)
         wandb.run.save()
         artifact = wandb.Artifact('agent', type='model')
         artifact.add_dir(savepath)
@@ -292,7 +292,7 @@ def train(args, hparam):
                     writer.add_histogram(f'q_net/{name}.grad', weight.grad, i_episode)
 
             if 'aviary' in env_name:
-                unnormed_state = envs.unnormalize_obs(np.stack(episode_state))
+                unnormed_state = np.stack(episode_state)
                 writer.add_scalar('loss/position[m]', np.linalg.norm((6*np.stack(unnormed_state)[:,:,:3]), axis=-1).mean(), i_episode)
                 writer.add_scalar('loss/velocity[m_s]', np.linalg.norm((3*np.stack(unnormed_state)[:,:,12:15]), axis=-1).mean(), i_episode)
                 writer.add_scalar('loss/ang_velocity[deg_s]', np.linalg.norm((2*180*np.stack(unnormed_state)[:,:,15:18]), axis=-1).mean(), i_episode)
