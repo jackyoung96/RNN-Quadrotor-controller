@@ -775,7 +775,7 @@ class HindsightReplayBufferGRU(ReplayBufferFastAdaptGRU):
                     ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
                 if self.angvel_goal:
-                    ang_achieve = np.linlag.norm(next_state[:,15:18]-goal[:,15:18])<self.epsilon_ang
+                    ang_achieve = np.linalg.norm(next_state[:,15:18]-goal[:,15:18])<self.epsilon_ang
                 else:
                     ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
                 if self.positive_rew:
