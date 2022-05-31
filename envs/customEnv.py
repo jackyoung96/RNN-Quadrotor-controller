@@ -7,7 +7,6 @@ import os
 from multiprocessing import Process, Pipe
 from abc import ABC, abstractmethod
 
-from redis import SentinelManagedSSLConnection
 from .customEnvDrone import customAviary, domainRandomAviary
 from gym_pybullet_drones.envs.BaseAviary import DroneModel, Physics
 from gym_pybullet_drones.envs.single_agent_rl.BaseSingleAgentAviary import ActionType, ObservationType, BaseSingleAgentAviary

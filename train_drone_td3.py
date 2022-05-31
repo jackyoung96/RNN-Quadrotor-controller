@@ -333,7 +333,7 @@ def train(args, hparam):
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
             td3_trainer.save_model(os.path.join(savepath,"iter%07d"%i_episode))
             envs.save(os.path.join(savepath,"iter%07d"%i_episode))
-            wandb.log_artifact(artifact, description=str(i_episode))
+            wandb.log_artifact(artifact)
 
         if np.mean(scores_window)>=best_score: 
             td3_trainer.save_model(os.path.join(savepath,"best"))
@@ -342,7 +342,7 @@ def train(args, hparam):
         
     td3_trainer.save_model(os.path.join(savepath,"final"))
     print('\rFinal\tAverage Score: {:.2f}'.format(np.mean(scores_window)))
-    wandb.log_artifact(artifact, description="final")
+    wandb.log_artifact(artifact)
 
     envs.close()
     del envs
