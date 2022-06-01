@@ -16,6 +16,7 @@ paperutils/
 videos/
 
 wandb/
+artifacts/
 
 envs/assets/**
 !envs/assets/cf2x_default.urdf

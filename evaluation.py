@@ -341,10 +341,8 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
     
     return eval_reward / test_itr, eval_success / test_itr
 
-def drone_test(eval_env, agent, test_itr=10, record=False, log=False):
-    if record:
-        disp = Display(visible=False, size=(100, 60))
-        disp.start()
+def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False):
+    
         # hyper-parameters for RL training
     DETERMINISTIC=True  # DDPG: deterministic policy gradient      
     
@@ -353,7 +351,6 @@ def drone_test(eval_env, agent, test_itr=10, record=False, log=False):
     eval_reward = 0
     eval_position = 0 
     eval_angle = 0
-    max_steps = 500
 
     goal = np.array([[0,0,0, # pos
                     1,0,0,
@@ -446,9 +443,6 @@ def drone_test(eval_env, agent, test_itr=10, record=False, log=False):
                         success %d\n\
                         position error[m] %.3f\n\
                         angle error[deg] %.3f"%(i_eval,total_rew,success, np.mean(e_ps[-100:]), np.rad2deg(np.mean(e_as[-100:]))))
-    
-    if record:
-        disp.stop()
     
     if log:
         print("total average reward %.3f success rate %.2f"%(eval_reward / test_itr,eval_success / test_itr))

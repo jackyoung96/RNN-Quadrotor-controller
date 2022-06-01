@@ -583,9 +583,6 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
         self.target_policy_net = self.target_ini(self.policy_net, self.target_policy_net)
-        self.target_q_net1.eval()
-        self.target_q_net2.eval()
-        self.target_policy_net.eval()
         
         self.q_lr = kwargs.get('q_lr',1e-3)
         self.policy_lr = kwargs.get('policy_lr',1e-4)
@@ -634,9 +631,9 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
 
     def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99, soft_tau=5e-3):
         if self.use_her:
-            hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal = self.replay_buffer.sample(batch_size)
+            state, action, last_action, reward, next_state, done, param, goal = self.replay_buffer.sample(batch_size)
         else:
-            hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal = self.replay_buffer.sample_original(batch_size)
+            state, action, last_action, reward, next_state, done, param, goal = self.replay_buffer.sample_original(batch_size)
         # print('sample:', state, action,  reward, done)
         state, next_state, goal = map(norm_ftn, [state, next_state, goal])
 
@@ -655,10 +652,16 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
             # Normalize regard to episode axis (clipped by 10.0)
             reward = torch.clamp((reward - reward.mean(dim=1, keepdim=True)) / (reward.std(dim=1, keepdim=True) + 1e-8), -10.0, 10.0)
  
+        if "LSTM" in self.rnn_type:
+            hidden_in = (torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device), \
+                        torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device))  # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
+        else:
+            hidden_in = torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device)
+
         predicted_q_value1 = self.q_net1(state, action, param, goal)
         predicted_q_value2 = self.q_net2(state, action, param, goal)
-        new_action, hidden_out, *_= self.policy_net.evaluate(state, last_action, hidden_in, goal, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
-        new_next_action, hidden_out, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, goal, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
+        new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, goal, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
+        new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_in, goal, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
         # Training Q Function
         predicted_target_q1 = self.target_q_net1(next_state, new_next_action, param, goal)
@@ -671,13 +674,13 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 1.0)
+        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 1.0)
+        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
@@ -697,7 +700,7 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
             policy_loss = - predicted_new_q_value.mean()
             self.policy_optimizer.zero_grad()
             policy_loss.backward()
-            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
+            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
             self.policy_optimizer.step()
             if self.lr_scheduler:
                 self.scheduler_policy.step()

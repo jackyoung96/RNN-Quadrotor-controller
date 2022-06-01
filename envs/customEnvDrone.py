@@ -532,6 +532,7 @@ class domainRandomAviary(customAviary):
         self.random_urdf()
         self.env._housekeeping = self._housekeeping
         self.goal = kwargs.get('goal', None)
+        self.env.FRAME_PER_SEC = 30
 
     def test(self):
         self.train = False

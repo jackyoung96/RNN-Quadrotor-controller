@@ -415,6 +415,7 @@ class dynRandeEnv:
                 task='stabilize',
                 obs_norm=False,
                 nenvs=4, seed=0,
+                episode_len=2,
                 load_path=None,
                 dyn_range=dict(), # physical properties range
                 record=False):
@@ -426,6 +427,7 @@ class dynRandeEnv:
         self.nenvs = nenvs
         self.dyn_range = dyn_range
         self.record = record
+        self.episode_len = episode_len
 
         self.obs_norm = obs_norm
 
@@ -435,7 +437,7 @@ class dynRandeEnv:
             envs.append(env)
         self.env = DummyVecEnv([lambda: env for env in envs])
         if load_path is not None:
-            self.env = VecNormalize.load(os.path.join(load_path,'env.pkl'), self.env)
+            self.env = VecNormalize.load(load_path+'env.pkl', self.env)
         else:
             self.env = VecNormalize(self.env, norm_obs=self.obs_norm, norm_reward=False)
         self.env = VecDynRandEnv(self.env)
@@ -447,6 +449,12 @@ class dynRandeEnv:
             vel_noise=2.0
             angvel_noise=np.pi/2
             goal = None
+        elif self.task == 'stabilize-record':
+            initial_xyzs = [[0.0,0.0,1.5]]
+            rpy_noise=np.pi/4
+            vel_noise=2.0
+            angvel_noise=np.pi/2
+            goal = None
         elif self.task == 'takeoff':
             initial_xyzs = [[0.0,0.0,0.025]]
             rpy_noise=0
@@ -454,7 +462,7 @@ class dynRandeEnv:
             angvel_noise=0
             goal = np.array([[0.0,0.0,1.0]])
         else:
-            raise NotImplementedError("please choose task among [stabilize, takeoff]")
+            raise NotImplementedError("please choose task among [stabilize, stabilize-record, takeoff]")
         env = gym.make(id=self.env_name, # arbitrary environment that has state normalization and clipping
             drone_model=DroneModel.CF2X,
             initial_xyzs=np.array(initial_xyzs),
@@ -462,7 +470,7 @@ class dynRandeEnv:
             physics=Physics.PYB_GND_DRAG_DW,
             freq=200,
             aggregate_phy_steps=1,
-            gui=self.record,
+            gui=False,
             record=self.record, 
             obs=ObservationType.KIN,
             act=ActionType.RPM)
@@ -472,7 +480,7 @@ class dynRandeEnv:
             task='stabilize2',
             # reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
             reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.002},
-            episode_len_sec=2,
+            episode_len_sec=self.episode_len,
             max_rpm=66535,
             initial_xyzs=initial_xyzs, # Far from the ground
             freq=200,

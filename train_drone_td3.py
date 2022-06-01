@@ -11,7 +11,7 @@ from td3.agent import td3_agent
 from envs.customEnv import dynRandeEnv
 
 import argparse
-
+from pyvirtualdisplay import Display
 import os
 from torch.utils.tensorboard import SummaryWriter
 import wandb
@@ -57,6 +57,7 @@ def train(args, hparam):
     max_episodes  = int(1e6)
     hidden_dim = hparam['hidden_dim']
     max_steps = 300
+    eval_max_steps = 500
     goal_dim = hparam['goal_dim']
     param_num = hparam['param_num']
     her_history_length = args.her_length
@@ -130,8 +131,8 @@ def train(args, hparam):
     # Define environment and agent #####
     ####################################
 
-    envs = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=nenvs, dyn_range=dyn_range, seed=0)
-    eval_env = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%seval"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=1, dyn_range=dyn_range, seed=1234567)
+    envs = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=nenvs, dyn_range=dyn_range, episode_len=max_steps/200, seed=0)
+    eval_env = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%seval"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=1, dyn_range=dyn_range, episode_len=max_steps/200, seed=1234567)
     td3_trainer = td3_agent(env=envs,
                 rnn=args.rnn,
                 device=device,
@@ -205,9 +206,6 @@ def train(args, hparam):
                                                     deterministic=DETERMINISTIC, 
                                                         explore_noise_scale=explore_noise_scale)
             next_state, reward, done, _ = envs.step(action) 
-            if step == 0:
-                ini_hidden_in = hidden_in
-                ini_hidden_out = hidden_out
             episode_state.append(envs.unnormalize_obs(state))
             episode_action.append(action)
             episode_last_action.append(last_action)
@@ -221,9 +219,7 @@ def train(args, hparam):
         
         # Push into Experience replay buffer
         if args.rnn in ['RNNHER', "LSTMHER", "GRUHER"]:
-            td3_trainer.replay_buffer.push_batch(ini_hidden_in, 
-                            ini_hidden_out, 
-                            episode_state, 
+            td3_trainer.replay_buffer.push_batch(episode_state, 
                             episode_action, 
                             episode_last_action,
                             episode_reward, 
@@ -232,9 +228,7 @@ def train(args, hparam):
                             param,
                             goal)
         else:           
-            td3_trainer.replay_buffer.push_batch(ini_hidden_in, 
-                            ini_hidden_out, 
-                            episode_state, 
+            td3_trainer.replay_buffer.push_batch(episode_state, 
                             episode_action, 
                             episode_last_action,
                             episode_reward, 
@@ -311,7 +305,7 @@ def train(args, hparam):
             eval_env.load(os.path.join(savepath+"eval"))
             eval_env.env.training = False
             td3_trainer.policy_net.eval()
-            eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, test_itr=eval_itr, record=False)
+            eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, max_steps=eval_max_steps, test_itr=eval_itr, record=False)
             td3_trainer.policy_net.train()
             if writer is not None:
                 writer.add_scalar('eval/reward', eval_rew, i_episode)
@@ -353,41 +347,53 @@ def train(args, hparam):
     return mean_rewards, loss_storage, eval_rew, eval_success, dtime
 
 def test(args, hparam):
+    if args.record:
+        disp = Display(visible=False, size=(100, 60))
+        disp.start()
     env_name = "takeoff-aviary-v0"
+    max_steps = 800
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     print("Device:",device)
 
     # Define environment
     eval_env = dynRandeEnv(env_name=env_name, 
-                       load_path=args.path,
+                    #    load_path=args.path,
                        tag="test", 
                        task=args.task,
                        nenvs=1, 
                        dyn_range=dyn_range, 
                        seed=int(123456789),
                        record=args.record)
+    eval_env.env.training = False
     td3_trainer = td3_agent(env=eval_env,
                 rnn=args.rnn,
                 device=device,
                 hparam=hparam)
     td3_trainer.load_model(args.path)
-    td3_trainer.eval()
+    td3_trainer.policy_net.eval()
     
-    eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, test_itr=5, record=args.record, log=True)
+    eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, max_steps=max_steps, test_itr=5, record=args.record, log=True)
     print("EVALUATION REWARD:",eval_rew)
     print("EVALUATION SUCCESS RATE:",eval_success)
     print("EVALUATION POSITION ERROR[m]:",eval_position)
     print("EVALUATION ANGLE ERROR[deg]:",np.rad2deg(eval_angle))
 
+    if args.record:
+        disp.stop()
+
 if __name__=='__main__':
     # train(1000, 'CartPole-v1')
     parser = argparse.ArgumentParser()
+
+    # Common arguments
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--rnn', choices=['None','RNN2','GRU2','LSTM2',
                                             'RNNHER','GRUHER','LSTMHER'], default='None', help='Use memory network (LSTM)')
     parser.add_argument('--policy_actf', type=str, default='relu', help="policy activation function")
+    parser.add_argument('--obs_norm', action='store_true', help='use batchnorm for input normalization')
 
+    # Arguments for training 
     parser.add_argument('--tb_log', action='store_true', help="Tensorboard logging")
     parser.add_argument('--hparam', action='store_true', help="find hparam set")
     parser.add_argument('--lr_scheduler', action='store_true', help="Use lr scheduler")
@@ -398,13 +404,13 @@ if __name__=='__main__':
     parser.add_argument('--large_eps', action='store_true', help="use large epsilon")
     parser.add_argument('--angvel_goal', action='store_true', help='use angular velocity instead of angle as the goal')
     parser.add_argument('--her_length', type=int, default=100, help='sequence length for her')
-    parser.add_argument('--obs_norm', action='store_true', help='use batchnorm for input normalization')
     parser.add_argument('--small_lr', action='store_true', help='use small lr')
 
+    # Arguments for test
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
     parser.add_argument('--record', action='store_true', help='whether record or not')
-    parser.add_argument('--task', default='stabilize',choices=['stabilize','takeoff','waypoint'],
+    parser.add_argument('--task', default='stabilize',choices=['stabilize', 'stabilize-record', 'takeoff'],
                         help='For takeoff-aviary-v0 environment')
 
 

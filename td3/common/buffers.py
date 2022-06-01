@@ -466,7 +466,7 @@ class HindsightReplayBufferRNN(ReplayBufferFastAdaptRNN):
         if not self.env_name in ['takeoff-aviary-v0', 'Pendulum-v0']:
             assert "env should be choosen among ['takeoff-aviary-v0', 'Pendulum-v0']"
     
-    def push(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
+    def push(self, state, action, last_action, reward, next_state, done, param, goal):
         gs = [goal[None,:]]
         if np.random.random()<0.8 and self.her:
             gs.append(next_state[-1:,:])
@@ -497,47 +497,24 @@ class HindsightReplayBufferRNN(ReplayBufferFastAdaptRNN):
                 reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
                 done = np.where(pos_achieve , 1.0, 0.0)
             # ang_achieve = np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)<self.epsilon_ang
-            self.buffer[self.position] = (hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal)
+            self.buffer[self.position] = (state, action, last_action, reward, next_state, done, param, goal)
             self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
 
-    def push_batch(self, hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param, goal):
+    def push_batch(self, state, action, last_action, reward, next_state, done, param, goal):
         B,L = state[0].shape[0], len(state)
         state, action, last_action, reward, next_state, done = \
             map(lambda x: np.stack(x, axis=1),[state, action, last_action, reward, next_state, done])
         assert all(state.shape[0] == x.shape[0] for x in [action, last_action, reward, next_state, done]), "Somethings wrong on dimension"
-        if self.rnn_type == 'LSTM':
-            hidden_in = (hidden_in[0].view(B,1,1,-1), hidden_in[1].view(B,1,1,-1))
-            hidden_out = (hidden_out[0].view(B,1,1,-1), hidden_out[1].view(B,1,1,-1))
-            for hin_h,hin_c, hout_h,hout_c, s,a,la,r,ns,d,p,g in zip(*hidden_in, *hidden_out, state, action, last_action, reward, next_state, done,param, goal):
-                for i in range(0,L+1-self.history_length,self.history_length):
-                    self.push((hin_h,hin_c),(hout_h,hout_c),*map(lambda x:x[i:i+self.history_length],[s,a,la,r,ns,d]),p,g)
-        elif self.rnn_type=="RNN" or self.rnn_type=='GRU':
-            hidden_in = hidden_in.view(B,1,1,-1)
-            hidden_out = hidden_out.view(B,1,1,-1)
-            for hin, hout, s,a,la,r,ns,d,p,g in zip(hidden_in, hidden_out, state, action, last_action, reward, next_state, done,param, goal):
-                for i in range(0,L+1-self.history_length,self.history_length):
-                    self.push(hin,hout,*map(lambda x:x[i:i+self.history_length],[s,a,la,r,ns,d]),p,g)
-        else:
-            for s,a,la,r,ns,d,p,g in zip(state, action, last_action, reward, next_state, done,param, goal):
-                for i in range(0,L+1-self.history_length,self.history_length):
-                    self.push(None,None,*map(lambda x:x[i:i+self.history_length],[s,a,la,r,ns,d]),p,g)
+        for s,a,la,r,ns,d,p,g in zip(state, action, last_action, reward, next_state, done,param, goal):
+            for i in range(0,L+1-self.history_length,self.history_length):
+                self.push(*map(lambda x:x[i:i+self.history_length],[s,a,la,r,ns,d]),p,g)
 
     def sample(self, batch_size):
         s_lst, a_lst, la_lst, r_lst, ns_lst, hi_lst, ci_lst, ho_lst, co_lst, d_lst, p_lst, g_lst=[],[],[],[],[],[],[],[],[],[],[],[]
         batch = random.sample(self.buffer, batch_size)
+        
         for sample in batch:
-            if self.rnn_type == 'LSTM':
-                (h_in, c_in), (h_out, c_out), state, action, last_action, reward, next_state, done, param, goal = sample
-                hi_lst.append(h_in)  # h_in: (1, batch_size=1, hidden_size)
-                ci_lst.append(c_in)
-                ho_lst.append(h_out)
-                co_lst.append(c_out)
-            elif self.rnn_type=="RNN" or self.rnn_type=='GRU':
-                h_in, h_out, state, action, last_action, reward, next_state, done, param, goal = sample
-                hi_lst.append(h_in)  # h_in: (1, batch_size=1, hidden_size)
-                ho_lst.append(h_out)
-            else:
-                h_in, h_out, state, action, last_action, reward, next_state, done, param, goal = sample
+            state, action, last_action, reward, next_state, done, param, goal = sample
             # t0 = np.random.randint(0,state.shape[0]-self.sample_length)
             s_lst.append(state) 
             a_lst.append(action)
@@ -547,24 +524,10 @@ class HindsightReplayBufferRNN(ReplayBufferFastAdaptRNN):
             d_lst.append(done)
             p_lst.append(param)
             g_lst.append(goal)
-
-        if self.rnn_type == 'LSTM': 
-            hi_lst = torch.cat(hi_lst, dim=-2).detach() # cat along the batch dim
-            ho_lst = torch.cat(ho_lst, dim=-2).detach()
-            ci_lst = torch.cat(ci_lst, dim=-2).detach()
-            co_lst = torch.cat(co_lst, dim=-2).detach()
-            hidden_in = (hi_lst, ci_lst)
-            hidden_out = (ho_lst, co_lst)
-        elif self.rnn_type=="RNN" or self.rnn_type=='GRU':
-            hidden_in = torch.cat(hi_lst, dim=-2).detach() # cat along the batch dim
-            hidden_out = torch.cat(ho_lst, dim=-2).detach()
         
         s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst = map(lambda x: np.stack(x,axis=0), [s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst])
 
-        if self.rnn_type=='FF':
-            return s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst
-        else:
-            return hidden_in, hidden_out, s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst
+        return s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst
 
 class HindsightReplayBufferLSTM(ReplayBufferFastAdaptLSTM):
     """ 
