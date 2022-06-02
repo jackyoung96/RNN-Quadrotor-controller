@@ -10,7 +10,7 @@ def td3_agent(env,
 
     if rnn in ["RNN2", "LSTM2", "GRU2"]:
         # Param + FF
-        replay_buffer = ReplayBufferFastAdaptRNN(replay_buffer_size, rnn, **hparam)
+        replay_buffer = ReplayBufferRNN(replay_buffer_size, rnn, **hparam)
         td3_trainer = TD3RNN_Trainer2(replay_buffer,
                     env.env.action_space, 
                     env.env.action_space, 
@@ -19,7 +19,17 @@ def td3_agent(env,
                     action_scale=1.0 if 'aviary' in env.env.env_name else 10.0,
                     device=device, 
                     **hparam)
-    if "HER" in rnn:
+    elif rnn in ["RNN3", "LSTM3", "GRU3"]:
+        replay_buffer = ReplayBufferRNN(replay_buffer_size, rnn, **hparam)
+        td3_trainer = TD3RNN_Trainer3(replay_buffer,
+                    env.env.action_space, 
+                    env.env.action_space, 
+                    rnn_type=rnn,
+                    out_actf=F.tanh,
+                    action_scale=1.0 if 'aviary' in env.env.env_name else 10.0,
+                    device=device, 
+                    **hparam)
+    elif "HER" in rnn:
         # batch_size = batch_size*int(max_steps//her_sample_length / 2)
         replay_buffer = HindsightReplayBufferRNN(replay_buffer_size, rnn,
                             env=env.env_name,
@@ -38,9 +48,8 @@ def td3_agent(env,
             if hparam['behavior_path']==None:
                 raise FileNotFoundError("Need proper behavior_path")
             td3_trainer.load_behavior(hparam['behavior_path'])
-            
     elif rnn == "None":
-        replay_buffer = ReplayBufferFastAdaptRNN(replay_buffer_size, rnn, **hparam)
+        replay_buffer = ReplayBuffer(replay_buffer_size, rnn, **hparam)
         td3_trainer = TD3_Trainer(replay_buffer,
                     env.env.observation_space, 
                     env.env.action_space, 

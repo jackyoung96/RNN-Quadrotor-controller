@@ -85,7 +85,7 @@ def train(args, hparam):
     eval_noise_scale = 0.5
     best_score = -np.inf
     frame_idx   = 0
-    replay_buffer_size = 3e5
+    replay_buffer_size = 3e5 if args.rnn != "None" else 3e5 * max_steps
     explore_episode = 500
     update_itr = 1
     writer_interval = 100
