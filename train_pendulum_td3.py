@@ -9,7 +9,7 @@ from td3.td3 import *
 from td3.common.buffers import *
 from td3.agent import td3_agent
 from envs.customEnv import dynRandeEnv
-from utils import wandb_artifact
+from utils import wandb_artifact, save_frames_as_gif
 
 import argparse
 from pyvirtualdisplay import Display
@@ -18,7 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 import wandb
 from datetime import datetime
 
-from evaluation import evaluation, generate_result, drone_test
+from evaluation import evaluation, generate_result, drone_test, pendulum_test
 import random
 import pickle as pkl
 import pandas as pd
@@ -126,7 +126,6 @@ def train(args, hparam):
                 device=device,
                 hparam=hparam,
                 replay_buffer_size=replay_buffer_size)
-    wandb.watch([td3_trainer.q_net1,td3_trainer.policy_net], log="parameters")
 
     # keep track of progress
     mean_rewards = []
@@ -260,19 +259,6 @@ def train(args, hparam):
                 if weight.grad is not None:
                     writer.add_histogram(f'q_net/{name}.grad', weight.grad, i_episode)
 
-            if 'aviary' in env_name:
-                unnormed_state = np.stack(episode_state)
-                writer.add_scalar('loss/position[m]', np.linalg.norm((6*np.stack(unnormed_state)[:,:,:3]), axis=-1).mean(), i_episode)
-                writer.add_scalar('loss/velocity[m_s]', np.linalg.norm((3*np.stack(unnormed_state)[:,:,12:15]), axis=-1).mean(), i_episode)
-                writer.add_scalar('loss/ang_velocity[deg_s]', np.linalg.norm((2*180*np.stack(unnormed_state)[:,:,15:18]), axis=-1).mean(), i_episode)
-                writer.add_scalar('loss/angle[deg]', 180/np.pi*np.arccos(np.clip(np.stack(unnormed_state)[:,:,11].flatten(),-1.0,1.0)).mean(), i_episode)
-                wandb.log({'loss/position[m]': np.linalg.norm((6*np.stack(unnormed_state)[:,:,:3]), axis=-1).mean(),
-                        'loss/velocity[m_s]': np.linalg.norm((3*np.stack(unnormed_state)[:,:,12:15]), axis=-1).mean(),
-                        'loss/ang_velocity[deg_s]': np.linalg.norm((2*180*np.stack(unnormed_state)[:,:,15:18]), axis=-1).mean(),
-                        'loss/angle[deg]': 180/np.pi*np.arccos(np.clip(np.stack(unnormed_state)[:,:,11].flatten(),-1.0,1.0)).mean()},
-                         step=i_episode)
-                
-
 
         ######################################
         ### Evaluation #######################
@@ -283,16 +269,14 @@ def train(args, hparam):
             eval_env.load(os.path.join(savepath+"eval"))
             eval_env.env.training = False
             td3_trainer.policy_net.eval()
-            eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, max_steps=eval_max_steps, test_itr=eval_itr, record=False)
+            eval_rew, eval_success, eval_angle, imgs = pendulum_test(eval_env, agent=td3_trainer, max_steps=eval_max_steps, test_itr=eval_itr, record=False)
             td3_trainer.policy_net.train()
             if writer is not None:
                 writer.add_scalar('eval/reward', eval_rew, i_episode)
                 writer.add_scalar('eval/success_rate', eval_success, i_episode)
-                writer.add_scalar('eval/position', eval_position, i_episode)
                 writer.add_scalar('eval/angle', np.rad2deg(eval_angle), i_episode)
                 wandb.log({'eval/reward':eval_rew,
                             'eval/success_rate':eval_success,
-                            'eval/position': eval_position,
                             'eval/angle': np.rad2deg(eval_angle)},
                             step=i_episode)
 
@@ -357,11 +341,15 @@ def test(args, hparam):
     td3_trainer.load_model(args.path)
     td3_trainer.policy_net.eval()
     
-    eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, max_steps=max_steps, test_itr=10, record=args.record, log=True)
+    eval_rew, eval_success, eval_angle, imgs = pendulum_test(eval_env, agent=td3_trainer, max_steps=max_steps, test_itr=10, record=args.record, log=True)
     print("EVALUATION REWARD:",eval_rew)
     print("EVALUATION SUCCESS RATE:",eval_success)
-    print("EVALUATION POSITION ERROR[m]:",eval_position)
     print("EVALUATION ANGLE ERROR[deg]:",np.rad2deg(eval_angle))
+
+    if not os.path.isdir("videos/pendulum"):
+        os.makedirs("videos/pendulum")
+    dtime = datetime.now()
+    save_frames_as_gif(imgs, "videos/pendulum", dtime.strftime("%y%b%d%H%M%S")+".gif")
 
     if args.record:
         disp.stop()

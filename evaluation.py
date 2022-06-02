@@ -341,6 +341,109 @@ def generate_result(env_name, agent, dyn_range, test_itr, seed, record=False):
     
     return eval_reward / test_itr, eval_success / test_itr
 
+def pendulum_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False):
+    
+        # hyper-parameters for RL training
+    DETERMINISTIC=True  # DDPG: deterministic policy gradient      
+    
+    device = agent.device
+    eval_success = 0
+    eval_reward = 0
+    eval_angle = 0
+
+    goal = np.array([[0,0,0]]) # dummy action
+    goal = eval_env.normalize_obs(goal)
+
+    with torch.no_grad():
+        for i_eval in range(test_itr):
+
+            state, param = eval_env.reset()
+            total_rew = 0
+            last_action = eval_env.env.action_space.sample()[None,:]
+            last_action = np.zeros_like(last_action)
+            if hasattr(agent, 'rnn_type'):
+                if 'LSTM' == agent.rnn_type:
+                    hidden_out = (torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device), \
+                                torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device))
+                else:
+                    hidden_out = torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device)
+
+            step, success = 0,0
+            e_as = []
+            state_buffer, action_buffer, reward_buffer = [],[],[]
+            imgs = []
+
+            for i_step in range(max_steps):
+                if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
+                    hidden_in = hidden_out
+                    if not hasattr(agent.q_net1, '_goal_dim'):
+                        action, hidden_out = \
+                            agent.policy_net.get_action(state, 
+                                                            last_action, 
+                                                            hidden_in, 
+                                                            deterministic=DETERMINISTIC, 
+                                                            explore_noise_scale=0.0)
+                    else:
+                        action, hidden_out = \
+                            agent.policy_net.get_action(state, 
+                                                            last_action, 
+                                                            hidden_in, 
+                                                            goal=goal,
+                                                            deterministic=DETERMINISTIC, 
+                                                            explore_noise_scale=0.0)
+                else:
+                    action = agent.policy_net.get_action(state, 
+                                                        deterministic=DETERMINISTIC, 
+                                                        explore_noise_scale=0.0)
+                action = action[None,:]
+                next_state, reward, done, _ = eval_env.step(action) 
+
+                if record:
+                    imgs.append(eval_env.env.render("rgb_array"))
+                
+                # Metric (position, angle error)
+                unnormed_state = eval_env.unnormalize_obs(next_state)
+                e_a = np.arccos(np.clip(unnormed_state[0,0], -1.0, 1.0)) # angle (rad)
+                e_as.append(e_a)
+                ang_achieve = e_a < np.deg2rad(5)
+                if hasattr(agent.q_net1, '_goal_dim'):
+                    reward = 0.0 if ang_achieve else -1.0
+
+                # Success test
+                if ang_achieve:
+                    step = step+1 
+                else:
+                    step = 0
+                if step > 50: # 0.5 second
+                    success = 1
+                    break
+                
+                state_buffer.append(state)
+                action_buffer.append(action)
+                reward_buffer.append(reward)
+                if not isinstance(action, np.ndarray):
+                    action = np.array([action])
+                state, last_action = next_state, action
+                total_rew += reward
+
+            eval_success += success
+            eval_reward += total_rew
+            eval_angle += np.mean(e_as[-50:])
+
+            if log:
+                print("%d iteration \n\
+                        reward %.3f\n\
+                        success %d\n\
+                        angle error[deg] %.3f"%(i_eval,total_rew,success, np.rad2deg(np.mean(e_as[-100:]))))
+    
+    if log:
+        print("total average reward %.3f success rate %.2f"%(eval_reward / test_itr,eval_success / test_itr))
+    
+    return eval_reward / test_itr, \
+            eval_success / test_itr, \
+            eval_angle / test_itr, \
+            imgs
+
 def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False):
     
         # hyper-parameters for RL training

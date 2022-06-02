@@ -394,9 +394,9 @@ class VecDynRandEnv(VecEnvWrapper):
         super().__init__(venv=venv, observation_space=venv.observation_space)
         self.env_name = env_name
         self.dyn_range = dyn_range
-        self.original_params = None
+        self.origin_params = None
         if not self.env_name=='takeoff-aviary-v0':
-            self.original_params = {
+            self.origin_params = {
                 # Only for pendulum
                 'max_torque': self.venv.venv.envs[0].max_torque,
                 'm': self.venv.venv.envs[0].m,

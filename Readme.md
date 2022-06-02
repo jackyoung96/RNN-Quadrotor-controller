@@ -8,6 +8,10 @@
 ## Hyperparameter search
 > ```python train_td3.py --env Pendulum-v0 --randomize --rnn GRU --tb_log --gpu 3 --hparam```
 
+## pendulum run command
+
+python train_pendulum_td3.py --policy_actf tanh --reward_norm --gpu 0 --rnn None --hparam 
+
 
 ## drone run command
 
