@@ -41,8 +41,8 @@ hparam_set = {
     "param_num": [3],
     "hidden_dim": [128],
 
-    "q_lr": [1e-3, 3e-4],
-    "policy_lr": [1e-3, 3e-5],
+    "q_lr": [1e-3, 3e-4, 1e-4],
+    "policy_lr": [1e-3, 3e-4, 1e-4],
     "policy_target_update_interval": [2,3,4],
 }
 
@@ -52,7 +52,7 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(1e5)
+    max_episodes  = int(2e4)
     hidden_dim = hparam['hidden_dim']
     max_steps = 150
     eval_max_steps = 200
@@ -68,15 +68,17 @@ def train(args, hparam):
 
     batch_size  = 256 if args.rnn != "None" else 256 * max_steps
     nenvs = 16
-    explore_noise_scale = 0.5
-    eval_noise_scale = 0.5
+    explore_noise_scale_init = 0.25
+    eval_noise_scale_init = 0.25
+    explore_noise_scale = explore_noise_scale_init
+    eval_noise_scale = eval_noise_scale_init
     best_score = -np.inf
     frame_idx   = 0
     replay_buffer_size = 1e5
     explore_episode = 500
     update_itr = 1
-    writer_interval = 100
-    eval_freq = 500
+    writer_interval = int(100/nenvs)*nenvs
+    eval_freq = int(500/nenvs)*nenvs
     eval_itr = 20
 
     DETERMINISTIC=True  # DDPG: deterministic policy gradient
@@ -112,7 +114,9 @@ def train(args, hparam):
         wandb.run.name = "%s_%s"%(rnn_tag, now)
         wandb.run.save()
     
+    # os.environ["CUDA_VISIBLE_DEVICES"] = "%d"%args.gpu
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
+    torch.cuda.set_device(device)
     print("Device:",device)
 
     ####################################
@@ -220,6 +224,10 @@ def train(args, hparam):
                 policy_loss.append(loss_dict['policy_loss'])
                 q_loss_1.append(loss_dict['q_loss_1'])
                 q_loss_2.append(loss_dict['q_loss_2'])
+        
+        # Noise decay
+        explore_noise_scale = (0.9 * (1-i_episode/max_episodes) + 0.1) * explore_noise_scale_init
+        eval_noise_scale = (0.9 * (1-i_episode/max_episodes) + 0.1) * eval_noise_scale_init
 
         loss_storage['policy_loss'].append(np.mean(policy_loss))
         loss_storage['q_loss_1'].append(np.mean(q_loss_1))
@@ -232,7 +240,7 @@ def train(args, hparam):
         ## Tensorboard & WandB writing ###########
         ##########################################
 
-        if writer is not None and i_episode%writer_interval == 0:
+        if writer is not None and i_episode%writer_interval == 1:
             writer.add_scalar('loss/loss_p', np.mean(loss_storage['policy_loss']), i_episode)
             writer.add_scalar('loss/loss_q_1', np.mean(loss_storage['q_loss_1']), i_episode)
             writer.add_scalar('loss/loss_q_2', np.mean(loss_storage['q_loss_2']), i_episode)
@@ -264,7 +272,7 @@ def train(args, hparam):
         ### Evaluation #######################
         ######################################
 
-        if i_episode % eval_freq == 0 and i_episode != 0:
+        if i_episode % eval_freq == 1 and i_episode != 1:
             envs.save(os.path.join(savepath+"eval"))
             eval_env.load(os.path.join(savepath+"eval"))
             eval_env.env.training = False
@@ -284,7 +292,7 @@ def train(args, hparam):
         ### Model save #########################
         ########################################
 
-        if i_episode % 5000 == 0:
+        if i_episode % (int(5000/nenvs)*nenvs) == 0 and i_episode != 1:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
             td3_trainer.save_model(os.path.join(savepath,"iter%07d"%i_episode))
             envs.save(os.path.join(savepath,"iter%07d"%i_episode))
@@ -314,8 +322,8 @@ def test(args, hparam):
     if args.record:
         disp = Display(visible=False, size=(100, 60))
         disp.start()
-    env_name = "takeoff-aviary-v0"
-    max_steps = 800
+    env_name = "Pendulum-v0"
+    max_steps = 250
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     print("Device:",device)
@@ -327,8 +335,6 @@ def test(args, hparam):
     eval_env = dynRandeEnv(env_name=env_name, 
                     #    load_path=args.path,
                        tag="test", 
-                       task=args.task,
-                       episode_len=max_steps/200,
                        nenvs=1, 
                        dyn_range=dyn_range, 
                        seed=int(123456789),
@@ -361,8 +367,7 @@ if __name__=='__main__':
     # Common arguments
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--rnn', choices=['None','RNN2','GRU2','LSTM2',
-                                            'RNNHER','GRUHER','LSTMHER',
-                                            'RNNbhvHER','GRUbhvHER','LSTMbhvHER']
+                                            'RNN3','GRU3','LSTM3']
                                 , default='None', help='Use memory network (LSTM)')
     parser.add_argument('--policy_actf', type=str, default='tanh', help="policy activation function")
     parser.add_argument('--obs_norm', action='store_true', help='use batchnorm for input normalization')

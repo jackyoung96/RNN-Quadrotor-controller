@@ -395,7 +395,8 @@ def pendulum_test(eval_env, agent, max_steps, test_itr=10, record=False, log=Fal
                     action = agent.policy_net.get_action(state, 
                                                         deterministic=DETERMINISTIC, 
                                                         explore_noise_scale=0.0)
-                action = action[None,:]
+                
+                action = np.array([action])
                 next_state, reward, done, _ = eval_env.step(action) 
 
                 if record:

@@ -171,7 +171,7 @@ class TD3_Trainer():
 
 
 class TD3RNN_Trainer():
-    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, rnn_type='RNN', out_actf=None, action_scale=1.0,device='cpu', policy_target_update_interval=1, **kwargs):
+    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, rnn_type='RNN', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
         self.replay_buffer = replay_buffer
         self.device = device
         self.hidden_dim = hidden_dim

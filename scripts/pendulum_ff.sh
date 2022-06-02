@@ -1,0 +1,1 @@
+python train_pendulum_td3.py --policy_actf tanh --reward_norm --gpu $1 --rnn None --hparam --tb_log

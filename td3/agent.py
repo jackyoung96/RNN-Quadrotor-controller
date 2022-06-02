@@ -12,7 +12,7 @@ def td3_agent(env,
         # Param + FF
         replay_buffer = ReplayBufferRNN(replay_buffer_size, **hparam)
         td3_trainer = TD3RNN_Trainer2(replay_buffer,
-                    env.env.action_space, 
+                    env.env.observation_space, 
                     env.env.action_space, 
                     rnn_type=rnn,
                     out_actf=F.tanh,
@@ -22,7 +22,7 @@ def td3_agent(env,
     elif rnn in ["RNN3", "LSTM3", "GRU3"]:
         replay_buffer = ReplayBufferRNN(replay_buffer_size, **hparam)
         td3_trainer = TD3RNN_Trainer3(replay_buffer,
-                    env.env.action_space, 
+                    env.env.observation_space, 
                     env.env.action_space, 
                     rnn_type=rnn,
                     out_actf=F.tanh,
