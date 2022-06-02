@@ -19,7 +19,7 @@ def td3_agent(env,
                     action_scale=1.0 if 'aviary' in env.env.env_name else 10.0,
                     device=device, 
                     **hparam)
-    if rnn in ["RNNHER", "LSTMHER", "GRUHER"]:
+    if "HER" in rnn:
         # batch_size = batch_size*int(max_steps//her_sample_length / 2)
         replay_buffer = HindsightReplayBufferRNN(replay_buffer_size, rnn,
                             env=env.env_name,
@@ -33,7 +33,12 @@ def td3_agent(env,
                     action_scale=1.0 if 'aviary' in env.env_name else 10.0,
                     device=device, 
                     **hparam)
-        # Using pre-trained policy
+        # Use Behavior networks
+        if "bhv" in rnn:
+            if hparam['behavior_path']==None:
+                raise FileNotFoundError("Need proper behavior_path")
+            td3_trainer.load_behavior(hparam['behavior_path'])
+            
     elif rnn == "None":
         replay_buffer = ReplayBufferFastAdaptRNN(replay_buffer_size, rnn, **hparam)
         td3_trainer = TD3_Trainer(replay_buffer,

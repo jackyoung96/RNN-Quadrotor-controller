@@ -187,13 +187,13 @@ def train(args, hparam):
             hidden_in = hidden_out
             if args.rnn == "None":
                 action = \
-                    td3_trainer.policy_net.get_action(state, 
+                    td3_trainer.get_action(state, 
                                                     deterministic=DETERMINISTIC, 
                                                     explore_noise_scale=explore_noise_scale)
                 hidden_in = hidden_out = None
             elif "HER" in args.rnn:
                 action, hidden_out = \
-                        td3_trainer.policy_net.get_action(state, 
+                        td3_trainer.get_action(state, 
                                                         last_action, 
                                                         hidden_in,
                                                         goal=envs.normalize_obs(goal),
@@ -201,11 +201,11 @@ def train(args, hparam):
                                                         explore_noise_scale=explore_noise_scale)
             else:
                 action, hidden_out = \
-                    td3_trainer.policy_net.get_action(state, 
+                    td3_trainer.get_action(state, 
                                                     last_action, 
                                                     hidden_in, 
                                                     deterministic=DETERMINISTIC, 
-                                                        explore_noise_scale=explore_noise_scale)
+                                                    explore_noise_scale=explore_noise_scale)
             next_state, reward, done, _ = envs.step(action) 
             episode_state.append(envs.unnormalize_obs(state))
             episode_action.append(action)
@@ -394,7 +394,9 @@ if __name__=='__main__':
     # Common arguments
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--rnn', choices=['None','RNN2','GRU2','LSTM2',
-                                            'RNNHER','GRUHER','LSTMHER'], default='None', help='Use memory network (LSTM)')
+                                            'RNNHER','GRUHER','LSTMHER'
+                                            'RNNbhvHER','GRUbhvHER','LSTMbhvHER']
+                                , default='None', help='Use memory network (LSTM)')
     parser.add_argument('--policy_actf', type=str, default='tanh', help="policy activation function")
     parser.add_argument('--obs_norm', action='store_true', help='use batchnorm for input normalization')
 
@@ -403,13 +405,13 @@ if __name__=='__main__':
     parser.add_argument('--hparam', action='store_true', help="find hparam set")
     parser.add_argument('--lr_scheduler', action='store_true', help="Use lr scheduler")
     parser.add_argument('--reward_norm', action='store_true', help="reward normalization")
-    parser.add_argument('--rnn_pretrained', action='store_true', help="use pretrained rnn layer")
     parser.add_argument('--her_gamma', default=0.0, type=float)
     parser.add_argument('--positive_rew', action='store_true', help="use [0,1] reward instead of [-1,0]")
     parser.add_argument('--large_eps', action='store_true', help="use large epsilon")
     parser.add_argument('--angvel_goal', action='store_true', help='use angular velocity instead of angle as the goal')
     parser.add_argument('--her_length', type=int, default=100, help='sequence length for her')
     parser.add_argument('--small_lr', action='store_true', help='use small lr')
+    parser.add_argument('--behavior_path', default=None, help='path for behavior networks')
 
     # Arguments for test
     parser.add_argument('--test', action='store_true')

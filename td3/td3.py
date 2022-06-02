@@ -23,43 +23,6 @@ from .common.policy_networks import *
 
 from time import time
 
-# torch.manual_seed(1234)  #Reproducibility
-
-# GPU = True
-# device_idx = 0
-# if GPU:
-#     device = torch.device("cuda:" + str(device_idx) if torch.cuda.is_available() else "cpu")
-# else:
-#     device = torch.device("cpu")
-# print(device)
-
-# parser = argparse.ArgumentParser(description='Train or test neural net motor controller.')
-# parser.add_argument('--train', dest='train', action='store_true', default=False)
-# parser.add_argument('--test', dest='test', action='store_true', default=False)
-
-# args = parser.parse_args()
-
-class NormalizedActions(gym.ActionWrapper):
-    def _action(self, action):
-        low  = self.action_space.low
-        high = self.action_space.high
-        
-        action = low + (action + 1.0) * 0.5 * (high - low)
-        action = np.clip(action, low, high)
-        
-        return action
-
-    def _reverse_action(self, action):
-        low  = self.action_space.low
-        high = self.action_space.high
-        
-        action = 2 * (action - low) / (high - low) - 1
-        action = np.clip(action, low, high)
-        
-        return action
-        
-
-
 
 class TD3_Trainer():
     def __init__(self, replay_buffer, state_space, action_space, hidden_dim, action_scale=1.0,out_actf=None, device='cpu', policy_target_update_interval=1,**kwargs):
@@ -72,8 +35,8 @@ class TD3_Trainer():
         self.target_q_net2 = QNetwork(state_space, action_space, hidden_dim).to(self.device)
         self.policy_net = PolicyNetwork(state_space, action_space, hidden_dim, device, out_actf, action_scale).to(self.device)
         self.target_policy_net = PolicyNetwork(state_space, action_space, hidden_dim, device, out_actf, action_scale).to(self.device)
-        # print('Q Network (1,2): ', self.q_net1)
-        # print('Policy Network: ', self.policy_net)
+        self.behavior_net = PolicyNetwork(state_space, action_space, hidden_dim, device, out_actf, action_scale).to(self.device)
+        self.is_behavior = False
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
@@ -113,6 +76,12 @@ class TD3_Trainer():
             )
 
         return target_net
+
+    def get_action(self, state, **kwargs):
+        if not self.is_behavior:
+            return self.policy_net.get_action(state, **kwargs)
+        else:
+            return self.behavior_net.get_action(state, **kwargs)
     
     def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99,soft_tau=1e-3):
         state, action, reward, next_state, done = self.replay_buffer.sample(batch_size)
@@ -224,6 +193,8 @@ class TD3RNN_Trainer():
         policy_actf = kwargs.get('policy_actf', F.relu)
         self.policy_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
         self.target_policy_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
+        self.behavior_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
+        self.is_behavior = False
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
@@ -262,7 +233,18 @@ class TD3RNN_Trainer():
             )
 
         return target_net
+
+    def load_behavior(self, path):
+        self.behavior_net.load_state_dict(torch.load(path+'_policy.pt', map_location=self.device))
+        self.is_behavior = True
     
+    def get_action(self, state, last_action, hidden_in, **kwargs):
+        with torch.no_grad():
+            if not self.is_behavior:
+                return self.policy_net.get_action(state, last_action, hidden_in, **kwargs)
+            else:
+                return self.behavior_net.get_action(state, last_action, hidden_in, **kwargs)
+
     def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
         time_test = {}
 
@@ -579,6 +561,8 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         policy_actf = kwargs.get('policy_actf', F.relu)
         self.policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
         self.target_policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
+        self.behavior_net = self.policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
+        self.is_behavior = False
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
@@ -687,6 +671,14 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
                 "q_loss_1": q_value_loss1.item(), 
                 "q_loss_2": q_value_loss2.item()
                 }
+
+
+
+
+
+#####################################
+## FastAdapt td3 ####################
+#####################################
 
 class ParamPredictorNetwork(nn.Module):
     """ Base network class for value function approximation """
