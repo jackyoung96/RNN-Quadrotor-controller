@@ -88,7 +88,7 @@ class TD3_Trainer():
             return self.behavior_net.get_action(state, **kwargs)
     
     def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99,soft_tau=1e-3):
-        state, action, reward, next_state, done, _ = self.replay_buffer.sample(batch_size)
+        state, action, reward, next_state, done = self.replay_buffer.sample(batch_size)
 
         state, next_state = map(norm_ftn, [state, next_state])
 
