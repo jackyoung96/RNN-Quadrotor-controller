@@ -139,7 +139,6 @@ def train(args, hparam):
                 device=device,
                 hparam=hparam,
                 replay_buffer_size=replay_buffer_size)
-    wandb.watch([td3_trainer.q_net1,td3_trainer.policy_net], log="parameters")
 
     # keep track of progress
     mean_rewards = []
@@ -188,24 +187,24 @@ def train(args, hparam):
             if args.rnn == "None":
                 action = \
                     td3_trainer.get_action(state, 
-                                                    deterministic=DETERMINISTIC, 
-                                                    explore_noise_scale=explore_noise_scale)
+                                            deterministic=DETERMINISTIC, 
+                                            explore_noise_scale=explore_noise_scale)
                 hidden_in = hidden_out = None
             elif "HER" in args.rnn:
                 action, hidden_out = \
                         td3_trainer.get_action(state, 
-                                                        last_action, 
-                                                        hidden_in,
-                                                        goal=envs.normalize_obs(goal),
-                                                        deterministic=DETERMINISTIC, 
-                                                        explore_noise_scale=explore_noise_scale)
+                                    last_action, 
+                                    hidden_in,
+                                    goal=envs.normalize_obs(goal),
+                                    deterministic=DETERMINISTIC, 
+                                    explore_noise_scale=explore_noise_scale)
             else:
                 action, hidden_out = \
                     td3_trainer.get_action(state, 
-                                                    last_action, 
-                                                    hidden_in, 
-                                                    deterministic=DETERMINISTIC, 
-                                                    explore_noise_scale=explore_noise_scale)
+                                last_action, 
+                                hidden_in, 
+                                deterministic=DETERMINISTIC, 
+                                explore_noise_scale=explore_noise_scale)
             next_state, reward, done, _ = envs.step(action) 
             episode_state.append(envs.unnormalize_obs(state))
             episode_action.append(action)

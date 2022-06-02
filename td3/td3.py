@@ -243,6 +243,7 @@ class TD3RNN_Trainer():
             if not self.is_behavior:
                 return self.policy_net.get_action(state, last_action, hidden_in, **kwargs)
             else:
+                kwargs['explore_noise_scale'] = 0.0
                 return self.behavior_net.get_action(state, last_action, hidden_in, **kwargs)
 
     def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
