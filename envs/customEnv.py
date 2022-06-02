@@ -551,8 +551,12 @@ class dynRandeEnv:
     def load(self,path):
         envs = []
         for idx in range(self.nenvs):
-            env = self.drone_env(idx)
+            if self.env_name=='takeoff-aviary-v0':
+                env = self.drone_env(idx)
+            else:
+                env = gym.make(self.env_name)
+                setattr(env, 'env_name', self.env_name)
             envs.append(env)
         self.env = DummyVecEnv([lambda: env for env in envs])
         self.env = VecNormalize.load(path+'env.pkl', self.env)
-        self.env = VecDynRandEnv(self.env)
+        self.env = VecDynRandEnv(self.env, self.env_name, self.dyn_range)
