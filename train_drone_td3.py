@@ -219,7 +219,7 @@ def train(args, hparam):
             frame_idx += 1
         
         # Push into Experience replay buffer
-        if args.rnn in ['RNNHER', "LSTMHER", "GRUHER"]:
+        if "HER" in args.rnn:
             td3_trainer.replay_buffer.push_batch(episode_state, 
                             episode_action, 
                             episode_last_action,
@@ -394,7 +394,7 @@ if __name__=='__main__':
     # Common arguments
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--rnn', choices=['None','RNN2','GRU2','LSTM2',
-                                            'RNNHER','GRUHER','LSTMHER'
+                                            'RNNHER','GRUHER','LSTMHER',
                                             'RNNbhvHER','GRUbhvHER','LSTMbhvHER']
                                 , default='None', help='Use memory network (LSTM)')
     parser.add_argument('--policy_actf', type=str, default='tanh', help="policy activation function")

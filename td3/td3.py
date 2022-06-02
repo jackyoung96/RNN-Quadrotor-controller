@@ -174,13 +174,13 @@ class TD3RNN_Trainer():
         self.hidden_dim = hidden_dim
         self.rnn_type = rnn_type
         
-        if rnn_type=='RNN':
+        if 'RNN' in self.rnn_type:
             qnet = QNetworkRNN
             policy = PolicyNetworkRNN
-        elif rnn_type=='LSTM':
+        elif 'LSTM' in self.rnn_type:
             qnet = QNetworkLSTM
             policy = PolicyNetworkLSTM
-        elif rnn_type=='GRU':
+        elif 'GRU' in self.rnn_type:
             qnet = QNetworkGRU
             policy = PolicyNetworkGRU
         else:
@@ -441,17 +441,17 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
 class TD3RNN_Trainer3(TD3RNN_Trainer):
     def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN3', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
         super(TD3RNN_Trainer3, self).__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.strip('3'), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
-        if rnn_type=='RNN3':
+        if 'RNN' in self.rnn_type:
             self.q_net1 = QNetworkRNNParam(state_space, action_space, hidden_dim, param_num).to(self.device)
             self.q_net2 = QNetworkRNNParam(state_space, action_space, hidden_dim, param_num).to(self.device)
             self.target_q_net1 = QNetworkRNNParam(state_space, action_space, hidden_dim, param_num).to(self.device)
             self.target_q_net2 = QNetworkRNNParam(state_space, action_space, hidden_dim, param_num).to(self.device)
-        elif rnn_type=='LSTM3':
+        elif 'LSTM' in self.rnn_type:
             self.q_net1 = QNetworkLSTMParam(state_space, action_space, hidden_dim, param_num).to(self.device)
             self.q_net2 = QNetworkLSTMParam(state_space, action_space, hidden_dim, param_num).to(self.device)
             self.target_q_net1 = QNetworkLSTMParam(state_space, action_space, hidden_dim, param_num).to(self.device)
             self.target_q_net2 = QNetworkLSTMParam(state_space, action_space, hidden_dim, param_num).to(self.device)
-        elif rnn_type=='GRU3':
+        elif 'GRU' in self.rnn_type:
             self.q_net1 = QNetworkGRUParam(state_space, action_space, hidden_dim, param_num).to(self.device)
             self.q_net2 = QNetworkGRUParam(state_space, action_space, hidden_dim, param_num).to(self.device)
             self.target_q_net1 = QNetworkGRUParam(state_space, action_space, hidden_dim, param_num).to(self.device)
@@ -543,7 +543,7 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
 
 class TD3HERRNN_Trainer(TD3RNN_Trainer):
     def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, goal_dim, rnn_type='RNN', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
-        super().__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.replace('HER',''), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
+        super().__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.replace('HER','').replace('bhv',''), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
         self.state_space, self.action_space, self.param_num, self.hidden_dim, self.goal_dim = \
             state_space, action_space, param_num, hidden_dim, goal_dim
 
@@ -552,11 +552,11 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         self.q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
         self.target_q_net1 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
         self.target_q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
-        if rnn_type=='RNNHER':
+        if 'RNN' in self.rnn_type:
             policy = PolicyNetworkGoalRNN
-        elif rnn_type=='LSTMHER':
+        elif 'LSTM' in self.rnn_type:
             policy = PolicyNetworkGoalLSTM
-        elif rnn_type=='GRUHER':
+        elif 'GRU' in self.rnn_type:
             policy = PolicyNetworkGoalGRU
         policy_actf = kwargs.get('policy_actf', F.relu)
         self.policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)

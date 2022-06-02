@@ -10,15 +10,14 @@
 
 
 ## drone run command
-> ```python train_drone_td3.py --rnn=RNNHER --policy_actf tanh --reward_norm  --her_gamma 0.0 --angvel_goal --her_length 100 --tb_log --gpu 2```
-> ```python train_drone_td3.py --rnn=RNNHER --policy_actf tanh  --her_gamma 0.0 --angvel_goal --her_length 100 --tb_log --gpu 1```
-> ```python train_drone_td3.py --rnn=RNNHER --policy_actf tanh --reward_norm  --her_gamma 1.0 --her_length 100 --tb_log --gpu 0```
 
-> ```python train_drone_td3.py --rnn=LSTMHER --policy_actf tanh --her_gamma 0.0 --her_length 100 --tb_log --gpu 0```
-> ```python train_drone_td3.py --rnn=RNNHER --policy_actf tanh --reward_norm  --her_gamma 0.0 --positive_rew --her_length 100 --tb_log --gpu 2```
+### HER + no her + reward normalize
 
-python train_drone_td3.py --rnn=RNNHER --policy_actf tanh --her_length 100 --tb_log --reward_norm --obs_norm --her_gamma 1.0 --gpu 2
-python train_drone_td3.py --rnn=RNNHER --policy_actf tanh --her_length 100 --tb_log --reward_norm --her_gamma 1.0 --gpu 3
+> python train_drone_td3.py --policy_actf tanh --her_length 100 --tb_log --reward_norm --her_gamma 1.0 --gpu 0 --rnn=RNNHER 
 
-python train_drone_td3.py --rnn=LSTMHER --policy_actf tanh --her_length 100 --tb_log --reward_norm --her_gamma 1.0 --gpu 3
-python train_drone_td3.py --rnn=RNNHER --policy_actf tanh --her_length 100 --tb_log --reward_norm --her_gamma 1.0 --small_lr --gpu 0
+### HER
+
+> ```python train_drone_td3.py --policy_actf tanh --her_gamma 0.0 --her_length 100 --tb_log --gpu 0 --rnn=RNNHER
+
+### HERbhv
+> python train_drone_td3.py --policy_actf tanh --her_gamma 0.0 --her_length 100 --tb_log --gpu 0 --rnn RNNbhvHER --behavior_path artifacts/agent-22Jun01050026:v15/iter0055000
