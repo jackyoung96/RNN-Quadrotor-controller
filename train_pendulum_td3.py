@@ -79,7 +79,7 @@ def train(args, hparam):
     update_itr = 1
     writer_interval = int(100/nenvs)*nenvs
     eval_freq = int(500/nenvs)*nenvs
-    eval_itr = 20
+    eval_itr = 50
 
     DETERMINISTIC=True  # DDPG: deterministic policy gradient
     
