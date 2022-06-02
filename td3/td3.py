@@ -17,7 +17,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR, CyclicLR
 import torch.nn.functional as F
 from torch.distributions import Normal
 
-from .common.buffers import ReplayBuffer, ReplayBufferPER
+from .common.buffers import *
 from .common.value_networks import *
 from .common.policy_networks import *
 
@@ -101,7 +101,6 @@ class TD3_Trainer():
 
         predicted_q_value1 = self.q_net1(state, action)
         predicted_q_value2 = self.q_net2(state, action)
-        new_action, *_ = self.policy_net.evaluate(state, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
         new_next_action, *_ = self.target_policy_net.evaluate(next_state, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
         if self.reward_norm:
@@ -132,6 +131,8 @@ class TD3_Trainer():
 
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
+
+            new_action, *_ = self.policy_net.evaluate(state, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
             predicted_new_q_value = self.q_net1(state, new_action)
 
             policy_loss = - predicted_new_q_value.mean()
@@ -275,12 +276,11 @@ class TD3RNN_Trainer():
 
         predicted_q_value1, _ = self.q_net1(state, action, last_action, hidden_in)
         predicted_q_value2, _ = self.q_net2(state, action, last_action, hidden_in)
-        new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, goal, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
-        new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
+        new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_in, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
         # Training Q Function
-        target_q_1, _ = self.target_q_net1(next_state, new_next_action, action, hidden_out)
-        target_q_2, _ = self.target_q_net2(next_state, new_next_action, action, hidden_out)
+        target_q_1, _ = self.target_q_net1(next_state, new_next_action, action, hidden_in)
+        target_q_2, _ = self.target_q_net2(next_state, new_next_action, action, hidden_in)
         target_q_min = torch.min(target_q_1, target_q_2)
 
         target_q_value = reward + (1 - done) * gamma * target_q_min # if done==1, only reward 
@@ -305,7 +305,7 @@ class TD3RNN_Trainer():
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
 
-            new_action, hidden_out, hidden_all, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
+            new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
             predicted_new_q_value, _ = self.q_net1(state, new_action, last_action, hidden_in)
 
             policy_loss = - predicted_new_q_value.mean()
@@ -391,8 +391,7 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
 
         predicted_q_value1 = self.q_net1(state, action, param)
         predicted_q_value2 = self.q_net2(state, action, param)
-        new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
-        new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
+        new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_in, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
         # Training Q Function
         predicted_target_q1 = self.target_q_net1(next_state, new_next_action, param)
@@ -418,10 +417,8 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
         
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
-            # Training Policy Function
-            ''' implementation 1 '''
-            # predicted_new_q_value = torch.min(self.q_net1(state, new_action),self.q_net2(state, new_action))
-            ''' implementation 2 '''
+            
+            new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
             predicted_new_q_value = self.q_net1(state, new_action, param)
 
             policy_loss = - predicted_new_q_value.mean()
@@ -505,12 +502,11 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
 
         predicted_q_value1, _ = self.q_net1(state, action, last_action, hidden_in, param)
         predicted_q_value2, _ = self.q_net2(state, action, last_action, hidden_in, param)
-        new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
-        new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
+        new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_in, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
         # Training Q Function
-        predicted_target_q1, _ = self.target_q_net1(next_state, new_next_action, action, hidden_out, param)
-        predicted_target_q2, _ = self.target_q_net2(next_state, new_next_action, action, hidden_out, param)
+        predicted_target_q1, _ = self.target_q_net1(next_state, new_next_action, action, hidden_in, param)
+        predicted_target_q2, _ = self.target_q_net2(next_state, new_next_action, action, hidden_in, param)
         target_q_min = torch.min(predicted_target_q1, predicted_target_q2)
 
         target_q_value = reward + (1 - done) * gamma * target_q_min # if done==1, only reward
@@ -532,10 +528,8 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
         
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
-            # Training Policy Function
-            ''' implementation 1 '''
-            # predicted_new_q_value = torch.min(self.q_net1(state, new_action),self.q_net2(state, new_action))
-            ''' implementation 2 '''
+
+            new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
             predicted_new_q_value, _ = self.q_net1(state, new_action, last_action, hidden_in, param)
 
             policy_loss = - predicted_new_q_value.mean()
@@ -576,7 +570,7 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         policy_actf = kwargs.get('policy_actf', F.relu)
         self.policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
         self.target_policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
-        self.behavior_net = self.policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
+        self.behavior_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
         self.is_behavior = False
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
@@ -633,7 +627,6 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
 
         predicted_q_value1 = self.q_net1(state, action, param, goal)
         predicted_q_value2 = self.q_net2(state, action, param, goal)
-        new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, goal, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
         new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_in, goal, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
         # Training Q Function
@@ -665,6 +658,7 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
 
+            new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, goal, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
             predicted_new_q_value = self.q_net1(state, new_action, param, goal)
 
             policy_loss = - predicted_new_q_value.mean()

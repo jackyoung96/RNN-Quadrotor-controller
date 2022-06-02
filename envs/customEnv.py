@@ -394,12 +394,14 @@ class VecDynRandEnv(VecEnvWrapper):
         super().__init__(venv=venv, observation_space=venv.observation_space)
         self.env_name = env_name
         self.dyn_range = dyn_range
-        self.original_params = {
-            # Only for pendulum
-            'max_torque': self.venv.venv.envs[0].max_torque,
-            'm': self.venv.venv.envs[0].m,
-            'l': self.venv.venv.envs[0].l
-        }
+        self.original_params = None
+        if not self.env_name=='takeoff-aviary-v0':
+            self.original_params = {
+                # Only for pendulum
+                'max_torque': self.venv.venv.envs[0].max_torque,
+                'm': self.venv.venv.envs[0].m,
+                'l': self.venv.venv.envs[0].l
+            }
     def get_rand(self, param):
         origin = self.origin_params[param]
         r = self.dyn_range.get(param, 1)

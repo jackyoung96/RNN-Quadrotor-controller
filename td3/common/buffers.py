@@ -103,8 +103,8 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
     'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
 
     """
-    def __init__(self, capacity, rnn_type, env_name='takeoff-aviary-v0', **kwargs):
-        super().__init__(capacity, rnn_type)
+    def __init__(self, capacity, env_name='takeoff-aviary-v0', **kwargs):
+        super().__init__(capacity)
         self.positive_rew = kwargs.get("positive_rew", False)
         self.angvel_goal = kwargs.get("angvel_goal", False)
         self.gamma = kwargs.get("her_gamma", 0.0)
