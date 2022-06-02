@@ -602,32 +602,6 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
 
         self.use_her = kwargs.get('use_her', True)
         self.reward_norm = kwargs.get('reward_norm', True)
-    
-    def reset_critic(self):
-        self.q_net1 = QNetworkGoalParam(self.state_space, self.action_space, self.param_num, self.hidden_dim, self.goal_dim).to(self.device)
-        self.q_net2 = QNetworkGoalParam(self.state_space, self.action_space, self.param_num, self.hidden_dim, self.goal_dim).to(self.device)
-        self.target_q_net1 = QNetworkGoalParam(self.state_space, self.action_space, self.param_num, self.hidden_dim, self.goal_dim).to(self.device)
-        self.target_q_net2 = QNetworkGoalParam(self.state_space, self.action_space, self.param_num, self.hidden_dim, self.goal_dim).to(self.device)
-        self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
-        self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
-        self.q_optimizer1 = optim.Adam(self.q_net1.parameters(), lr=self.q_lr, weight_decay=self.weight_decay)
-        self.q_optimizer2 = optim.Adam(self.q_net2.parameters(), lr=self.q_lr, weight_decay=self.weight_decay)
-        if self.lr_scheduler:
-            self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=self.q_lr, step_size_up=self.t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
-            self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=self.q_lr, step_size_up=self.t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
-
-    def load_lstm(self, path):
-        model_dict = self.policy_net.state_dict()
-        pre_dict = torch.load(path+'_policy.pt', map_location=self.device)
-        lstm_dict = {k:v for k,v in pre_dict.items() if 'rnn' in k}
-        print(lstm_dict.keys())
-        model_dict.update(lstm_dict)
-        self.policy_net.load_state_dict(model_dict)
-        for name,param in self.policy_net.named_parameters():
-            if 'rnn' in name:
-                param.requires_grad = False
-        self.target_policy_net = self.target_ini(self.policy_net, self.target_policy_net)
-        self.target_policy_net.eval()
 
     def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99, soft_tau=5e-3):
         if self.use_her:

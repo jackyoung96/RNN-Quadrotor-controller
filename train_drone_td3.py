@@ -55,7 +55,7 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(1e6)
+    max_episodes  = int(1e5)
     hidden_dim = hparam['hidden_dim']
     max_steps = 300
     eval_max_steps = 500
@@ -395,7 +395,7 @@ if __name__=='__main__':
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--rnn', choices=['None','RNN2','GRU2','LSTM2',
                                             'RNNHER','GRUHER','LSTMHER'], default='None', help='Use memory network (LSTM)')
-    parser.add_argument('--policy_actf', type=str, default='relu', help="policy activation function")
+    parser.add_argument('--policy_actf', type=str, default='tanh', help="policy activation function")
     parser.add_argument('--obs_norm', action='store_true', help='use batchnorm for input normalization')
 
     # Arguments for training 

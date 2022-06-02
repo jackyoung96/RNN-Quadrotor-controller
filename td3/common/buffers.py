@@ -490,12 +490,12 @@ class HindsightReplayBufferRNN(ReplayBufferFastAdaptRNN):
                     reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,1.0, 0.0)+self.gamma*reward
                 else:
                     reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
-                done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
+                # done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
 
             elif self.env_name == 'Pendulum-v0':
                 pos_achieve = np.linalg.norm(next_state[:,:2]-goal[:,:2],axis=-1)<self.epsilon_pos
                 reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
-                done = np.where(pos_achieve , 1.0, 0.0)
+                # done = np.where(pos_achieve , 1.0, 0.0)
             # ang_achieve = np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)<self.epsilon_ang
             self.buffer[self.position] = (state, action, last_action, reward, next_state, done, param, goal)
             self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
