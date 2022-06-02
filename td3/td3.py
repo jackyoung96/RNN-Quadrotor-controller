@@ -63,6 +63,8 @@ class TD3_Trainer():
             # self.scheduler_policy = CosineAnnealingLR(self.policy_optimizer, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
             self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=policy_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
+        self.reward_norm = kwargs.get('reward_norm', True)
+
     def target_ini(self, net, target_net):
         for target_param, param in zip(target_net.parameters(), net.parameters()):
             target_param.data.copy_(param.data)
@@ -81,11 +83,13 @@ class TD3_Trainer():
         if not self.is_behavior:
             return self.policy_net.get_action(state, **kwargs)
         else:
+            kwargs['explore_noise_scale'] = 0.0
             return self.behavior_net.get_action(state, **kwargs)
     
-    def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99,soft_tau=1e-3):
-        state, action, reward, next_state, done = self.replay_buffer.sample(batch_size)
-        # print('sample:', state, action,  reward, done)
+    def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99,soft_tau=1e-3):
+        state, action, reward, next_state, done, _ = self.replay_buffer.sample(batch_size)
+
+        state, next_state = map(norm_ftn, [state, next_state])
 
         state      = torch.FloatTensor(state).to(self.device)
         next_state = torch.FloatTensor(next_state).to(self.device)
@@ -97,10 +101,12 @@ class TD3_Trainer():
 
         predicted_q_value1 = self.q_net1(state, action)
         predicted_q_value2 = self.q_net2(state, action)
-        new_action, log_prob, z, mean, log_std = self.policy_net.evaluate(state, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
-        new_next_action, _, _, _, _ = self.target_policy_net.evaluate(next_state, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
+        new_action, *_ = self.policy_net.evaluate(state, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
+        new_next_action, *_ = self.target_policy_net.evaluate(next_state, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
-        # reward = (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6) # normalize with batch mean and std; plus a small number to prevent numerical problem
+        if self.reward_norm:
+            # Normalize regard to episode axis (clipped by 10.0)
+            reward = torch.clamp((reward - reward.mean(dim=0, keepdim=True)) / (reward.std(dim=0, keepdim=True) + 1e-8), -10.0, 10.0)
 
     # Training Q Function
         target_q_1 = self.target_q_net1(next_state, new_next_action)
@@ -113,31 +119,26 @@ class TD3_Trainer():
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()  
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 1.0)
+        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 1.0)
+        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
 
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
-        # This is the **Delayed** update of policy and all targets (for Q and policy). 
-        # Training Policy Function
-            ''' implementation 1 '''
-            # predicted_new_q_value = torch.min(self.q_net1(state, new_action),self.q_net2(state, new_action))
-            ''' implementation 2 '''
             predicted_new_q_value = self.q_net1(state, new_action)
 
             policy_loss = - predicted_new_q_value.mean()
 
             self.policy_optimizer.zero_grad()
             policy_loss.backward()
-            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
+            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
             self.policy_optimizer.step()
             if self.lr_scheduler:
                 self.scheduler_policy.step()
@@ -190,7 +191,7 @@ class TD3RNN_Trainer():
         self.target_q_net1 = qnet(state_space, action_space, hidden_dim).to(self.device)
         self.target_q_net2 = qnet(state_space, action_space, hidden_dim).to(self.device)
         
-        policy_actf = kwargs.get('policy_actf', F.relu)
+        policy_actf = kwargs.get('policy_actf', F.tanh)
         self.policy_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
         self.target_policy_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
         self.behavior_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
@@ -220,6 +221,8 @@ class TD3RNN_Trainer():
             # self.scheduler_policy = CosineAnnealingLR(self.policy_optimizer, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
             self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=policy_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
     
+        self.reward_norm = kwargs.get('reward_norm', True)
+
     def target_ini(self, net, target_net):
         for target_param, param in zip(target_net.parameters(), net.parameters()):
             target_param.data.copy_(param.data)
@@ -246,55 +249,53 @@ class TD3RNN_Trainer():
                 kwargs['explore_noise_scale'] = 0.0
                 return self.behavior_net.get_action(state, last_action, hidden_in, **kwargs)
 
-    def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
-        time_test = {}
-
-        t_start = time()
-        hidden_in, hidden_out, state, action, last_action, reward, next_state, done = self.replay_buffer.sample(batch_size)
-        time_test['sample'] = time()-t_start
+    def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
+        state, action, last_action, reward, next_state, done, param = self.replay_buffer.sample(batch_size)
         # print('sample:', state, action,  reward, done)
 
-        t_start = time()
+        state, next_state = map(norm_ftn, [state, next_state])
+
+        B,L        = state.shape[:2]
         state      = torch.FloatTensor(state).to(self.device)
         next_state = torch.FloatTensor(next_state).to(self.device)
         action     = torch.FloatTensor(action).to(self.device)
         last_action     = torch.FloatTensor(last_action).to(self.device)
         reward     = torch.FloatTensor(reward).unsqueeze(-1).to(self.device)  
         done       = torch.FloatTensor(np.float32(done)).unsqueeze(-1).to(self.device)
-        time_test['tensor'] = time()-t_start
- 
-        t_start = time()
+
+        if self.reward_norm:
+            # Normalize regard to episode axis (clipped by 10.0)
+            reward = torch.clamp((reward - reward.mean(dim=1, keepdim=True)) / (reward.std(dim=1, keepdim=True) + 1e-8), -10.0, 10.0)
+
+        if "LSTM" in self.rnn_type:
+            hidden_in = (torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device), \
+                        torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device))  # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
+        else:
+            hidden_in = torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device)
+
         predicted_q_value1, _ = self.q_net1(state, action, last_action, hidden_in)
         predicted_q_value2, _ = self.q_net2(state, action, last_action, hidden_in)
-        time_test['q'] = time()-t_start
-        t_start = time()
-        new_next_action, hidden_out, hidden_all, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
-        time_test['p'] = time()-t_start
-        # reward = (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6) # normalize with batch mean and std; plus a small number to prevent numerical problem
+        new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, goal, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
+        new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
         # Training Q Function
-        t_start = time()
         target_q_1, _ = self.target_q_net1(next_state, new_next_action, action, hidden_out)
         target_q_2, _ = self.target_q_net2(next_state, new_next_action, action, hidden_out)
         target_q_min = torch.min(target_q_1, target_q_2)
-        time_test['q_target'] = time()-t_start
 
         target_q_value = reward + (1 - done) * gamma * target_q_min # if done==1, only reward 
-        
 
-        # print("debug",predicted_q_value1[0,:,0], target_q_value[0,:,0])
-        t_start = time()
         q_value_loss1 = ((predicted_q_value1 - target_q_value.detach())**2).mean()  # detach: no gradients for the variable
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 1.0)
+        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 1.0)
+        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
@@ -303,17 +304,14 @@ class TD3RNN_Trainer():
         
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
-            # Training Policy Function
-            ''' implementation 1 '''
-            # predicted_new_q_value = torch.min(self.q_net1(state, new_action),self.q_net2(state, new_action))
-            ''' implementation 2 '''
+
             new_action, hidden_out, hidden_all, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
             predicted_new_q_value, _ = self.q_net1(state, new_action, last_action, hidden_in)
 
             policy_loss = - predicted_new_q_value.mean()
             self.policy_optimizer.zero_grad()
             policy_loss.backward()
-            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
+            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
             self.policy_optimizer.step()
             if self.lr_scheduler:
                 self.scheduler_policy.step()
@@ -321,13 +319,12 @@ class TD3RNN_Trainer():
             self.target_q_net1=self.target_soft_update(self.q_net1, self.target_q_net1, soft_tau)
             self.target_q_net2=self.target_soft_update(self.q_net2, self.target_q_net2, soft_tau)
             self.target_policy_net=self.target_soft_update(self.policy_net, self.target_policy_net, soft_tau)
-        time_test['backward'] = time()-t_start
+
         self.update_cnt+=1
 
         return {"policy_loss": policy_loss.item() if not policy_loss is None else 0, 
                 "q_loss_1": q_value_loss1.item(), 
-                "q_loss_2": q_value_loss2.item(),
-                "time_test":time_test}
+                "q_loss_2": q_value_loss2.item()}
 
     def save_model(self, path):
         torch.save(self.q_net1.state_dict(), path+'_q1.pt')
@@ -369,7 +366,7 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
         self.reward_norm = kwargs.get('reward_norm', False)
 
     def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
-        hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param = self.replay_buffer.sample(batch_size)
+        state, action, last_action, reward, next_state, done, param = self.replay_buffer.sample(batch_size)
         # print('sample:', state, action,  reward, done)
 
         state, next_state = norm_ftn(state), norm_ftn(next_state)
@@ -385,6 +382,12 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
  
         if self.reward_norm:
             reward = (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6)
+
+        if "LSTM" in self.rnn_type:
+            hidden_in = (torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device), \
+                        torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device))  # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
+        else:
+            hidden_in = torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device)
 
         predicted_q_value1 = self.q_net1(state, action, param)
         predicted_q_value2 = self.q_net2(state, action, param)
@@ -402,13 +405,13 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 1.0)
+        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 1.0)
+        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
@@ -424,7 +427,7 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
             policy_loss = - predicted_new_q_value.mean()
             self.policy_optimizer.zero_grad()
             policy_loss.backward()
-            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
+            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
             self.policy_optimizer.step()
             if self.lr_scheduler:
                 self.scheduler_policy.step()
@@ -475,9 +478,10 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
             self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
             self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
+        self.reward_norm = kwargs.get('reward_norm', True)
 
-    def update(self, batch_size, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
-        hidden_in, hidden_out, state, action, last_action, reward, next_state, done, param = self.replay_buffer.sample(batch_size)
+    def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
+        state, action, last_action, reward, next_state, done, param = self.replay_buffer.sample(batch_size)
         # print('sample:', state, action,  reward, done)
 
         B,L        = state.shape[:2]
@@ -489,10 +493,20 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
         done       = torch.FloatTensor(np.float32(done)).unsqueeze(-1).to(self.device)
         param      = torch.FloatTensor(param[:,None,:]).expand(B,L,-1).to(self.device)
  
+        if self.reward_norm:
+            # Normalize regard to episode axis (clipped by 10.0)
+            reward = torch.clamp((reward - reward.mean(dim=1, keepdim=True)) / (reward.std(dim=1, keepdim=True) + 1e-8), -10.0, 10.0)
+
+        if "LSTM" in self.rnn_type:
+            hidden_in = (torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device), \
+                        torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device))  # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
+        else:
+            hidden_in = torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device)
+
         predicted_q_value1, _ = self.q_net1(state, action, last_action, hidden_in, param)
         predicted_q_value2, _ = self.q_net2(state, action, last_action, hidden_in, param)
-        new_action, hidden_out, hidden_all, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
-        new_next_action, hidden_out, hidden_all, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
+        new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
+        new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_out, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
         # Training Q Function
         predicted_target_q1, _ = self.target_q_net1(next_state, new_next_action, action, hidden_out, param)
@@ -505,13 +519,13 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 1.0)
+        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 1.0)
+        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
@@ -527,7 +541,7 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
             policy_loss = - predicted_new_q_value.mean()
             self.policy_optimizer.zero_grad()
             policy_loss.backward()
-            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
+            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
             self.policy_optimizer.step()
             if self.lr_scheduler:
                 self.scheduler_policy.step()
@@ -650,10 +664,7 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
 
         policy_loss = None
         if self.update_cnt%self.policy_target_update_interval==0:
-            # Training Policy Function
-            ''' implementation 1 '''
-            # predicted_new_q_value = torch.min(self.q_net1(state, new_action),self.q_net2(state, new_action))
-            ''' implementation 2 '''
+
             predicted_new_q_value = self.q_net1(state, new_action, param, goal)
 
             policy_loss = - predicted_new_q_value.mean()
