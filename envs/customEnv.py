@@ -460,7 +460,7 @@ class dynRandeEnv:
             rpy_noise=0
             vel_noise=0
             angvel_noise=0
-            goal = np.array([[0.0,0.0,1.0]])
+            goal = np.array([[0.0,0.0,0.8]])
         else:
             raise NotImplementedError("please choose task among [stabilize, stabilize-record, takeoff]")
         env = gym.make(id=self.env_name, # arbitrary environment that has state normalization and clipping

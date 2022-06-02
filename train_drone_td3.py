@@ -9,6 +9,7 @@ from td3.td3 import *
 from td3.common.buffers import *
 from td3.agent import td3_agent
 from envs.customEnv import dynRandeEnv
+from utils import wandb_artifact
 
 import argparse
 from pyvirtualdisplay import Display
@@ -356,11 +357,15 @@ def test(args, hparam):
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     print("Device:",device)
 
+    if not os.path.isdir(os.path.split(args.path)[0]):
+        wandb_artifact("TD3-drone", args.path.split('/')[1])
+
     # Define environment
     eval_env = dynRandeEnv(env_name=env_name, 
                     #    load_path=args.path,
                        tag="test", 
                        task=args.task,
+                       episode_len=max_steps/200,
                        nenvs=1, 
                        dyn_range=dyn_range, 
                        seed=int(123456789),
@@ -373,7 +378,7 @@ def test(args, hparam):
     td3_trainer.load_model(args.path)
     td3_trainer.policy_net.eval()
     
-    eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, max_steps=max_steps, test_itr=5, record=args.record, log=True)
+    eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, max_steps=max_steps, test_itr=10, record=args.record, log=True)
     print("EVALUATION REWARD:",eval_rew)
     print("EVALUATION SUCCESS RATE:",eval_success)
     print("EVALUATION POSITION ERROR[m]:",eval_position)

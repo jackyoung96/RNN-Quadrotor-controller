@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import os
 import gym
 from PIL import Image
+import wandb
 
 def collect_trajectories(envs, agent, rollout_length=200):
     """collect trajectories for a parallelized parallelEnv object
@@ -171,3 +172,9 @@ def save_frames_as_gif(frames, path, filename):
     if not os.path.isdir(path):
         os.makedirs(path)
     imgs[0].save(os.path.join(path,filename), save_all=True, append_images=imgs[1::2], duration=20, loop=0)
+
+def wandb_artifact(project, path):
+    run = wandb.init(project=project, job_type='inference')
+    artifact = run.use_artifact(path)
+    artifact.download()
+    run.finish()
