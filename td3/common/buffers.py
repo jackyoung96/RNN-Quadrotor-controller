@@ -34,14 +34,13 @@ class ReplayBuffer:
             state, action, last_action, reward, next_state, done = sample
             s_lst.append(state) 
             a_lst.append(action)
-            la_lst.append(last_action)
             r_lst.append(reward)
             ns_lst.append(next_state)
             d_lst.append(done)
         
-        s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst = map(lambda x: np.stack(x,axis=0), [s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst])
+        s_lst, a_lst, r_lst, ns_lst, d_lst = map(lambda x: np.stack(x,axis=0), [s_lst, a_lst, r_lst, ns_lst, d_lst])
 
-        return s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, None
+        return s_lst, a_lst, r_lst, ns_lst, d_lst
 
     def __len__(
             self):  # cannot work in multiprocessing case, len(replay_buffer) is not available in proxy of manager!
