@@ -33,9 +33,10 @@ class TD3_Trainer():
         self.q_net2 = QNetwork(state_space, action_space, hidden_dim).to(self.device)
         self.target_q_net1 = QNetwork(state_space, action_space, hidden_dim).to(self.device)
         self.target_q_net2 = QNetwork(state_space, action_space, hidden_dim).to(self.device)
-        self.policy_net = PolicyNetwork(state_space, action_space, hidden_dim, device, out_actf, action_scale).to(self.device)
-        self.target_policy_net = PolicyNetwork(state_space, action_space, hidden_dim, device, out_actf, action_scale).to(self.device)
-        self.behavior_net = PolicyNetwork(state_space, action_space, hidden_dim, device, out_actf, action_scale).to(self.device)
+        policy_actf = kwargs.get('policy_actf', F.tanh)
+        self.policy_net = PolicyNetwork(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
+        self.target_policy_net = PolicyNetwork(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
+        self.behavior_net = PolicyNetwork(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
         self.is_behavior = False
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)

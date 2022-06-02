@@ -8,7 +8,7 @@ from .utils import rot_matrix_similarity
 
 
 class ReplayBuffer:
-    def __init__(self, capacity):
+    def __init__(self, capacity, **kwargs):
         self.capacity = capacity
         self.buffer = []
         self.position = 0
@@ -51,7 +51,7 @@ class ReplayBuffer:
         return len(self.buffer)
 
 class ReplayBufferRNN:
-    def __init__(self, capacity):
+    def __init__(self, capacity, **kwargs):
         self.capacity = capacity
         self.buffer = []
         self.position = 0
@@ -104,7 +104,7 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
 
     """
     def __init__(self, capacity, env_name='takeoff-aviary-v0', **kwargs):
-        super().__init__(capacity)
+        super().__init__(capacity, **kwargs)
         self.positive_rew = kwargs.get("positive_rew", False)
         self.angvel_goal = kwargs.get("angvel_goal", False)
         self.gamma = kwargs.get("her_gamma", 0.0)
