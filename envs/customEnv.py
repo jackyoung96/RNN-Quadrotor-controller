@@ -390,13 +390,42 @@ class domainRandeEnv(parallelEnv):
             raise NotImplementedError
 
 class VecDynRandEnv(VecEnvWrapper):
-    def __init__(self, venv: VecEnv):
+    def __init__(self, venv: VecEnv, env_name: str, dyn_range=dict()):
         super().__init__(venv=venv, observation_space=venv.observation_space)
+        self.env_name = env_name
+        self.dyn_range = dyn_range
+        self.original_params = {
+            # Only for pendulum
+            'max_torque': self.venv.venv.envs[0].max_torque,
+            'm': self.venv.venv.envs[0].m,
+            'l': self.venv.venv.envs[0].l
+        }
+    def get_rand(self, param):
+        origin = self.origin_params[param]
+        r = self.dyn_range.get(param, 1)
+        ratio = np.random.uniform(1-r, r-1)
+        if abs(ratio) < 0.0001:
+            ratio = 1
+        elif ratio < 0:
+            ratio = 1/(1-ratio)
+        else:
+            ratio = ratio+1
+        
+        value = origin * ratio
+        norm = 2*(ratio-1/(1-r))/(r+1-1/(1-r))-1 if not r==1 else 0
+        return value, norm # Normalized value (-1~1)
 
     def reset(self) -> np.ndarray:
         params = []
         for env in self.venv.venv.envs:
-            params.append(env.random_urdf())
+            if self.env_name=='takeoff-aviary-v0':
+                params.append(env.random_urdf())
+            else:
+                env.max_torque, norm_maxtorque = self.get_rand('max_torque')
+                env.m, norm_m = self.get_rand('m')
+                env.l, norm_l = self.get_rand('l')
+                params.append([norm_maxtorque, norm_m, norm_l])
+
         params = np.stack(params, axis=0)
         obs = self.venv.reset()
         return obs, params
@@ -433,14 +462,18 @@ class dynRandeEnv:
 
         envs = []
         for idx in range(nenvs):
-            env = self.drone_env(idx)
+            if self.env_name=='takeoff-aviary-v0':
+                env = self.drone_env(idx)
+            else:
+                env = gym.make(env_name)
+                setattr(env, 'env_name', self.env_name)
             envs.append(env)
         self.env = DummyVecEnv([lambda: env for env in envs])
         if load_path is not None:
             self.env = VecNormalize.load(load_path+'env.pkl', self.env)
         else:
             self.env = VecNormalize(self.env, norm_obs=self.obs_norm, norm_reward=False)
-        self.env = VecDynRandEnv(self.env)
+        self.env = VecDynRandEnv(self.env, self.env_name, self.dyn_range)
 
     def drone_env(self, idx):  
         if self.task == 'stabilize':
