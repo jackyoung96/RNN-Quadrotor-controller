@@ -124,19 +124,22 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
             if len(self.buffer) < self.capacity:
                 self.buffer.append(None)
             if self.env_name == 'takeoff-aviary-v0':
-                if i!=0:
-                    ####### Distribution mean -> 0 #################
-                    state[:,:3] = state[:,:3] - goal[:,:3]
-                    next_state[:,:3] = next_state[:,:3] - goal[:,:3]
-                    goal[:,:3] = 0
-                    ################################################
+                # if i!=0:
+                #     ####### Distribution mean -> 0 #################
+                #     state[:,:3] = state[:,:3] - goal[:,:3]
+                #     next_state[:,:3] = next_state[:,:3] - goal[:,:3]
+                #     goal[:,:3] = 0
+                #     ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
                 ang_value = rot_matrix_z_similarity(next_state[:,3:12],goal[:,3:12]) # 1: 0deg, 0: >90 deg, from vertical z-axis
+                pos_achieve = np.arccos(ang_value) < self.epsilon_ang
                 if self.positive_rew:
                     reward = (1-self.gamma)*np.where(pos_achieve, ang_value, 0.0)+self.gamma*reward
                 else:
                     reward = (1-self.gamma)*np.where(pos_achieve, ang_value-1, -1.0)+self.gamma*reward
-                # done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
+                
+                if i!=0:
+                    done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
 
             elif self.env_name == 'Pendulum-v0':
                 theta = np.arctan2(next_state[:,1:2],next_state[:,0:1])
