@@ -2,6 +2,7 @@ import math
 import random
 
 import numpy as np
+from numpy.linalg import norm
 import matplotlib.pyplot as plt
 
 def plot_grad_flow(named_parameters):
@@ -31,6 +32,17 @@ def rot_matrix_similarity(mat1, mat2):
     for i in range(mat1.shape[0]):
         R = np.matmul(mat1[i], mat2)
         cos = (np.trace(R)-1)/2
-        cos1 = np.clip(cos, -1, 1)
-        result[i] = np.arccos(cos1)
+        result[i] = np.arccos(np.clip(cos, -1, 1))
+    return result
+
+def rot_matrix_z_similarity(mat1, mat2):
+    """
+    similarity btw two rotation matrix
+    """
+    mat1 = mat1.reshape((-1,3,3))
+    mat2 = mat2.reshape((3,3))
+    result = np.zeros((mat1.shape[0],))
+    for i in range(mat1.shape[0]):
+        cos = np.dot(mat1[i,2,:],mat2[2,:])/(norm(mat1[i,2,:])*norm(mat2[2,:]))
+        result[i] = np.arccos(np.clip(cos, -1, 1))
     return result

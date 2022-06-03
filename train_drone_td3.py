@@ -81,8 +81,10 @@ def train(args, hparam):
 
     batch_size  = 256 if args.rnn != "None" else 256 * max_steps
     nenvs = 2
-    explore_noise_scale = 0.5
-    eval_noise_scale = 0.5
+    explore_noise_scale_init = 0.25
+    eval_noise_scale_init = 0.25
+    explore_noise_scale = explore_noise_scale_init
+    eval_noise_scale = eval_noise_scale_init
     best_score = -np.inf
     frame_idx   = 0
     replay_buffer_size = 3e5 if args.rnn != "None" else 3e5 * max_steps
@@ -240,6 +242,10 @@ def train(args, hparam):
                 policy_loss.append(loss_dict['policy_loss'])
                 q_loss_1.append(loss_dict['q_loss_1'])
                 q_loss_2.append(loss_dict['q_loss_2'])
+
+        # Noise decay
+        explore_noise_scale = (0.9 * (1-i_episode/max_episodes) + 0.1) * explore_noise_scale_init
+        eval_noise_scale = (0.9 * (1-i_episode/max_episodes) + 0.1) * eval_noise_scale_init
 
         loss_storage['policy_loss'].append(np.mean(policy_loss))
         loss_storage['q_loss_1'].append(np.mean(q_loss_1))
