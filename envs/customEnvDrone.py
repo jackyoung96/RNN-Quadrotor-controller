@@ -664,7 +664,7 @@ class domainRandomAviary(customAviary):
                                 physicsClientId=self.env.CLIENT)
             self.goal_pos[i,:] = \
                 self.env.INIT_XYZS[i,:] + \
-                0.3*vel (1+np.random.uniform(-1.0,1.0,size=3)) if self.goal is None \
+                0.3 * vel *(1+np.random.uniform(-1.0,1.0,size=3)) if self.goal is None \
                                                                 else self.goal
 
 
