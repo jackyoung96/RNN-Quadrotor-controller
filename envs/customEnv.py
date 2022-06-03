@@ -545,6 +545,9 @@ class dynRandeEnv:
     def unnormalize_obs(self, obs):
         return self.env.unnormalize_obs(obs)
 
+    def close(self):
+        self.env.close()
+
     def save(self, path):
         self.env.save(path+'env.pkl')
     
