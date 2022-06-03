@@ -47,7 +47,7 @@ hparam_set = {
     "q_lr": [3e-4, 1e-3, 1e-4],
     "policy_lr": [3e-4, 1e-3, 1e-4],
     "policy_target_update_interval": [2],
-    "her_length": [100, 50, 300]
+    "her_length": [400, 100, 50]
 }
 
 def train(args, hparam):
@@ -58,14 +58,14 @@ def train(args, hparam):
 
     max_episodes  = int(1e5)
     hidden_dim = hparam['hidden_dim']
-    max_steps = 300
+    max_steps = 400
     eval_max_steps = 500
     goal_dim = hparam['goal_dim']
     param_num = hparam['param_num']
     her_history_length = hparam['her_length']
     her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
     policy_target_update_interval = hparam['policy_target_update_interval'] # delayed update for the policy network and target networks
-    epsilon_pos = np.sqrt(3*(0.1**2))/6 # 5 cm error
+    epsilon_pos = np.sqrt(3*(0.1**2))/6 # 10 cm error
     epsilon_ang = np.deg2rad(10) # 5 deg error
     hparam.update({"epsilon_pos":epsilon_pos,
                    "epsilon_ang":epsilon_ang})
