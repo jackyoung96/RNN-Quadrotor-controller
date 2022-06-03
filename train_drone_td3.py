@@ -170,17 +170,14 @@ def train(args, hparam):
         q_loss_1,q_loss_2,param_loss = [],[],[]
 
         # Goal for HER
-        if 'aviary' in env_name:
-            thetas = [np.random.uniform(-np.pi,np.pi) for _ in range(nenvs)]
-            goal = np.array([[0,0,0, # position
-                            np.cos(theta),np.sin(theta),0, # rotation matrix
-                            -np.sin(theta),np.cos(theta),0,
-                            0,0,1,
-                            0,0,0, # velocity
-                            0,0,0,# angular velocity
-                            0,0,0,0] for theta in thetas]) # dummy action goal
-        else:
-            goal = np.array([[1,0,0]]*nenvs)
+        thetas = [np.random.uniform(-np.pi,np.pi) for _ in range(nenvs)]
+        goal = np.array([[0,0,0, # position
+                        np.cos(theta),np.sin(theta),0, # rotation matrix
+                        -np.sin(theta),np.cos(theta),0,
+                        0,0,1,
+                        0,0,0, # velocity
+                        0,0,0,# angular velocity
+                        0,0,0,0] for theta in thetas]) # dummy action goal
 
         for step in range(max_steps):
             hidden_in = hidden_out
