@@ -42,11 +42,12 @@ dyn_range = {
 hparam_set = {
     "goal_dim": [18],
     "param_num": [14],
-    "hidden_dim": [128,256],
+    "hidden_dim": [128],
 
-    "q_lr": [1e-3, 3e-4],
-    "policy_lr": [1e-3, 3e-5],
-    "policy_target_update_interval": [2,3],
+    "q_lr": [1e-3, 3e-4, 1e-4],
+    "policy_lr": [1e-3, 3e-4, 1e-4],
+    "policy_target_update_interval": [2],
+    "her_length": [100, 50, 300]
 }
 
 def train(args, hparam):
@@ -61,25 +62,15 @@ def train(args, hparam):
     eval_max_steps = 500
     goal_dim = hparam['goal_dim']
     param_num = hparam['param_num']
-    her_history_length = args.her_length
+    her_history_length = hparam['her_length']
     her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
     policy_target_update_interval = hparam['policy_target_update_interval'] # delayed update for the policy network and target networks
-    if args.large_eps:
-        epsilon_pos = np.sqrt(3*(0.20**2))/6 # 5 cm error
-        if args.angvel_goal:
-            epsilon_ang = np.sqrt(3*((np.deg2rad(40)/(2*np.pi))**2))
-        else:
-            epsilon_ang = np.deg2rad(10)
-    else:
-        epsilon_pos = np.sqrt(3*(0.05**2))/6 # 5 cm error
-        if args.angvel_goal:
-            epsilon_ang = np.sqrt(3*((np.deg2rad(20)/(2*np.pi))**2))
-        else:
-            epsilon_ang = np.deg2rad(5) # 5 deg error
+    epsilon_pos = np.sqrt(3*(0.1**2))/6 # 5 cm error
+    epsilon_ang = np.deg2rad(10) # 5 deg error
     hparam.update({"epsilon_pos":epsilon_pos,
                    "epsilon_ang":epsilon_ang})
 
-    batch_size  = 256 if args.rnn != "None" else 256 * max_steps
+    batch_size  = 128 if args.rnn != "None" else 128 * max_steps
     nenvs = 2
     explore_noise_scale_init = 0.25
     eval_noise_scale_init = 0.25
@@ -89,7 +80,7 @@ def train(args, hparam):
     frame_idx   = 0
     replay_buffer_size = 3e5 if args.rnn != "None" else 3e5 * max_steps
     explore_episode = 500
-    update_itr = 1
+    update_itr = 10
     writer_interval = 100
     eval_freq = 1000
     eval_itr = 20
@@ -409,9 +400,6 @@ if __name__=='__main__':
     parser.add_argument('--reward_norm', action='store_true', help="reward normalization")
     parser.add_argument('--her_gamma', default=0.0, type=float)
     parser.add_argument('--positive_rew', action='store_true', help="use [0,1] reward instead of [-1,0]")
-    parser.add_argument('--large_eps', action='store_true', help="use large epsilon")
-    parser.add_argument('--angvel_goal', action='store_true', help='use angular velocity instead of angle as the goal')
-    parser.add_argument('--her_length', type=int, default=100, help='sequence length for her')
     parser.add_argument('--small_lr', action='store_true', help='use small lr')
     parser.add_argument('--behavior_path', default=None, help='path for behavior networks')
 

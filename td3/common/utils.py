@@ -44,5 +44,5 @@ def rot_matrix_z_similarity(mat1, mat2):
     result = np.zeros((mat1.shape[0],))
     for i in range(mat1.shape[0]):
         cos = np.dot(mat1[i,2,:],mat2[2,:])/(norm(mat1[i,2,:])*norm(mat2[2,:]))
-        result[i] = np.arccos(np.clip(cos, -1, 1))
+        result[i] = np.clip(cos, 0, 1)
     return result

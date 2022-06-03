@@ -4,7 +4,7 @@ import numpy as np
 from pkg_resources import Environment
 import torch
 
-from .utils import rot_matrix_similarity
+from .utils import rot_matrix_similarity, rot_matrix_z_similarity
 
 
 class ReplayBuffer:
@@ -131,14 +131,11 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
                     goal[:,:3] = 0
                     ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
-                if self.angvel_goal:
-                    ang_achieve = np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)<self.epsilon_ang
-                else:
-                    ang_achieve = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12])<self.epsilon_ang
+                ang_value = rot_matrix_z_similarity(next_state[:,3:12],goal[:,3:12]) # 1: 0deg, 0: >90 deg, from vertical z-axis
                 if self.positive_rew:
-                    reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,1.0, 0.0)+self.gamma*reward
+                    reward = (1-self.gamma)*np.where(pos_achieve, ang_value, 0.0)+self.gamma*reward
                 else:
-                    reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve) ,0.0, -1.0)+self.gamma*reward
+                    reward = (1-self.gamma)*np.where(pos_achieve, ang_value-1, -1.0)+self.gamma*reward
                 # done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
 
             elif self.env_name == 'Pendulum-v0':
