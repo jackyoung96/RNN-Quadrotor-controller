@@ -482,8 +482,10 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
             step, success = 0,0
             e_ps, e_as = [],[]
             state_buffer, action_buffer, reward_buffer = [],[],[]
+            time_buffer = []
 
             for i_step in range(max_steps):
+                start = time.time()
                 if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                     hidden_in = hidden_out
                     if not hasattr(agent.q_net1, '_goal_dim'):
@@ -505,6 +507,7 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
                     action = agent.policy_net.get_action(state, 
                                                         deterministic=DETERMINISTIC, 
                                                         explore_noise_scale=0.0)
+                time_buffer.append(time.time()-start)
                 action = action[None,:]
                 next_state, reward, done, _ = eval_env.step(action) 
                 
@@ -547,7 +550,8 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
                         success %d\n\
                         position error[m] %.3f\n\
                         angle error[deg] %.3f"%(i_eval,total_rew,success, np.mean(e_ps[-100:]), np.rad2deg(np.mean(e_as[-100:]))))
-    
+                print("EXECUTION TIME:", np.mean(time_buffer))
+
     if log:
         print("total average reward %.3f success rate %.2f"%(eval_reward / test_itr,eval_success / test_itr))
         print("position error[m] %.3f angle error[deg] %.3f"%(eval_position / test_itr, np.rad2deg(eval_angle / test_itr)))
