@@ -54,7 +54,7 @@ class customAviary(gym.Wrapper):
         self.reward_coeff = kwargs.get('reward_coeff', None)
 
         self.env.EPISODE_LEN_SEC = kwargs.get('episode_len_sec', 2)
-        self.MAX_RPM = kwargs.get('max_rpm', 2*16-1)
+        self.MAX_RPM = kwargs.get('max_rpm', 2**16-1)
         self.env.SIM_FREQ = kwargs.get('freq', 240)
 
         if not self.task in TASK_LIST:
