@@ -207,6 +207,12 @@ include_directories(
 catkin_install_python(PROGRAMS src/command.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
-catkin_install_python(PROGRAMS src/state_publisher.py
+catkin_install_python(PROGRAMS src/goal_publisher.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+catkin_install_python(PROGRAMS src/controller_select.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+catkin_install_python(PROGRAMS src/publish_external_pose_vicon.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

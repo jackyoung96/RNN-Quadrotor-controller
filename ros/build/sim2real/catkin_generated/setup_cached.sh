@@ -8,6 +8,8 @@
 
 # modified environment variables
 export CMAKE_PREFIX_PATH="/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/sim2real:$CMAKE_PREFIX_PATH"
+export LD_LIBRARY_PATH="/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/sim2real/lib:$LD_LIBRARY_PATH"
+export PKG_CONFIG_PATH="/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/sim2real/lib/pkgconfig:$PKG_CONFIG_PATH"
 export PWD='/home/jack/crazyflie/sim-to-real-TD3/ros/build/sim2real'
 export ROSLISP_PACKAGE_DIRECTORIES="/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/sim2real/share/common-lisp:$ROSLISP_PACKAGE_DIRECTORIES"
 export ROS_PACKAGE_PATH="/home/jack/crazyflie/sim-to-real-TD3/ros/src/sim2real:$ROS_PACKAGE_PATH"

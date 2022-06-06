@@ -61,10 +61,10 @@ def generate(path, output_path=None):
 	state_dim = 22
 	action_dim = 4
 	goal_dim = 18
-	hidden_dim = 128
 
 	# TODO: check if the policy is really a mlp policy
 	model = torch.load(path, map_location="cpu")
+	hidden_dim = model['linear1.weight'].numpy().shape[0]
 
 	structure = """static int state_dim = """+str(int(state_dim))+""";\n"""+\
 				"""static int action_dim = """+str(int(action_dim))+""";\n"""+\
