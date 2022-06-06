@@ -1,19 +1,8 @@
-import numpy as np
-import torch
-import torch.nn.functional as F
+#!/home/jack/anaconda3/envs/crazyflie python
 
-from td3.td3 import *
-from td3.common.buffers import *
-from td3.agent import td3_agent
-from envs.customEnv import dynRandeEnv, dummyEnv
-
-import argparse
-import numpy as np
 import time
-import threading
 
 import rospy
-from std_msgs.msg import Float32MultiArray
 from std_msgs.msg import String
 
 import cflib.crtp
@@ -26,42 +15,46 @@ from cflib.utils import uri_helper
 #########################################
 
 CF = None
+pub = rospy.Publisher('controller', String, queue_size=100)
 
 def cf_init(address):
-    address = uri_helper.address_from_env(default=0xE7E7E7E701)
+    uri = uri_helper.uri_from_env(default=address)
     cflib.crtp.init_drivers()
-    print('Scanning interfaces for Crazyflies...')
-    available = cflib.crtp.scan_interfaces(address)
-    print('Crazyflies found:')
-    for i in available:
-        print(i[0])
-
     cf = Crazyflie(rw_cache='./cache')
-    cf.open_link(available[0][0])
+    cf.open_link(uri)
 
     return cf
+
+def pub_controller(name, value):
+    result = name + ": " + value
+    pub.publish(result)
 
 def commandCallback(msg):
     global CF
     
     if msg.data == 'any':
-        CF.param.set_value('stabilizer.controller', 0)
+        CF.param.set_value('stabilizer.controller', '0')
     elif msg.data == 'pid':
-        CF.param.set_value('stabilizer.controller', 1)
+        CF.param.set_value('stabilizer.controller', '1')
     elif msg.data == 'mellinger':
-        CF.param.set_value('stabilizer.controller', 2)
+        CF.param.set_value('stabilizer.controller', '2')
     elif msg.data == 'indi':
-        CF.param.set_value('stabilizer.controller', 3)
+        CF.param.set_value('stabilizer.controller', '3')
     elif msg.data == 'nn':
-        CF.param.set_value('stabilizer.controller', 4)
-    time.sleep(1)
+        CF.param.set_value('stabilizer.controller', '4')
+    time.sleep(0.5)
+    CF.param.add_update_callback('stabilizer', 'controller', cb = pub_controller)
+    time.sleep(0.5)
 
 
 def main():
+    global CF
     rospy.init_node('sim2real_agent', anonymous=True)
     uri = rospy.get_param("uri", 'radio://0/100/2M/E7E7E7E701')
-    cf = cf_init(uri)
-    rospy.Subscriber("/command", String, commandCallback)
+    CF = cf_init(uri)
+    CF.param.set_value('stabilizer.estimator', '2')
+    time.sleep(0.5)
+    rospy.Subscriber("command", String, commandCallback)
     rospy.spin()
         
 
@@ -70,4 +63,4 @@ if __name__ == "__main__":
         main()
     except rospy.ROSInterruptException:
         time.sleep(1)
-        cf.close_link()
+        CF.close_link()

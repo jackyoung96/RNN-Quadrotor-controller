@@ -24,6 +24,9 @@
 
     <node name="crazyflie_demo_controller" pkg="crazyflie_demo" type="controller.py" output="screen">
     </node>
+
+    <node name="log" pkg="sim2real" type="log.py" output="screen">
+    </node>
   </group>
 
 </launch>

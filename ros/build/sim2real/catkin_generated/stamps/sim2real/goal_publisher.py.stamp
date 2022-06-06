@@ -3,7 +3,7 @@ import rospy
 from std_msgs.msg import Float32MultiArray, String
 from geometry_msgs.msg import TransformStamped
 from collections import deque
-from crazyflie_driver.msg import Position
+from crazyflie_driver.msg import Position, GenericLogData
 
 import numpy as np
 from scipy.spatial.transform import Rotation as R
@@ -18,58 +18,51 @@ ANGVEL_BUFFER = deque(maxlen=maxlen)
 TIME_BUFFER = deque(maxlen=maxlen)
 ACTION_BUFFER = deque(maxlen=maxlen)
 
-pub_pos = rospy.Publisher('/cmd_position', Position, queue_size=100)
+pub_pos = rospy.Publisher('cmd_position', Position, queue_size=100)
 
 GOAL = None
 STATE = None
 ##################################################
 
 def stateCallback(data):
-    global POS_BUFFER, ROT_BUFFER, QUAT_BUFFER, VEL_BUFFER, ANGVEL_BUFFER, TIME_BUFFER, ACTION_BUFFER, GOAL, STATE
+    global STATE
 
-    t = data.header.stamp
-    t = t.secs+t.nsecs*1e-9
-    pos = data.transform.translation
-    rot = data.transform.rotation
-    quat = np.array([rot.x,rot.y,rot.z,rot.w])
-    r = R.from_quat(quat)
-    yaw = r.as_euler('zyx', degrees=True)
-
-    STATE = np.array([pos.x,pos.y,pos.z, yaw])
+    STATE = np.array(data.values)
 
 def commandCallback(msg):
     global GOAL, STATE
 
-    if msg.data == 'takeoff':
-        GOAL = STATE[:3] + np.array([0,0,0.8])
-    elif msg.data == 'left':
-        GOAL = GOAL + np.array([0,0.3,0])
-    elif msg.data == 'right':
-        GOAL = GOAL + np.array([0,-0.3,0])
-    elif msg.data == 'forward':
-        GOAL = GOAL + np.array([0.3,0,0])
-    elif msg.data == 'backward':
-        GOAL = GOAL + np.array([-0.3,0,0])
-    elif msg.data == 'up':
-        GOAL = GOAL + np.array([0,0,0.3])
-    elif msg.data == 'down':
-        GOAL = GOAL + np.array([0,0,-0.3])
-    elif msg.data == 'landing':
-        GOAL[2] = 0.1
-    elif msg.data == 'turnoff':
-        GOAL = None
-    
-    goal = Position()
-    goal.x = GOAL[0]
-    goal.y = GOAL[1]
-    goal.z = GOAL[2]
-    goal.yaw = STATE[3]
-    pub_pos.publish(goal)
+    if msg.data in ['takeoff', 'left', 'right', 'forward', 'backward', 'up', 'down', 'landing', 'turnoff']:
+        if msg.data == 'takeoff':
+            GOAL = STATE[:3] + np.array([0,0,0.2])
+        elif msg.data == 'left':
+            GOAL = GOAL + np.array([0,0.1,0])
+        elif msg.data == 'right':
+            GOAL = GOAL + np.array([0,-0.1,0])
+        elif msg.data == 'forward':
+            GOAL = GOAL + np.array([0.1,0,0])
+        elif msg.data == 'backward':
+            GOAL = GOAL + np.array([-0.1,0,0])
+        elif msg.data == 'up':
+            GOAL = GOAL + np.array([0,0,0.1])
+        elif msg.data == 'down':
+            GOAL = GOAL + np.array([0,0,-0.1])
+        elif msg.data == 'landing':
+            GOAL[2] = 0.1
+        elif msg.data == 'turnoff':
+            GOAL = None
+        
+        goal = Position()
+        goal.x = GOAL[0]
+        goal.y = GOAL[1]
+        goal.z = GOAL[2]
+        goal.yaw = STATE[3]
+        pub_pos.publish(goal)
 
 def main():
     rospy.init_node('state_publisher', anonymous=True)
-    rospy.Subscriber("/vicon/CF_JACK/CF_JACK", TransformStamped, stateCallback)
-    rospy.Subscriber("/command", String, commandCallback)
+    rospy.Subscriber("log1", GenericLogData, stateCallback)
+    rospy.Subscriber("command", String, commandCallback)
     rospy.spin()
 
 if __name__ == '__main__':

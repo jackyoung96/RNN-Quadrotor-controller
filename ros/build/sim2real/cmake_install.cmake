@@ -155,6 +155,14 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/sim2real" TYPE PROGRAM FILES "/home/jack/crazyflie/sim-to-real-TD3/ros/build/sim2real/catkin_generated/installspace/controller_select.py")
 endif()
 
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/sim2real" TYPE PROGRAM FILES "/home/jack/crazyflie/sim-to-real-TD3/ros/build/sim2real/catkin_generated/installspace/publish_external_pose_vicon.py")
+endif()
+
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/sim2real" TYPE PROGRAM FILES "/home/jack/crazyflie/sim-to-real-TD3/ros/build/sim2real/catkin_generated/installspace/log.py")
+endif()
+
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
   include("/home/jack/crazyflie/sim-to-real-TD3/ros/build/sim2real/gtest/cmake_install.cmake")

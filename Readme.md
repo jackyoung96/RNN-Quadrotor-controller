@@ -33,6 +33,7 @@ python train_pendulum_td3.py --policy_actf tanh --reward_norm --gpu 0 --rnn None
 ## Test drone in real world
 
 > roslaunch sim2real sim2real.launch
-> python test_drone_td3.py --rnn LSTMHER --path artifacts/agent-22Jun02190444:v19/iter0100000
+> rostopic echo /crazyflie/log1
+
 
 controller.c, estimate.c -> Default controller, Default estimate modifying -> flashing

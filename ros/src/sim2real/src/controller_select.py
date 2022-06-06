@@ -33,18 +33,18 @@ def commandCallback(msg):
     global CF
     
     if msg.data == 'any':
-        CF.param.set_value('stabilizer.controller', 0)
+        CF.param.set_value('stabilizer.controller', '0')
     elif msg.data == 'pid':
-        CF.param.set_value('stabilizer.controller', 1)
+        CF.param.set_value('stabilizer.controller', '1')
     elif msg.data == 'mellinger':
-        CF.param.set_value('stabilizer.controller', 2)
+        CF.param.set_value('stabilizer.controller', '2')
     elif msg.data == 'indi':
-        CF.param.set_value('stabilizer.controller', 3)
+        CF.param.set_value('stabilizer.controller', '3')
     elif msg.data == 'nn':
-        CF.param.set_value('stabilizer.controller', 4)
-    time.sleep(1)
+        CF.param.set_value('stabilizer.controller', '4')
+    time.sleep(0.5)
     CF.param.add_update_callback('stabilizer', 'controller', cb = pub_controller)
-    time.sleep(1)
+    time.sleep(0.5)
 
 
 def main():
@@ -52,6 +52,8 @@ def main():
     rospy.init_node('sim2real_agent', anonymous=True)
     uri = rospy.get_param("uri", 'radio://0/100/2M/E7E7E7E701')
     CF = cf_init(uri)
+    CF.param.set_value('stabilizer.estimator', '2')
+    time.sleep(0.5)
     rospy.Subscriber("command", String, commandCallback)
     rospy.spin()
         

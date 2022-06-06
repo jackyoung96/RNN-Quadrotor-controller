@@ -216,3 +216,6 @@ catkin_install_python(PROGRAMS src/controller_select.py
 catkin_install_python(PROGRAMS src/publish_external_pose_vicon.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+catkin_install_python(PROGRAMS src/log.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
