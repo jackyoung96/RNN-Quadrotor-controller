@@ -177,7 +177,7 @@ def main():
     global CF
     try:
         rospy.init_node('sim2real_agent', anonymous=True)
-        rospy.Subscriber("crazyflie_state", Float32MultiArray, actionCallback)
+        rospy.Subscriber("/crazyflie/state", Float32MultiArray, actionCallback)
         rospy.spin()
 
     except KeyboardInterrupt:

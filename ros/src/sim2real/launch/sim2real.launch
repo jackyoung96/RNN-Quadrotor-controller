@@ -1,0 +1,5 @@
+<launch>
+    <include file="$(find vicon_bridge)/launch/vicon.launch"/>
+    <node name="state_publisher" pkg="sim2real" type="state_publisher.py" />
+    <!-- <node name="command" pkg="sim2real" type="command.py" /> -->
+</launch>
