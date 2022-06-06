@@ -386,7 +386,7 @@ if __name__=='__main__':
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--rnn', choices=['None','RNN2','GRU2','LSTM2',
                                             'RNNHER','GRUHER','LSTMHER',
-                                            'RNNbhvHER','GRUbhvHER','LSTMbhvHER']
+                                            'RNNsHER','GRUsHER','LSTMsHER']
                                 , default='None', help='Use memory network (LSTM)')
     parser.add_argument('--policy_actf', type=str, default='tanh', help="policy activation function")
     parser.add_argument('--obs_norm', action='store_true', help='use batchnorm for input normalization')

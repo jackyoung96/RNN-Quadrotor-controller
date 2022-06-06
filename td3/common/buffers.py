@@ -124,19 +124,13 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
             if len(self.buffer) < self.capacity:
                 self.buffer.append(None)
             if self.env_name == 'takeoff-aviary-v0':
-                if i!=0:
-                    ####### Distribution mean -> 0 #################
-                    state[:,:3] = state[:,:3] - goal[:,:3]
-                    next_state[:,:3] = next_state[:,:3] - goal[:,:3]
-                    goal[:,:3] = 0
-                    ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
-                ang_value = rot_matrix_z_similarity(next_state[:,3:12],goal[:,3:12]) # 1: 0deg, 0: >90 deg, from vertical z-axis
-                ang_achieve = np.arccos(ang_value) < self.epsilon_ang
+                ang_value = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12]) # 1: 0deg, 0: >90 deg, from vertical z-axis
+                ang_achieve = ang_value < self.epsilon_ang
                 if self.positive_rew:
-                    reward = (1-self.gamma)*np.where(pos_achieve, ang_value, 0.0)+self.gamma*reward
+                    reward = (1-self.gamma)*np.where(pos_achieve, 1.0, 0.0)+self.gamma*reward
                 else:
-                    reward = (1-self.gamma)*np.where(pos_achieve, ang_value-1, -1.0)+self.gamma*reward
+                    reward = (1-self.gamma)*np.where(pos_achieve, 0.0, -1.0)+self.gamma*reward
                 
                 done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
 
@@ -178,3 +172,49 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
         s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst = map(lambda x: np.stack(x,axis=0), [s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst])
 
         return s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst
+
+class SingleHindsightReplayBufferRNN(HindsightReplayBufferRNN):
+    """ 
+    Replay buffer for agent with LSTM network additionally storing previous action, 
+    initial input hidden state and output hidden state of LSTM.
+    And each sample contains the whole episode instead of a single step.
+    'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
+
+    """
+    def __init__(self, capacity, env_name='takeoff-aviary-v0', **kwargs):
+        super().__init__(capacity, env_name=env_name, **kwargs)
+    
+    def push(self, state, action, last_action, reward, next_state, done, param, goal):
+        gs = [goal[None,:]]
+        if np.random.random()<0.8 and self.her:
+            gs.append(next_state[-1:,:])
+
+        for i,goal in enumerate(gs):
+            if len(self.buffer) < self.capacity:
+                self.buffer.append(None)
+            if self.env_name == 'takeoff-aviary-v0':
+                if i!=0:
+                    ####### Distribution mean -> 0 #################
+                    state[:,:3] = state[:,:3] - goal[:,:3]
+                    next_state[:,:3] = next_state[:,:3] - goal[:,:3]
+                    goal[:,:3] = 0
+                    ################################################
+                pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
+                ang_value = rot_matrix_z_similarity(next_state[:,3:12],goal[:,3:12]) # 1: 0deg, 0: >90 deg, from vertical z-axis
+                ang_achieve = np.arccos(ang_value) < self.epsilon_ang
+                if self.positive_rew:
+                    reward = (1-self.gamma)*np.where(pos_achieve, ang_value, 0.0)+self.gamma*reward
+                else:
+                    reward = (1-self.gamma)*np.where(pos_achieve, ang_value-1, -1.0)+self.gamma*reward
+                
+                done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
+
+            elif self.env_name == 'Pendulum-v0':
+                theta = np.arctan2(next_state[:,1:2],next_state[:,0:1])
+                goal_theta = np.arctan2(goal[:,1:2],goal[:,0:1])
+                ang_achieve = (theta-goal_theta)%(2*np.pi)<self.epsilon_ang
+                reward = (1-self.gamma)*np.where(ang_achieve ,0.0, -1.0)+self.gamma*reward
+                # done = np.where(pos_achieve , 1.0, 0.0)
+            # ang_achieve = np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)<self.epsilon_ang
+            self.buffer[self.position] = (state, action, last_action, reward, next_state, done, param, goal)
+            self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
