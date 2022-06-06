@@ -42,9 +42,9 @@ dyn_range = {
 hparam_set = {
     "goal_dim": [18],
     "param_num": [14],
-    "hidden_dim": [128],
+    "hidden_dim": [32],
 
-    "q_lr": [3e-4, 1e-3, 1e-4],
+    "q_lr": [1e-3, 3e-4, 1e-4],
     "policy_lr": [3e-4, 1e-3, 1e-4],
     "policy_target_update_interval": [2],
     "her_length": [400, 100, 50]
