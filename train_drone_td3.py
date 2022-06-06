@@ -44,10 +44,10 @@ hparam_set = {
     "param_num": [14],
     "hidden_dim": [32],
 
-    "q_lr": [1e-3, 3e-4, 1e-4],
-    "policy_lr": [3e-4, 1e-3, 1e-4],
+    "q_lr": [1e-3],
+    "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
-    "her_length": [400, 100, 50]
+    "her_length": [400]
 }
 
 def train(args, hparam):
@@ -56,7 +56,7 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(1e5)
+    max_episodes  = int(2e5)
     hidden_dim = hparam['hidden_dim']
     max_steps = 400
     eval_max_steps = 500
@@ -78,12 +78,12 @@ def train(args, hparam):
     eval_noise_scale = eval_noise_scale_init
     best_score = -np.inf
     frame_idx   = 0
-    replay_buffer_size = 3e5 if args.rnn != "None" else 3e5 * max_steps
+    replay_buffer_size = 2e5 if args.rnn != "None" else 2e5 * max_steps
     explore_episode = 500
     update_itr = 2
     writer_interval = 100
     eval_freq = 1000
-    eval_itr = 20
+    eval_itr = 50
 
     DETERMINISTIC=True  # DDPG: deterministic policy gradient
     
@@ -114,7 +114,7 @@ def train(args, hparam):
         writer = SummaryWriter(tbpath)
 
         # wandb
-        wandb.init(project="TD3-drone", config=hparam)
+        wandb.init(project="TD3-drone-final", config=hparam)
         wandb.run.name = "%s_%s"%(rnn_tag, now)
         wandb.run.save()
     
@@ -125,8 +125,8 @@ def train(args, hparam):
     # Define environment and agent #####
     ####################################
 
-    envs = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=nenvs, dyn_range=dyn_range, episode_len=max_steps/200, seed=0)
-    eval_env = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%seval"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=1, dyn_range=dyn_range, episode_len=max_steps/200, seed=1234567)
+    envs = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=nenvs, dyn_range=dyn_range, episode_len=max_steps/200, seed=args.seed)
+    eval_env = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%seval"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=1, dyn_range=dyn_range, episode_len=max_steps/200, seed=args.seed+1234567)
     td3_trainer = td3_agent(env=envs,
                 rnn=args.rnn,
                 device=device,
@@ -295,8 +295,6 @@ def train(args, hparam):
         ######################################
 
         if i_episode % eval_freq == 0 and i_episode != 0:
-            envs.save(os.path.join(savepath+"eval"))
-            eval_env.load(os.path.join(savepath+"eval"))
             eval_env.env.training = False
             td3_trainer.policy_net.eval()
             eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, max_steps=eval_max_steps, test_itr=eval_itr, record=False)
@@ -351,7 +349,7 @@ def test(args, hparam):
     print("Device:",device)
 
     if not os.path.isdir(os.path.split(args.path)[0]):
-        wandb_artifact("TD3-drone", args.path.split('/')[1])
+        wandb_artifact("TD3-drone-final", args.path.split('/')[1])
 
     # Define environment
     eval_env = dynRandeEnv(env_name=env_name, 
@@ -361,7 +359,7 @@ def test(args, hparam):
                        episode_len=max_steps/200,
                        nenvs=1, 
                        dyn_range=dyn_range, 
-                       seed=int(123456789),
+                       seed=int(args.seed+123456789),
                        record=args.record)
     eval_env.env.training = False
     td3_trainer = td3_agent(env=eval_env,
@@ -398,10 +396,11 @@ if __name__=='__main__':
     parser.add_argument('--hparam', action='store_true', help="find hparam set")
     parser.add_argument('--lr_scheduler', action='store_true', help="Use lr scheduler")
     parser.add_argument('--reward_norm', action='store_true', help="reward normalization")
-    parser.add_argument('--her_gamma', default=0.0, type=float)
+    parser.add_argument('--her_gamma', default=0.0, type=float, help="if 0 only her, if 1 no her")
     parser.add_argument('--positive_rew', action='store_true', help="use [0,1] reward instead of [-1,0]")
     parser.add_argument('--small_lr', action='store_true', help='use small lr')
     parser.add_argument('--behavior_path', default=None, help='path for behavior networks')
+    parser.add_argument('--seed', type=int, default=0, help='seed')
 
     # Arguments for test
     parser.add_argument('--test', action='store_true')

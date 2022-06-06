@@ -476,6 +476,7 @@ class dynRandeEnv:
         else:
             self.env = VecNormalize(self.env, norm_obs=self.obs_norm, norm_reward=False)
         self.env = VecDynRandEnv(self.env, self.env_name, self.dyn_range)
+        self.env.seed(self.seed)
 
     def drone_env(self, idx):  
         if self.task == 'stabilize':

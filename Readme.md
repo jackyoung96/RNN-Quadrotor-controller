@@ -25,7 +25,7 @@ python train_pendulum_td3.py --policy_actf tanh --reward_norm --gpu 0 --rnn None
 
 ### HER
 
-> python train_drone_td3.py --policy_actf tanh --her_gamma 0.0 --tb_log --gpu 2 --rnn RNNHER
+> python train_drone_td3.py --policy_actf tanh --her_gamma 0.0 --tb_log --gpu 0 --rnn LSTMHER
 
 ### HERbhv
 > python train_drone_td3.py --policy_actf tanh --her_gamma 0.0 --her_length 10 --tb_log --gpu 0 --rnn RNNbhvHER --behavior_path artifacts/agent-22Jun01050026:v15/iter0055000
