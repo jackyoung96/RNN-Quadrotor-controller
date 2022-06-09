@@ -553,7 +553,7 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
 
 class TD3HERRNN_Trainer(TD3RNN_Trainer):
     def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, goal_dim, rnn_type='RNN', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
-        super().__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.replace('HER','').replace('bhv',''), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
+        super().__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.replace('sHER','').replace('HER',''), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
         self.state_space, self.action_space, self.param_num, self.hidden_dim, self.goal_dim = \
             state_space, action_space, param_num, hidden_dim, goal_dim
 
