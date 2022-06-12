@@ -173,7 +173,7 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
 
         return s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst, g_lst
 
-class SingleHindsightReplayBufferRNN(HindsightReplayBufferRNN):
+class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
     """ 
     Replay buffer for agent with LSTM network additionally storing previous action, 
     initial input hidden state and output hidden state of LSTM.
@@ -184,10 +184,10 @@ class SingleHindsightReplayBufferRNN(HindsightReplayBufferRNN):
     def __init__(self, capacity, env_name='takeoff-aviary-v0', **kwargs):
         super().__init__(capacity, env_name=env_name, **kwargs)
     
-    def push(self, state, action, last_action, reward, next_state, done, param, goal):
-        gs = [goal[None,:]]
+    def push(self, state, action, last_action, reward, next_state, done, param):
+        gs = [np.array([[0,0,0]])]
         if np.random.random()<0.8 and self.her:
-            gs.append(next_state[-1:,:])
+            gs.append(next_state[-1:,:3])
 
         for i,goal in enumerate(gs):
             if len(self.buffer) < self.capacity:
@@ -200,7 +200,7 @@ class SingleHindsightReplayBufferRNN(HindsightReplayBufferRNN):
                     goal[:,:3] = 0
                     ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
-                ang_value = rot_matrix_z_similarity(next_state[:,3:12],goal[:,3:12]) # 1: 0deg, 0: >90 deg, from vertical z-axis
+                ang_value = np.clip(next_state[:,11:12],0,1) # 1: 0deg, 0: >90 deg, from vertical z-axis
                 ang_achieve = np.arccos(ang_value) < self.epsilon_ang
                 if self.positive_rew:
                     reward = (1-self.gamma)*np.where(pos_achieve, ang_value, 0.0)+self.gamma*reward

@@ -29,16 +29,10 @@ def td3_agent(env,
                     action_scale=1.0 if 'aviary' in env.env.env_name else 10.0,
                     device=device, 
                     **hparam)
-    elif "HER" in rnn:
-        # batch_size = batch_size*int(max_steps//her_sample_length / 2)
-        if "sHER" in rnn:
-            replay_buffer = SingleHindsightReplayBufferRNN(replay_buffer_size,
-                                env=env.env_name,
-                                **hparam)
-        else:
-            replay_buffer = HindsightReplayBufferRNN(replay_buffer_size,
-                                env=env.env_name,
-                                **hparam)
+    elif rnn in ["RNNHER", "LSTMHER", "GRUHER"]:
+        replay_buffer = HindsightReplayBufferRNN(replay_buffer_size,
+                            env=env.env_name,
+                            **hparam)
         # goal_dim = observation_space.shape[0]-4 if 'aviary' in env.env_name else observation_space.shape[0]
         td3_trainer = TD3HERRNN_Trainer(replay_buffer,
                     env.env.observation_space, 
@@ -48,6 +42,10 @@ def td3_agent(env,
                     action_scale=1.0 if 'aviary' in env.env_name else 10.0,
                     device=device, 
                     **hparam)
+    elif rnn in ["RNNsHER", "LSTMsHER", "GRUsHER"]:
+        replay_buffer = SingleHindsightReplayBufferRNN(replay_buffer_size,
+                            env=env.env_name,
+                            **hparam)
     elif rnn == "None":
         replay_buffer = ReplayBuffer(replay_buffer_size, **hparam)
         td3_trainer = TD3_Trainer(replay_buffer,

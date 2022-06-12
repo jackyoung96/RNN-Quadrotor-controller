@@ -359,7 +359,8 @@ def test(args, hparam):
                        task=args.task,
                        episode_len=max_steps/200,
                        nenvs=1, 
-                       dyn_range=dyn_range, 
+                    #    dyn_range=dyn_range, 
+                       dyn_range=dict(),
                        seed=int(args.seed+123456789),
                        record=args.record)
     eval_env.env.training = False
