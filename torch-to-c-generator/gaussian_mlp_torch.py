@@ -56,7 +56,7 @@ def get_rnn_loop(_in_dim, _out_dim, _in, _out):
 	"""
 	return loop
 
-def generate(path, output_path=None):
+def generate_her(path, output_path=None):
 
 	state_dim = 22
 	action_dim = 4
