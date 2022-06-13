@@ -461,6 +461,7 @@ class dynRandeEnv:
         self.episode_len = episode_len
 
         self.obs_norm = obs_norm
+        self.last_action = -np.ones((4,))[None,:]
 
         envs = []
         for idx in range(nenvs):
@@ -536,9 +537,12 @@ class dynRandeEnv:
         return env
 
     def reset(self):
+        self.last_action = -np.ones((4,))[None,:]
         return self.env.reset()
 
     def step(self, action):
+        action = 4*(1/200)/0.15 * (action-self.last_action) + self.last_action
+        self.last_action = action
         return self.env.step(action)
     
     def normalize_obs(self, obs):

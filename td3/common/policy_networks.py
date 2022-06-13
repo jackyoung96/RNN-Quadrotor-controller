@@ -113,14 +113,14 @@ class PolicyNetwork(PolicyNetworkBase):
         normal = Normal(0,1)
         z = normal.sample((num_batch,1)).to(self.device)
 
-        action = mean.detach().cpu().numpy().squeeze() if deterministic\
-                else (mean + std*z).detach().cpu().numpy().squeeze()
+        action = mean.detach().cpu().numpy() if deterministic\
+                else (mean + std*z).detach().cpu().numpy()
 
         ''' add noise '''
         noise = normal.sample(action.shape) * explore_noise_scale
         action = action + noise.numpy()
 
-        action = 4*(1/200)/0.15 * (action-last_action) + last_action
+        # action = 4*(1/200)/0.15 * (action-last_action) + last_action
 
         return action
 
@@ -226,8 +226,8 @@ class PolicyNetworkRNN(PolicyNetworkBase):
         normal = Normal(0,1)
         z = normal.sample(std.shape).to(self.device)
 
-        action = mean.detach().cpu().numpy().squeeze() if deterministic\
-                else (mean + std*z).detach().cpu().numpy().squeeze()
+        action = mean.detach().cpu().numpy() if deterministic\
+                else (mean + std*z).detach().cpu().numpy()
 
         # print("debug get action", mean.squeeze(), action)
 
@@ -235,8 +235,8 @@ class PolicyNetworkRNN(PolicyNetworkBase):
         noise = normal.sample(action.shape) * explore_noise_scale
         action = action + noise.numpy()
 
-        last_action = last_action.detach().cpu().numpy()
-        action = 4*(1/200)/0.15 * (action-last_action) + last_action
+        # last_action = last_action.detach().cpu().numpy()
+        # action = 4*(1/200)/0.15 * (action-last_action) + last_action
 
         return action, hidden_out
 
@@ -373,8 +373,8 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         normal = Normal(0,1)
         z = normal.sample(std.shape).to(self.device)
 
-        action = mean.detach().cpu().numpy().squeeze() if deterministic\
-                else (mean + std*z).detach().cpu().numpy().squeeze()
+        action = mean.detach().cpu().numpy() if deterministic\
+                else (mean + std*z).detach().cpu().numpy()
 
         # print("debug get action", mean.squeeze(), action)
 
@@ -389,8 +389,8 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         action = np.clip(action,-1,1)
         self.train()
 
-        last_action = last_action.detach().cpu().numpy()
-        action = 4*(1/200)/0.15 * (action-last_action) + last_action
+        # last_action = last_action.detach().cpu().numpy()
+        # action = 4*(1/200)/0.15 * (action-last_action) + last_action
 
         return action, hidden_out
 
