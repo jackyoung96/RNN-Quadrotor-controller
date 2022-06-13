@@ -54,7 +54,7 @@ def main(hparam):
     disp.start()
 
     env_name = "takeoff-aviary-v0"
-    max_steps = 400  # 8.5 sec
+    max_steps = 100  # 8.5 sec
 
     device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Device:",device)
@@ -89,17 +89,16 @@ def main(hparam):
         # (np.array([[0,0.5,1.025]]),1600),
         # (np.array([[0,0,1.025]]),2000)
     ]
-    # waypoints = [
-    #     (np.array([[0,0,0.025]]),0),
-    #     (np.array([[0,0,1.0]]),400),
-    #     (np.array([[0.5,0,1.0]]),800), # (pos, time)
-    #     # (np.array([[1,0,1.025]]),1200),
-    #     # (np.array([[1,1,1.025]]),1200),
-    #     # (np.array([[0,1,1.025]]),1600),
-    #     # (np.array([[0,0,1.025]]),1700)
-    # ]
+    waypoints = [
+        (np.array([[0,0,2.025]]),0),
+        (np.array([[0,0,2.3]]),400), # (pos, time)
+        # (np.array([[0.5,0,1.025]]),800),
+        # (np.array([[0,0,1.025]]),1200),
+        # (np.array([[0,0.5,1.025]]),1600),
+        # (np.array([[0,0,1.025]]),2000)
+    ]
 
-    max_steps = waypoints[-1][1]
+    # max_steps = waypoints[-1][1]
 
     # Define environment
     theta = np.random.uniform(0,2*np.pi)
@@ -163,9 +162,9 @@ def main(hparam):
     with torch.no_grad():
         env.env.envs[0].goal = getgoal(waypoints, 0)
         state, param = env.reset()
-        total_rew = 0
+
         last_action = env.env.action_space.sample()[None,:]
-        last_action = np.zeros_like(last_action)
+        last_action = -np.ones_like(last_action)
         if 'LSTM' == hparam['rnn']:
             hidden_out_zero = (torch.zeros([1, 1, hparam['hidden_dim']], dtype=torch.float).to(device), \
                         torch.zeros([1, 1, hparam['hidden_dim']], dtype=torch.float).to(device))
@@ -184,7 +183,7 @@ def main(hparam):
             if np.any(env.env.envs[0].goal_pos-goal_pos):
                 env.env.envs[0].goal_pos = goal_pos
                 hidden_out = hidden_out_zero
-                last_action = np.zeros_like(last_action)
+                last_action = -np.ones_like(last_action)
 
             if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                 hidden_in = hidden_out
@@ -205,14 +204,14 @@ def main(hparam):
                                                         explore_noise_scale=0.0)
             else:
                 action = agent.policy_net.get_action(state, 
+                                                    last_action,
                                                     deterministic=DETERMINISTIC, 
                                                     explore_noise_scale=0.0)
             
-            action = action[None,:]
             next_state, reward, done, _ = env.step(action) 
 
-            critic_test = agent.q_net1(torch.Tensor(state[None,:]).to(device), torch.Tensor(action[None,:]).to(device), torch.Tensor(param[None,:]).to(device), torch.Tensor(goal[None,:]).to(device)).detach().cpu().item()
-            critic_buffer.append(critic_test)
+            # critic_test = agent.q_net1(torch.Tensor(state[None,:]).to(device), torch.Tensor(action[None,:]).to(device), torch.Tensor(param[None,:]).to(device), torch.Tensor(goal[None,:]).to(device)).detach().cpu().item()
+            # critic_buffer.append(critic_test)
 
             e_p = np.linalg.norm(6*next_state[0,:3]) # position (m)
             e_a = np.rad2deg(np.arccos(np.clip(next_state[0,11], -1.0, 1.0))) # angle (deg)
@@ -247,6 +246,8 @@ def main(hparam):
     print("EVALUATION POSITION ERROR[m]:", eval_position)
     print("EVALUATION ANGLE ERROR[deg]:", np.rad2deg(eval_angle))
 
+    print("EVALUATION ANGVEL ERROR[deg/s]:", np.linalg.norm((2*180*np.stack(state_buffer)[:,:,15:18]), axis=-1).mean())
+
     disp.stop()
 
 if __name__ == '__main__':
@@ -265,7 +266,7 @@ if __name__ == '__main__':
     hparam = {
         "goal_dim": 18,
         "param_num": 14,
-        "hidden_dim": 32,
+        "hidden_dim": 40,
         "policy_actf": F.tanh,
     }
     hparam.update(vars(args))
