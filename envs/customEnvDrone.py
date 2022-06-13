@@ -59,7 +59,11 @@ class customAviary(gym.Wrapper):
 
         if not self.task in TASK_LIST:
             raise "Wrong task!!"
+        print("DEBUG",self.env._computeObs)
+        print(self._computeObs)
         self.env._computeObs = self._computeObs
+        print("DEBUG",self.env._computeObs)
+        print(self._computeObs)
         self.env._preprocessAction = self._preprocessAction
         self.env._computeReward = self._computeReward
         self.env._computeDone = self._computeDone
@@ -198,9 +202,9 @@ class customAviary(gym.Wrapper):
         init_rpys = []
         for i in range(self.env.NUM_DRONES):
             init_rpy = self.env.INIT_RPYS[i,:] + self.rpy_noise*np.random.uniform(-1.0,1.0,self.env.INIT_RPYS[i,:].shape)
-            init_rpy[i,-1] = init_rpy[i,-1] + np.random.uniform(-np.pi, np.pi) # random yaw
+            # init_rpy[i,-1] = init_rpy[i,-1] + np.random.uniform(-np.pi, np.pi) # random yaw
             init_rpys.append(init_rpy)
-        self.env.DRONE_IDS = np.array([p.loadURDF(os.path.dirname(os.path.abspath(__file__))+"/../../../gym_pybullet_drones/assets/"+self.env.URDF,
+        self.env.DRONE_IDS = np.array([p.loadURDF(os.path.dirname(os.path.abspath(__file__))+"/../gym-pybullet-drones/gym_pybullet_drones/assets/"+self.env.URDF,
                                               self.env.INIT_XYZS[i,:],
                                               p.getQuaternionFromEuler(init_rpys[i]),
                                               flags = p.URDF_USE_INERTIA_FROM_FILE,
@@ -573,7 +577,7 @@ class domainRandomAviary(customAviary):
         self.env.DRAG_COEFF, \
         self.env.DW_COEFF_1, \
         self.env.DW_COEFF_2, \
-        self.env.DW_COEFF_3 = self.env._parseURDFParameters()
+        self.env.DW_COEFF_3 = self.env.env._parseURDFParameters()
 
         self.battery = self.orig_params['BATTERY'] * np.random.uniform(1.0-self.battery_range, 1.0)
         if self.battery_range != 0:

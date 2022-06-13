@@ -26,7 +26,7 @@ def EKFCallback(data):
                         "x":data.values[0],
                         "y":data.values[1],
                         "z":data.values[2],
-                        "w":data.values[3],})
+                        "w":data.values[3]}, ignore_index=True)
 
 def viconCallback(data):
     global log, start
@@ -44,12 +44,12 @@ def viconCallback(data):
                         "x":pos.x,
                         "y":pos.y,
                         "z":pos.z,
-                        "w":yaw})
+                        "w":yaw},ignore_index=True)
 
 def main():
     rospy.init_node('logging', anonymous=True)
     rospy.Subscriber("log1", GenericLogData, EKFCallback)
-    rospy.Subscriber("/vicon/CF_JACK/CF_JACK", String, viconCallback)
+    rospy.Subscriber("/vicon/CF_JACK/CF_JACK", TransformStamped, viconCallback)
     rospy.spin()
 
 if __name__ == '__main__':

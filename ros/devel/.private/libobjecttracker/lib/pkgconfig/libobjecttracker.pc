@@ -1,0 +1,8 @@
+prefix=/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/libobjecttracker
+
+Name: libobjecttracker
+Description: Description of libobjecttracker
+Version: 0.0.1
+Cflags: -I/home/jack/crazyflie/sim-to-real-TD3/ros/src/externalDependencies/libobjecttracker/include
+Libs: -L${prefix}/lib -llibobjecttracker
+Requires: 

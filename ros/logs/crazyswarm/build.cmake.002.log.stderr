@@ -1,0 +1,44 @@
+[31m[1mCMake Error[0m at /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyswarm/externalDependencies/libmotioncapture/CMakeLists.txt:54 (add_subdirectory):
+  The source directory
+
+    /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyswarm/externalDependencies/libmotioncapture/deps/vicon-datastream-sdk
+
+  does not contain a CMakeLists.txt file.
+
+
+[31m[1mCMake Error[0m at /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyswarm/externalDependencies/libmotioncapture/CMakeLists.txt:82 (add_subdirectory):
+  The source directory
+
+    /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyswarm/externalDependencies/libmotioncapture/deps/NatNetSDKCrossplatform
+
+  does not contain a CMakeLists.txt file.
+
+
+[31m[1mCMake Error[0m at /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyswarm/externalDependencies/libmotioncapture/CMakeLists.txt:102 (add_subdirectory):
+  The source directory
+
+    /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyswarm/externalDependencies/libmotioncapture/deps/qualisys_cpp_sdk
+
+  does not contain a CMakeLists.txt file.
+
+
+[31m[1mCMake Error[0m at /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyswarm/externalDependencies/libmotioncapture/CMakeLists.txt:140 (add_subdirectory):
+  The source directory
+
+    /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyswarm/externalDependencies/libmotioncapture/deps/vrpn
+
+  does not contain a CMakeLists.txt file.
+
+
+[31m[1mCMake Error[0m at /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyswarm/externalDependencies/libmotioncapture/CMakeLists.txt:176 (add_subdirectory):
+  The source directory
+
+    /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyswarm/externalDependencies/libmotioncapture/deps/pybind11
+
+  does not contain a CMakeLists.txt file.
+
+
+[31m[1mCMake Error[0m at /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyswarm/externalDependencies/libmotioncapture/CMakeLists.txt:180 (pybind11_add_module):
+  Unknown CMake command "pybind11_add_module".
+
+

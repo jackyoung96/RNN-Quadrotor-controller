@@ -1,0 +1,4 @@
+Symlinking /home/jack/crazyflie/sim-to-real-TD3/ros/devel/lib/liblibobjecttracker.so
+Symlinking /home/jack/crazyflie/sim-to-real-TD3/ros/devel/lib/pkgconfig/libobjecttracker.pc
+Symlinking /home/jack/crazyflie/sim-to-real-TD3/ros/devel/share/libobjecttracker/cmake/libobjecttrackerConfig-version.cmake
+Symlinking /home/jack/crazyflie/sim-to-real-TD3/ros/devel/share/libobjecttracker/cmake/libobjecttrackerConfig.cmake

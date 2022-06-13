@@ -17,7 +17,6 @@ from pyvirtualdisplay import Display
 import numpy as np
 from copy import deepcopy
 import pandas as pd
-from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
 import time
