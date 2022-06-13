@@ -515,10 +515,11 @@ class dynRandeEnv:
             frame_stack=1,
             task='stabilize2',
             # reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
-            reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.0},
+            # reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.0, 'rotation': 0.05},
+            reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.01, 'rotation': 0.5},
             episode_len_sec=self.episode_len,
             max_rpm=66535,
-            initial_xyzs=initial_xyzs, # Far from the ground
+            initial_xyzs=np.array(initial_xyzs), # Far from the ground
             freq=200,
             rpy_noise=rpy_noise,
             vel_noise=vel_noise,
