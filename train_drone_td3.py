@@ -47,7 +47,8 @@ hparam_set = {
     "q_lr": [1e-3],
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
-    "her_length": [400]
+    "max_steps": [100],
+    "her_length": [100]
 }
 
 def train(args, hparam):
@@ -58,7 +59,7 @@ def train(args, hparam):
 
     max_episodes  = int(2e5)
     hidden_dim = hparam['hidden_dim']
-    max_steps = 400
+    max_steps = hparam['max_steps']
     eval_max_steps = 500
     goal_dim = hparam['goal_dim']
     param_num = hparam['param_num']
@@ -72,7 +73,7 @@ def train(args, hparam):
 
     batch_size  = 64 if args.rnn != "None" else 64 * max_steps
     nenvs = 1
-    explore_noise_scale_init = 0.5
+    explore_noise_scale_init = 0.25
     eval_noise_scale_init = 0.25
     explore_noise_scale = explore_noise_scale_init
     eval_noise_scale = eval_noise_scale_init
