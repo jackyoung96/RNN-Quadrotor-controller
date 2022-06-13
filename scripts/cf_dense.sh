@@ -1,5 +1,4 @@
-python train_drone_td3.py --rnn GRUHER --tb_log --reward_norm --her_gamma 1 --seed 0 --gpu $1
-python train_drone_td3.py --rnn GRUHER --tb_log --reward_norm --her_gamma 1 --seed 1 --gpu $1
-python train_drone_td3.py --rnn GRUHER --tb_log --reward_norm --her_gamma 1 --seed 2 --gpu $1
-python train_drone_td3.py --rnn GRUHER --tb_log --reward_norm --her_gamma 1 --seed 3 --gpu $1
-python train_drone_td3.py --rnn GRUHER --tb_log --reward_norm --her_gamma 1 --seed 4 --gpu $1
+for s in {0..4}
+do
+    python train_drone_td3.py --rnn LSTM2 --tb_log --reward_norm --seed $s --gpu $1
+done

@@ -80,12 +80,12 @@ class TD3_Trainer():
 
         return target_net
 
-    def get_action(self, state, **kwargs):
+    def get_action(self, state, last_action, **kwargs):
         if not self.is_behavior:
-            return self.policy_net.get_action(state, **kwargs)
+            return self.policy_net.get_action(state, last_action, **kwargs)
         else:
             # kwargs['explore_noise_scale'] = 0.0
-            return self.behavior_net.get_action(state, **kwargs)
+            return self.behavior_net.get_action(state, last_action, **kwargs)
     
     def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99,soft_tau=1e-3):
         state, action, reward, next_state, done = self.replay_buffer.sample(batch_size)

@@ -103,7 +103,7 @@ class PolicyNetwork(PolicyNetworkBase):
         return action, log_prob, z, mean, std
         
     
-    def get_action(self, state, deterministic, explore_noise_scale):
+    def get_action(self, state, last_action, deterministic, explore_noise_scale):
         '''
         generate action for interaction with env
         '''
@@ -119,6 +119,8 @@ class PolicyNetwork(PolicyNetworkBase):
         ''' add noise '''
         noise = normal.sample(action.shape) * explore_noise_scale
         action = action + noise.numpy()
+
+        action = 4*(1/200)/0.15 * (action-last_action) + last_action
 
         return action
 
@@ -232,6 +234,9 @@ class PolicyNetworkRNN(PolicyNetworkBase):
         ''' add noise '''
         noise = normal.sample(action.shape) * explore_noise_scale
         action = action + noise.numpy()
+
+        last_action = last_action.detach().cpu().numpy()
+        action = 4*(1/200)/0.15 * (action-last_action) + last_action
 
         return action, hidden_out
 
@@ -383,6 +388,9 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         action = action + noise.numpy()
         action = np.clip(action,-1,1)
         self.train()
+
+        last_action = last_action.detach().cpu().numpy()
+        action = 4*(1/200)/0.15 * (action-last_action) + last_action
 
         return action, hidden_out
 

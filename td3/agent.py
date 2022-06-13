@@ -46,6 +46,14 @@ def td3_agent(env,
         replay_buffer = SingleHindsightReplayBufferRNN(replay_buffer_size,
                             env=env.env_name,
                             **hparam)
+        td3_trainer = TD3sHERRNN_Trainer(replay_buffer,
+                    env.env.observation_space, 
+                    env.env.action_space, 
+                    rnn_type=rnn,
+                    out_actf=F.tanh,
+                    action_scale=1.0 if 'aviary' in env.env_name else 10.0,
+                    device=device, 
+                    **hparam)
     elif rnn == "None":
         replay_buffer = ReplayBuffer(replay_buffer_size, **hparam)
         td3_trainer = TD3_Trainer(replay_buffer,

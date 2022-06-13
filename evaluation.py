@@ -514,10 +514,10 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
                 e_a = np.arccos(np.clip(unnormed_state[0,11], -1.0, 1.0)) # angle (rad)
                 e_ps.append(e_p)
                 e_as.append(e_a)
-                pos_achieve = e_p < np.linalg.norm([0.1]*3)
+                pos_achieve = e_p < 0.1
                 ang_achieve = e_a < np.deg2rad(10)
-                if hasattr(agent.q_net1, '_goal_dim'):
-                    reward = 0.0 if pos_achieve and ang_achieve else -1.0
+
+                reward = 0.0 if pos_achieve and ang_achieve else -1.0
 
                 # Success test
                 if pos_achieve and ang_achieve:
@@ -556,3 +556,4 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
             eval_success / test_itr, \
             eval_position / test_itr, \
             eval_angle / test_itr
+

@@ -213,7 +213,7 @@ class customAviary(gym.Wrapper):
                                 linearVelocity = vel.tolist(),\
                                 angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
-            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] + 0.3 * vel * (1 + np.random.uniform(-1.0,1.0,size=3))
+            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] + np.random.uniform(-1.0,1.0,size=3)
 
 
         for i in range(self.env.NUM_DRONES):
@@ -480,7 +480,6 @@ class customAviary(gym.Wrapper):
             Whether the current episode is done.
 
         """
-        state = self.env._getDroneStateVector(0)
         if self.step_counter/self.SIM_FREQ > self.EPISODE_LEN_SEC:
         # Alternative done condition, see PR #32
         # if (self.step_counter/self.SIM_FREQ > (self.EPISODE_LEN_SEC)) or ((self._getDroneStateVector(0))[2] < 0.05):
@@ -663,8 +662,7 @@ class domainRandomAviary(customAviary):
                                 angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
             self.goal_pos[i,:] = \
-                self.env.INIT_XYZS[i,:] + \
-                0.3 * vel *(1+np.random.uniform(-1.0,1.0,size=3)) if self.goal is None \
+                self.env.INIT_XYZS[i,:] + np.random.uniform(-1.0,1.0,size=3) if self.goal is None \
                                                                 else self.goal
 
 

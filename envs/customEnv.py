@@ -482,13 +482,13 @@ class dynRandeEnv:
         if self.task == 'stabilize':
             initial_xyzs = [[0.0,0.0,10000.0]]
             rpy_noise=np.pi/4
-            vel_noise=2.0
+            vel_noise=1.0
             angvel_noise=np.pi/2
             goal = None
         elif self.task == 'stabilize-record':
             initial_xyzs = [[0.0,0.0,1.5]]
             rpy_noise=np.pi/4
-            vel_noise=2.0
+            vel_noise=1.0
             angvel_noise=np.pi/2
             goal = None
         elif self.task == 'takeoff':
@@ -515,7 +515,7 @@ class dynRandeEnv:
             frame_stack=1,
             task='stabilize2',
             # reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
-            reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.002},
+            reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.0},
             episode_len_sec=self.episode_len,
             max_rpm=66535,
             initial_xyzs=initial_xyzs, # Far from the ground

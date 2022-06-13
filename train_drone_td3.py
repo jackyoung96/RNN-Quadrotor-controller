@@ -42,7 +42,7 @@ dyn_range = {
 hparam_set = {
     "goal_dim": [18],
     "param_num": [14],
-    "hidden_dim": [32],
+    "hidden_dim": [40],
 
     "q_lr": [1e-3],
     "policy_lr": [3e-4],
@@ -65,25 +65,25 @@ def train(args, hparam):
     her_history_length = hparam['her_length']
     her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
     policy_target_update_interval = hparam['policy_target_update_interval'] # delayed update for the policy network and target networks
-    epsilon_pos = np.sqrt(3*(0.1**2))/6 # 10 cm error
-    epsilon_ang = np.deg2rad(10) # 5 deg error
+    epsilon_pos = 0.05/6 # 5 cm error
+    epsilon_ang = np.deg2rad(10) # 10 deg error
     hparam.update({"epsilon_pos":epsilon_pos,
                    "epsilon_ang":epsilon_ang})
 
-    batch_size  = 128 if args.rnn != "None" else 128 * max_steps
-    nenvs = 2
-    explore_noise_scale_init = 0.25
+    batch_size  = 64 if args.rnn != "None" else 64 * max_steps
+    nenvs = 1
+    explore_noise_scale_init = 0.5
     eval_noise_scale_init = 0.25
     explore_noise_scale = explore_noise_scale_init
     eval_noise_scale = eval_noise_scale_init
     best_score = -np.inf
     frame_idx   = 0
     replay_buffer_size = 2e5 if args.rnn != "None" else 2e5 * max_steps
-    explore_episode = 500
+    explore_episode = 65
     update_itr = 2
-    writer_interval = 100
-    eval_freq = 1000
-    eval_itr = 50
+    writer_interval = 1000
+    eval_freq = 2000
+    eval_itr = 25
 
     DETERMINISTIC=True  # DDPG: deterministic policy gradient
     
@@ -126,8 +126,8 @@ def train(args, hparam):
     # Define environment and agent #####
     ####################################
 
-    envs = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=nenvs, dyn_range=dyn_range, episode_len=max_steps/200, seed=args.seed)
-    eval_env = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%seval"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=1, dyn_range=dyn_range, episode_len=max_steps/200, seed=args.seed+1234567)
+    envs = dynRandeEnv(env_name=env_name, obs_norm=False, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=nenvs, dyn_range=dyn_range, episode_len=max_steps/200, seed=args.seed)
+    eval_env = dynRandeEnv(env_name=env_name, obs_norm=False, tag="%s%s%seval"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=1, dyn_range=dyn_range, episode_len=max_steps/200, seed=args.seed+1234567)
     td3_trainer = td3_agent(env=envs,
                 rnn=args.rnn,
                 device=device,
@@ -147,7 +147,7 @@ def train(args, hparam):
         
         state, param = envs.reset()
         last_action = np.stack([envs.env.action_space.sample() for _ in range(nenvs)],axis=0).squeeze()
-        last_action = np.zeros_like(last_action)
+        last_action = -np.ones_like(last_action)[None,:]
         episode_state = []
         episode_action = []
         episode_last_action = []
@@ -178,10 +178,11 @@ def train(args, hparam):
             if args.rnn == "None":
                 action = \
                     td3_trainer.get_action(state, 
+                                            last_action,
                                             deterministic=DETERMINISTIC, 
                                             explore_noise_scale=explore_noise_scale)
                 hidden_in = hidden_out = None
-            elif "HER" in args.rnn:
+            elif args.rnn in ["RNNHER", "LSTMHER","GRUHER"]:
                 action, hidden_out = \
                         td3_trainer.get_action(state, 
                                     last_action, 
@@ -197,6 +198,7 @@ def train(args, hparam):
                                 deterministic=DETERMINISTIC, 
                                 explore_noise_scale=explore_noise_scale)
             next_state, reward, done, _ = envs.step(action) 
+
             episode_state.append(envs.unnormalize_obs(state))
             episode_action.append(action)
             episode_last_action.append(last_action)
@@ -209,7 +211,7 @@ def train(args, hparam):
             frame_idx += 1
         
         # Push into Experience replay buffer
-        if "HER" in args.rnn:
+        if args.rnn in ["RNNHER","LSTMHER","GRUHER"]:
             td3_trainer.replay_buffer.push_batch(episode_state, 
                             episode_action, 
                             episode_last_action,
@@ -315,18 +317,20 @@ def train(args, hparam):
         ### Model save #########################
         ########################################
 
-        if i_episode % 5000 == 0:
+        if i_episode % 2000 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
             td3_trainer.save_model(os.path.join(savepath,"iter%07d"%i_episode))
             envs.save(os.path.join(savepath,"iter%07d"%i_episode))
-            artifact = wandb.Artifact('agent-%s'%now, type='model')
-            artifact.add_dir(savepath+"/")
-            wandb.log_artifact(artifact)
 
         if np.mean(scores_window)>=best_score: 
             td3_trainer.save_model(os.path.join(savepath,"best"))
             envs.save(os.path.join(savepath,"best"))
             best_score = np.mean(scores_window)
+
+        if i_episode % 10000 == 0:
+            artifact = wandb.Artifact('agent-%s'%now, type='model')
+            artifact.add_dir(savepath+"/")
+            wandb.log_artifact(artifact)
         
     td3_trainer.save_model(os.path.join(savepath,"final"))
     print('\rFinal\tAverage Score: {:.2f}'.format(np.mean(scores_window)))
