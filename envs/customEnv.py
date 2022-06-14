@@ -482,13 +482,13 @@ class dynRandeEnv:
     def drone_env(self, idx):  
         if self.task == 'stabilize':
             initial_xyzs = [[0.0,0.0,10000.0]]
-            rpy_noise=np.pi/4
+            rpy_noise=np.pi
             vel_noise=1.0
             angvel_noise=np.pi/2
             goal = None
         elif self.task == 'stabilize-record':
             initial_xyzs = [[0.0,0.0,1.5]]
-            rpy_noise=np.pi/4
+            rpy_noise=np.pi
             vel_noise=1.0
             angvel_noise=np.pi/2
             goal = None
@@ -521,6 +521,7 @@ class dynRandeEnv:
             episode_len_sec=self.episode_len,
             max_rpm=66535,
             initial_xyzs=np.array(initial_xyzs), # Far from the ground
+            initial_rpys=np.array([[0.0,0.0,0.0]]),
             freq=200,
             rpy_noise=rpy_noise,
             vel_noise=vel_noise,
