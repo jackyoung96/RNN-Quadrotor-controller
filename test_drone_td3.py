@@ -38,12 +38,16 @@ class dummyEnv:
     def __init__(self, env, env_name, dyn_range):
         self.env = DummyVecEnv([lambda: env])
         self.env_name = env_name
+        self.last_action = -np.ones((4,))[None,:]
 
     def reset(self):
         param = self.env.envs[0].random_urdf()
+        self.last_action = -np.ones((4,))[None,:]
         return self.env.reset(), param[None,:]
 
     def step(self, action):
+        action = 4*(1/200)/0.15 * (action-self.last_action) + self.last_action
+        self.last_action = action
         return self.env.step(action)
     
     def close(self):
@@ -118,7 +122,7 @@ def main(hparam):
         frame_stack=1,
         task='stabilize2',
         # reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
-        reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.002},
+        reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.01, 'd_action':0.0, 'rotation': 0.5},
         episode_len_sec=max_steps/200,
         max_rpm=66535,
         initial_xyzs=waypoints[0][0], # Far from the ground
@@ -165,7 +169,7 @@ def main(hparam):
 
         last_action = env.env.action_space.sample()[None,:]
         last_action = -np.ones_like(last_action)
-        if 'LSTM' == hparam['rnn']:
+        if 'LSTM' in hparam['rnn']:
             hidden_out_zero = (torch.zeros([1, 1, hparam['hidden_dim']], dtype=torch.float).to(device), \
                         torch.zeros([1, 1, hparam['hidden_dim']], dtype=torch.float).to(device))
         else:
@@ -207,7 +211,7 @@ def main(hparam):
                                                     last_action,
                                                     deterministic=DETERMINISTIC, 
                                                     explore_noise_scale=0.0)
-            
+
             next_state, reward, done, _ = env.step(action) 
 
             # critic_test = agent.q_net1(torch.Tensor(state[None,:]).to(device), torch.Tensor(action[None,:]).to(device), torch.Tensor(param[None,:]).to(device), torch.Tensor(goal[None,:]).to(device)).detach().cpu().item()
@@ -233,7 +237,8 @@ def main(hparam):
             if not isinstance(action, np.ndarray):
                 action = np.array([action])
 
-            state, last_action = next_state, action
+            state = next_state
+            last_action = action
 
         eval_position = np.mean(e_ps)
         eval_angle = np.mean(e_as)
