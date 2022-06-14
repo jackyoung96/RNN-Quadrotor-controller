@@ -46,8 +46,8 @@ class dummyEnv:
         return self.env.reset(), param[None,:]
 
     def step(self, action):
-        action = 4*(1/200)/0.15 * (action-self.last_action) + self.last_action
-        self.last_action = action
+        # action = 4*(1/200)/0.15 * (action-self.last_action) + self.last_action
+        # self.last_action = action
         return self.env.step(action)
     
     def close(self):
@@ -58,12 +58,12 @@ def main(hparam):
     disp.start()
 
     env_name = "takeoff-aviary-v0"
-    max_steps = 100  # 8.5 sec
+    max_steps = 400  # 8.5 sec
 
     device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Device:",device)
 
-    if hparam['task'] == 'random':
+    if 'random' in hparam['task']:
         dyn_range = {
             # drones
             'mass_range': 0.3, # (1-n) ~ (1+n)
@@ -73,43 +73,47 @@ def main(hparam):
             'i_range': 0.3,
             'battery_range': 0.3 # (1-n) ~ (1)
         }
-    elif hparam['task'] == 'normal':
+    elif 'normal' in hparam['task']:
         dyn_range = {}
     else:
         raise NotImplementedError
 
-    # waypoints = [
-    #     (np.array([[0,0,1.0]]),0), # (pos, time)
-    #     (np.array([[0.5,0,1.0]]),400),
-    #     # (np.array([[0.5,0.5,1.0]]),800),
-    #     # (np.array([[0,0.5,1.0]]),1200),
-    #     # (np.array([[0,0,1.0]]),1600)
-    # ]
-    waypoints = [
-        (np.array([[0,0,0.025]]),0),
-        (np.array([[0,0,1.025]]),400), # (pos, time)
-        # (np.array([[0.5,0,1.025]]),800),
-        # (np.array([[0,0,1.025]]),1200),
-        # (np.array([[0,0.5,1.025]]),1600),
-        # (np.array([[0,0,1.025]]),2000)
-    ]
-    waypoints = [
-        (np.array([[0,0,2.025]]),0),
-        (np.array([[0,0,2.3]]),400), # (pos, time)
-        # (np.array([[0.5,0,1.025]]),800),
-        # (np.array([[0,0,1.025]]),1200),
-        # (np.array([[0,0.5,1.025]]),1600),
-        # (np.array([[0,0,1.025]]),2000)
-    ]
+    if 'waypoint' in hparam['task']:
+        waypoints = [
+            (np.array([[0,  0,  0.025]]),0),
+            (np.array([[0,  0,  1.025]]),400), # (pos, time)
+            (np.array([[0.5,0,  1.025]]),800),
+            (np.array([[0.5,0.5,1.025]]),1200),
+            (np.array([[0,  0.5,1.025]]),1600),
+            (np.array([[0,  0,  1.025]]),2000)
+        ]
+        theta = np.random.uniform(0,2*np.pi)
+        initial_rpys = np.array([[0.0,0.0,theta]])
+        rpy_noise = 0
+        vel_noise = 0
+        angvel_noise = 0
+        max_steps = waypoints[-1][1]
+    elif 'stabilizing' in hparam['task']:
+        waypoints = [
+            (np.array([[0,  0,  10000.0]]),0),
+            (None, 500), # (pos, time)
+        ]
+        initial_rpys = np.random.uniform(-np.pi, np.pi, size=(1,3))
+        rpy_noise = np.pi
+        vel_noise = 1.0
+        angvel_noise = np.pi/2
+        max_steps = waypoints[-1][1]
+    else:
+        raise NotImplementedError
 
-    # max_steps = waypoints[-1][1]
+    
 
     # Define environment
     theta = np.random.uniform(0,2*np.pi)
     env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
         drone_model=DroneModel.CF2X,
         initial_xyzs=waypoints[0][0],
-        initial_rpys=np.array([[0.0,0.0,theta]]),
+        initial_rpys=initial_rpys,
         physics=Physics.PYB_GND_DRAG_DW,
         freq=200,
         aggregate_phy_steps=1,
@@ -121,16 +125,15 @@ def main(hparam):
         observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
         frame_stack=1,
         task='stabilize2',
-        # reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
-        reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.01, 'd_action':0.0, 'rotation': 0.5},
+        reward_coeff={'pos':0.0, 'vel':0.0, 'ang_vel':0.0, 'd_action':0.0, 'rotation': 0.0},
         episode_len_sec=max_steps/200,
         max_rpm=66535,
         initial_xyzs=waypoints[0][0], # Far from the ground
-        initial_rpys=np.array([[0.0,0.0,theta]]),
+        initial_rpys=initial_rpys,
         freq=200,
-        rpy_noise=0,
-        vel_noise=0,
-        angvel_noise=0,
+        rpy_noise=rpy_noise,
+        vel_noise=vel_noise,
+        angvel_noise=angvel_noise,
         mass_range=dyn_range.get('mass_range', 0.0),
         cm_range=dyn_range.get('cm_range', 0.0),
         kf_range=dyn_range.get('kf_range', 0.0),
@@ -240,10 +243,11 @@ def main(hparam):
             state = next_state
             last_action = action
 
+
         eval_position = np.mean(e_ps)
         eval_angle = np.mean(e_as)
         
-        if e_p < np.linalg.norm([0.1,0.1,0.1]) and e_a < 10:
+        if np.sum(np.where(np.array(e_as) < 10, 1, 0)[-100:]) == 100: 
             eval_success = 1
 
     drone_state_buffer.to_csv('paperworks/%s.csv'%(hparam['rnn']+hparam['task']), header=False)
@@ -264,14 +268,16 @@ if __name__ == '__main__':
                                             'RNNsHER','GRUsHER','LSTMsHER']
                                 , default='None', help='Use memory network (LSTM)')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
-    parser.add_argument('--task', default='normal',choices=['randomize', 'normal'],
-                        help='For takeoff-aviary-v0 environment')
+    parser.add_argument('--task', default='normal-waypoint',
+                                  choices=['normal-waypoint','random-waypoint',
+                                            'normal-stabilize','random-stabilize'],
+                                  help='For takeoff-aviary-v0 environment')
     args = parser.parse_args()
 
     hparam = {
         "goal_dim": 18,
         "param_num": 14,
-        "hidden_dim": 128,
+        "hidden_dim": 40,
         "policy_actf": F.tanh,
     }
     hparam.update(vars(args))
