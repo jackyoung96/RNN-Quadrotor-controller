@@ -701,10 +701,14 @@ class TD3sHERRNN_Trainer(TD3RNN_Trainer):
         self.state_space, self.action_space, self.param_num, self.hidden_dim = \
             state_space, action_space, param_num, hidden_dim
 
-        self.q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
-        self.q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
-        self.target_q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
-        self.target_q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        # self.q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        # self.q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        # self.target_q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        # self.target_q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        self.q_net1 = QNetworkParam(state_space, action_space, param_num, 128).to(self.device)
+        self.q_net2 = QNetworkParam(state_space, action_space, param_num, 128).to(self.device)
+        self.target_q_net1 = QNetworkParam(state_space, action_space, param_num, 128).to(self.device)
+        self.target_q_net2 = QNetworkParam(state_space, action_space, param_num, 128).to(self.device)
         if 'RNN' in self.rnn_type:
             policy = PolicyNetworkRNN
         elif 'LSTM' in self.rnn_type:
