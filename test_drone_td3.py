@@ -282,7 +282,7 @@ if __name__ == '__main__':
     hparam = {
         "goal_dim": 18,
         "param_num": 14,
-        "hidden_dim": 32,
+        "hidden_dim": 48,
         "policy_actf": F.tanh,
     }
     hparam.update(vars(args))
