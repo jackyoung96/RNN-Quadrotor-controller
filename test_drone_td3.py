@@ -1,4 +1,3 @@
-from re import I
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -46,21 +45,25 @@ class dummyEnv:
         return self.env.reset(), param[None,:]
 
     def step(self, action):
-        # action = 4*(1/200)/0.15 * (action-self.last_action) + self.last_action
-        # self.last_action = action
+        action = 4*(1/200)/0.15 * (action-self.last_action) + self.last_action
+        self.last_action = action
         return self.env.step(action)
+
+    def render(self):
+        return self.env.render()
     
     def close(self):
         self.env.close()
 
 def main(hparam):
-    disp = Display(visible=False, size=(100, 60))
-    disp.start()
+    # disp = Display(visible=False, size=(100, 60))
+    # disp.start()
 
     env_name = "takeoff-aviary-v0"
     max_steps = 400  # 8.5 sec
 
-    device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     print("Device:",device)
 
     if 'random' in hparam['task']:
@@ -93,12 +96,12 @@ def main(hparam):
         vel_noise = 0
         angvel_noise = 0
         max_steps = waypoints[-1][1]
-    elif 'stabilizing' in hparam['task']:
+    elif 'stabilize' in hparam['task']:
         waypoints = [
-            (np.array([[0,  0,  10000.0]]),0),
-            (None, 500), # (pos, time)
+            (np.array([[0,  0,  1.0]]),0),
+            (None, 300), # (pos, time)
         ]
-        initial_rpys = np.random.uniform(-np.pi, np.pi, size=(1,3))
+        initial_rpys = np.random.uniform(-np.pi/4, np.pi/4, size=(1,3))
         rpy_noise = np.pi
         vel_noise = 1.0
         angvel_noise = np.pi/2
@@ -109,7 +112,7 @@ def main(hparam):
     
 
     # Define environment
-    theta = np.random.uniform(0,2*np.pi)
+    theta = np.random.uniform(0,0)
     env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
         drone_model=DroneModel.CF2X,
         initial_xyzs=waypoints[0][0],
@@ -117,7 +120,7 @@ def main(hparam):
         physics=Physics.PYB_GND_DRAG_DW,
         freq=200,
         aggregate_phy_steps=1,
-        gui=False,
+        gui=True,
         record=False,
         obs=ObservationType.KIN,
         act=ActionType.RPM)
@@ -187,7 +190,7 @@ def main(hparam):
 
         for i_step in range(max_steps):
             goal_pos = getgoal(waypoints, i_step)
-            if np.any(env.env.envs[0].goal_pos-goal_pos):
+            if goal_pos is not None and np.any(env.env.envs[0].goal_pos-goal_pos):
                 env.env.envs[0].goal_pos = goal_pos
                 hidden_out = hidden_out_zero
                 last_action = -np.ones_like(last_action)
@@ -216,6 +219,8 @@ def main(hparam):
                                                     explore_noise_scale=0.0)
 
             next_state, reward, done, _ = env.step(action) 
+            env.render()
+            input()
 
             # critic_test = agent.q_net1(torch.Tensor(state[None,:]).to(device), torch.Tensor(action[None,:]).to(device), torch.Tensor(param[None,:]).to(device), torch.Tensor(goal[None,:]).to(device)).detach().cpu().item()
             # critic_buffer.append(critic_test)
@@ -257,7 +262,7 @@ def main(hparam):
 
     print("EVALUATION ANGVEL ERROR[deg/s]:", np.linalg.norm((2*180*np.stack(state_buffer)[:,:,15:18]), axis=-1).mean())
 
-    disp.stop()
+    # disp.stop()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -277,7 +282,7 @@ if __name__ == '__main__':
     hparam = {
         "goal_dim": 18,
         "param_num": 14,
-        "hidden_dim": 40,
+        "hidden_dim": 128,
         "policy_actf": F.tanh,
     }
     hparam.update(vars(args))
