@@ -39,9 +39,6 @@ dyn_range = {
     'i_range': 0.3,
     'battery_range': 0.3 # (1-n) ~ (1)
 }
-dyn_range = {
-    
-}
 hparam_set = {
     "goal_dim": [18],
     "param_num": [14],
