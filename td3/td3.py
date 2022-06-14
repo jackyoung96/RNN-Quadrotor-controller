@@ -25,7 +25,7 @@ from time import time
 
 
 class TD3_Trainer():
-    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, action_scale=1.0,out_actf=None, device='cpu', policy_target_update_interval=1,**kwargs):
+    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, action_scale=1.0,out_actf=None, device='cpu', policy_target_update_interval=2,**kwargs):
         self.replay_buffer = replay_buffer
         self.device = device
 
@@ -64,7 +64,7 @@ class TD3_Trainer():
             # self.scheduler_policy = CosineAnnealingLR(self.policy_optimizer, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
             self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=policy_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
-        self.reward_norm = kwargs.get('reward_norm', True)
+        self.reward_norm = kwargs.get('reward_norm', False)
 
     def target_ini(self, net, target_net):
         for target_param, param in zip(target_net.parameters(), net.parameters()):
@@ -171,7 +171,7 @@ class TD3_Trainer():
 
 
 class TD3RNN_Trainer():
-    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, rnn_type='RNN', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
+    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, rnn_type='RNN', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=2, **kwargs):
         self.replay_buffer = replay_buffer
         self.device = device
         self.hidden_dim = hidden_dim
@@ -223,7 +223,7 @@ class TD3RNN_Trainer():
             # self.scheduler_policy = CosineAnnealingLR(self.policy_optimizer, T_max=t_max, eta_min=0, last_epoch=-1, verbose=False)
             self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=policy_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
     
-        self.reward_norm = kwargs.get('reward_norm', True)
+        self.reward_norm = kwargs.get('reward_norm', False)
 
     def target_ini(self, net, target_net):
         for target_param, param in zip(target_net.parameters(), net.parameters()):
@@ -342,7 +342,7 @@ class TD3RNN_Trainer():
 
 
 class TD3RNN_Trainer2(TD3RNN_Trainer):
-    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN2', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
+    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN2', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=2, **kwargs):
         super().__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.strip('2'), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
         self.q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
         self.q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
@@ -441,7 +441,7 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
                 }
 
 class TD3RNN_Trainer3(TD3RNN_Trainer):
-    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN3', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
+    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN3', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=2, **kwargs):
         super(TD3RNN_Trainer3, self).__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.strip('3'), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
         if 'RNN' in self.rnn_type:
             self.q_net1 = QNetworkRNNParam(state_space, action_space, hidden_dim, param_num).to(self.device)
@@ -476,7 +476,7 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
             self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
             self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
-        self.reward_norm = kwargs.get('reward_norm', True)
+        self.reward_norm = kwargs.get('reward_norm', False)
 
     def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99, soft_tau=1e-3):
         state, action, last_action, reward, next_state, done, param = self.replay_buffer.sample(batch_size)
@@ -552,7 +552,7 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
                 }
 
 class TD3HERRNN_Trainer(TD3RNN_Trainer):
-    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, goal_dim, rnn_type='RNN', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
+    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, goal_dim, rnn_type='RNN', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=2, **kwargs):
         super().__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.replace('sHER','').replace('HER',''), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
         self.state_space, self.action_space, self.param_num, self.hidden_dim, self.goal_dim = \
             state_space, action_space, param_num, hidden_dim, goal_dim
@@ -568,7 +568,7 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
             policy = PolicyNetworkGoalLSTM
         elif 'GRU' in self.rnn_type:
             policy = PolicyNetworkGoalGRU
-        policy_actf = kwargs.get('policy_actf', F.relu)
+        policy_actf = kwargs.get('policy_actf', F.tanh)
         self.policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
         self.target_policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
         self.behavior_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
@@ -595,7 +595,7 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
             # self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=self.policy_lr, step_size_up=self.t_max//self.policy_target_update_interval, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
         self.use_her = kwargs.get('use_her', True)
-        self.reward_norm = kwargs.get('reward_norm', True)
+        self.reward_norm = kwargs.get('reward_norm', False)
 
     def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99, soft_tau=5e-3):
         if self.use_her:
@@ -680,7 +680,7 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
                 }
 
 class TD3sHERRNN_Trainer(TD3RNN_Trainer):
-    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=1, **kwargs):
+    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=2, **kwargs):
         super().__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.replace('sHER',''), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
         self.state_space, self.action_space, self.param_num, self.hidden_dim = \
             state_space, action_space, param_num, hidden_dim
@@ -722,7 +722,7 @@ class TD3sHERRNN_Trainer(TD3RNN_Trainer):
             # self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=self.policy_lr, step_size_up=self.t_max//self.policy_target_update_interval, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
         self.use_her = kwargs.get('use_her', True)
-        self.reward_norm = kwargs.get('reward_norm', True)
+        self.reward_norm = kwargs.get('reward_norm', False)
 
     def update(self, batch_size, norm_ftn, deterministic, eval_noise_scale, gamma=0.99, soft_tau=5e-3):
         if self.use_her:

@@ -57,7 +57,7 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(2e5)
+    max_episodes  = int(1e5)
     hidden_dim = hparam['hidden_dim']
     max_steps = hparam['max_steps']
     eval_max_steps = 500
@@ -73,8 +73,8 @@ def train(args, hparam):
 
     batch_size  = 64 if args.rnn != "None" else 64 * max_steps
     nenvs = 1
-    explore_noise_scale_init = 0.5
-    eval_noise_scale_init = 0.5
+    explore_noise_scale_init = 0.25
+    eval_noise_scale_init = 0.25
     explore_noise_scale = explore_noise_scale_init
     eval_noise_scale = eval_noise_scale_init
     best_score = -np.inf
