@@ -192,8 +192,8 @@ def main(hparam):
             goal_pos = getgoal(waypoints, i_step)
             if goal_pos is not None and np.any(env.env.envs[0].goal_pos-goal_pos):
                 env.env.envs[0].goal_pos = goal_pos
-                hidden_out = hidden_out_zero
-                last_action = -np.ones_like(last_action)
+                # hidden_out = hidden_out_zero
+                # last_action = -np.ones_like(last_action)
 
             if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                 hidden_in = hidden_out
@@ -282,7 +282,7 @@ if __name__ == '__main__':
     hparam = {
         "goal_dim": 18,
         "param_num": 14,
-        "hidden_dim": 128,
+        "hidden_dim": 32,
         "policy_actf": F.tanh,
     }
     hparam.update(vars(args))
