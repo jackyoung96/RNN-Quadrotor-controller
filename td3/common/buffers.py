@@ -109,7 +109,7 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
         self.gamma = kwargs.get("her_gamma", 0.0)
         self.her = True if self.gamma != 1.0 else False
         self.history_length = kwargs.get("her_length", 100)
-        self.epsilon_pos = kwargs.get("epsilon_pos", np.linalg.norm([0.1]*3)/6)
+        self.epsilon_pos = kwargs.get("epsilon_pos", 0.1/6)
         self.epsilon_ang = kwargs.get("epsilon_ang", np.deg2rad(10))
         self.env_name = env_name
         if not self.env_name in ['takeoff-aviary-v0', 'Pendulum-v0']:
@@ -188,7 +188,7 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
         self.gamma = kwargs.get("her_gamma", 0.0)
         self.her = True if self.gamma != 1.0 else False
         self.history_length = kwargs.get("her_length", 100)
-        self.epsilon_pos = kwargs.get("epsilon_pos", np.linalg.norm([0.1]*3)/6)
+        self.epsilon_pos = kwargs.get("epsilon_pos", 0.1/6)
         self.epsilon_ang = kwargs.get("epsilon_ang", np.deg2rad(10))
         self.env_name = env_name
         if not self.env_name in ['takeoff-aviary-v0', 'Pendulum-v0']:

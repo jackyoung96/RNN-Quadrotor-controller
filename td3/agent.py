@@ -16,7 +16,7 @@ def td3_agent(env,
                     env.env.action_space, 
                     rnn_type=rnn,
                     out_actf=F.tanh,
-                    action_scale=1.0 if 'aviary' in env.env.env_name else 10.0,
+                    action_scale=1.0 if 'aviary' in env.env_name else 10.0,
                     device=device, 
                     **hparam)
     elif rnn in ["RNN3", "LSTM3", "GRU3"]:
@@ -26,7 +26,7 @@ def td3_agent(env,
                     env.env.action_space, 
                     rnn_type=rnn,
                     out_actf=F.tanh,
-                    action_scale=1.0 if 'aviary' in env.env.env_name else 10.0,
+                    action_scale=1.0 if 'aviary' in env.env_name else 10.0,
                     device=device, 
                     **hparam)
     elif rnn in ["RNNHER", "LSTMHER", "GRUHER"]:
