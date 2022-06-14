@@ -650,7 +650,7 @@ class domainRandomAviary(customAviary):
         init_rpys = []
         for i in range(self.env.NUM_DRONES):
             init_rpy = self.env.INIT_RPYS[i,:] + self.rpy_noise*np.random.uniform(-1.0,1.0,self.env.INIT_RPYS[i,:].shape)
-            init_rpy[-1] = init_rpy[-1] + np.random.uniform(-np.pi, np.pi) # random yaw
+            # init_rpy[-1] = init_rpy[-1] + np.random.uniform(-np.pi, np.pi) # random yaw
             init_rpys.append(init_rpy)
         self.env.DRONE_IDS = np.array([p.loadURDF(os.path.dirname(os.path.abspath(__file__))+"/assets/"+self.URDF,
                                               self.env.INIT_XYZS[i,:],

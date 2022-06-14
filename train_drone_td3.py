@@ -73,8 +73,8 @@ def train(args, hparam):
 
     batch_size  = 64 if args.rnn != "None" else 64 * max_steps
     nenvs = 1
-    explore_noise_scale_init = 0.25
-    eval_noise_scale_init = 0.25
+    explore_noise_scale_init = 0.5
+    eval_noise_scale_init = 0.5
     explore_noise_scale = explore_noise_scale_init
     eval_noise_scale = eval_noise_scale_init
     best_score = -np.inf
@@ -353,9 +353,6 @@ def test(args, hparam):
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     print("Device:",device)
-
-    if not os.path.isdir(os.path.split(args.path)[0]):
-        wandb_artifact("TD3-drone-final", args.path.split('/')[1])
 
     # Define environment
     eval_env = dynRandeEnv(env_name=env_name, 
