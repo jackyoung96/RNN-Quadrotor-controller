@@ -48,7 +48,7 @@ hparam_set = {
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
     "max_steps": [200],
-    "her_length": [50]
+    "her_length": [200]
 }
 
 def train(args, hparam):
