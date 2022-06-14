@@ -93,7 +93,7 @@ def main(hparam):
         vel_noise = 0
         angvel_noise = 0
         max_steps = waypoints[-1][1]
-    elif 'stabilizing' in hparam['task']:
+    elif 'stabilize' in hparam['task']:
         waypoints = [
             (np.array([[0,  0,  10000.0]]),0),
             (None, 500), # (pos, time)
@@ -187,10 +187,10 @@ def main(hparam):
 
         for i_step in range(max_steps):
             goal_pos = getgoal(waypoints, i_step)
-            if np.any(env.env.envs[0].goal_pos-goal_pos):
+            if goal_pos is not None and np.any(env.env.envs[0].goal_pos-goal_pos):
                 env.env.envs[0].goal_pos = goal_pos
-                hidden_out = hidden_out_zero
-                last_action = -np.ones_like(last_action)
+                # hidden_out = hidden_out_zero
+                # last_action = -np.ones_like(last_action)
 
             if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                 hidden_in = hidden_out
@@ -277,7 +277,7 @@ if __name__ == '__main__':
     hparam = {
         "goal_dim": 18,
         "param_num": 14,
-        "hidden_dim": 40,
+        "hidden_dim": 32,
         "policy_actf": F.tanh,
     }
     hparam.update(vars(args))

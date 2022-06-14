@@ -34,21 +34,21 @@ dyn_range = {
     # drones
     'mass_range': 0.3, # (1-n) ~ (1+n)
     'cm_range': 0.3, # (1-n) ~ (1+n)
-    'kf_range': 0.3, # (1-n) ~ (1+n)
-    'km_range': 0.3, # (1-n) ~ (1+n)
+    'kf_range': 0.05, # (1-n) ~ (1+n)
+    'km_range': 0.05, # (1-n) ~ (1+n)
     'i_range': 0.3,
     'battery_range': 0.3 # (1-n) ~ (1)
 }
 hparam_set = {
     "goal_dim": [18],
     "param_num": [14],
-    "hidden_dim": [40],
+    "hidden_dim": [48],
 
     "q_lr": [1e-3],
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
     "max_steps": [200],
-    "her_length": [200]
+    "her_length": [50]
 }
 
 def train(args, hparam):
@@ -57,10 +57,10 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(1e5)
+    max_episodes  = int(2e5)
     hidden_dim = hparam['hidden_dim']
     max_steps = hparam['max_steps']
-    eval_max_steps = 500
+    eval_max_steps = 300
     goal_dim = hparam['goal_dim']
     param_num = hparam['param_num']
     her_history_length = hparam['her_length']
@@ -80,7 +80,7 @@ def train(args, hparam):
     best_score = -np.inf
     frame_idx   = 0
     replay_buffer_size = 2e5 if args.rnn != "None" else 2e5 * max_steps
-    explore_episode = 65
+    explore_episode = 1000
     update_itr = 2
     writer_interval = 200
     eval_freq = 2000
