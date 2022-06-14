@@ -217,7 +217,7 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
                 else:
                     reward = (1-self.gamma)*np.where(pos_achieve, ang_value-1, -1.0)+self.gamma*reward
                 
-                done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
+                done = np.where(pos_achieve , 1.0, 0.0)
 
             elif self.env_name == 'Pendulum-v0':
                 theta = np.arctan2(next_state[:,1:2],next_state[:,0:1])
