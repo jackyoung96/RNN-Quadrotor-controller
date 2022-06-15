@@ -34,21 +34,21 @@ dyn_range = {
     # drones
     'mass_range': 0.3, # (1-n) ~ (1+n)
     'cm_range': 0.3, # (1-n) ~ (1+n)
-    'kf_range': 0.3, # (1-n) ~ (1+n)
-    'km_range': 0.3, # (1-n) ~ (1+n)
+    'kf_range': 0.05, # (1-n) ~ (1+n)
+    'km_range': 0.05, # (1-n) ~ (1+n)
     'i_range': 0.3,
     'battery_range': 0.3 # (1-n) ~ (1)
 }
 hparam_set = {
     "goal_dim": [18],
     "param_num": [14],
-    "hidden_dim": [40],
+    "hidden_dim": [48],
 
     "q_lr": [1e-3],
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
-    "max_steps": [400],
-    "her_length": [400]
+    "max_steps": [200],
+    "her_length": [200]
 }
 
 def train(args, hparam):
@@ -57,10 +57,10 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(1e5)
+    max_episodes  = int(2e5)
     hidden_dim = hparam['hidden_dim']
     max_steps = hparam['max_steps']
-    eval_max_steps = 500
+    eval_max_steps = 300
     goal_dim = hparam['goal_dim']
     param_num = hparam['param_num']
     her_history_length = hparam['her_length']
@@ -289,7 +289,8 @@ def train(args, hparam):
                 wandb.log({'loss/position[m]': np.linalg.norm((6*np.stack(unnormed_state)[:,:,:3]), axis=-1).mean(),
                         'loss/velocity[m_s]': np.linalg.norm((3*np.stack(unnormed_state)[:,:,12:15]), axis=-1).mean(),
                         'loss/ang_velocity[deg_s]': np.linalg.norm((2*180*np.stack(unnormed_state)[:,:,15:18]), axis=-1).mean(),
-                        'loss/angle[deg]': 180/np.pi*np.arccos(np.clip(np.stack(unnormed_state)[:,:,11].flatten(),-1.0,1.0)).mean()},
+                        'loss/angle[deg]': 180/np.pi*np.arccos(np.clip(np.stack(unnormed_state)[:,:,11].flatten(),-1.0,1.0)).mean(),
+                        'loss/rpm': np.linalg.norm((1+np.stack(unnormed_state)[:,:,-4:])/2, axis=-1).mean()},
                          step=i_episode)
                 
 

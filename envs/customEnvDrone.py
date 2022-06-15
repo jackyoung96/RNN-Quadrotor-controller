@@ -198,7 +198,7 @@ class customAviary(gym.Wrapper):
         init_rpys = []
         for i in range(self.env.NUM_DRONES):
             init_rpy = self.env.INIT_RPYS[i,:] + self.rpy_noise*np.random.uniform(-1.0,1.0,self.env.INIT_RPYS[i,:].shape)
-            init_rpy[i,-1] = init_rpy[i,-1] + np.random.uniform(-np.pi, np.pi) # random yaw
+            # init_rpy[i,-1] = init_rpy[i,-1] + np.random.uniform(-np.pi, np.pi) # random yaw
             init_rpys.append(init_rpy)
         self.env.DRONE_IDS = np.array([p.loadURDF(os.path.dirname(os.path.abspath(__file__))+"/../../../gym_pybullet_drones/assets/"+self.env.URDF,
                                               self.env.INIT_XYZS[i,:],
@@ -213,7 +213,7 @@ class customAviary(gym.Wrapper):
                                 linearVelocity = vel.tolist(),\
                                 angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
-            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] + np.random.uniform(-1.0,1.0,size=3)
+            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:]+ 0.3 * vel * (1 + np.random.uniform(-1.0,1.0,size=3))
 
 
         for i in range(self.env.NUM_DRONES):
@@ -666,7 +666,7 @@ class domainRandomAviary(customAviary):
                                 angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
             self.goal_pos[i,:] = \
-                self.env.INIT_XYZS[i,:] + np.random.uniform(-1.0,1.0,size=3) if self.goal is None \
+                self.env.INIT_XYZS[i,:] + 0.3 * vel * (1 + np.random.uniform(-1.0,1.0,size=3)) if self.goal is None \
                                                                 else self.goal
 
 

@@ -29,10 +29,14 @@ class TD3_Trainer():
         self.replay_buffer = replay_buffer
         self.device = device
 
-        self.q_net1 = QNetwork(state_space, action_space, hidden_dim).to(self.device)
-        self.q_net2 = QNetwork(state_space, action_space, hidden_dim).to(self.device)
-        self.target_q_net1 = QNetwork(state_space, action_space, hidden_dim).to(self.device)
-        self.target_q_net2 = QNetwork(state_space, action_space, hidden_dim).to(self.device)
+        # self.q_net1 = QNetwork(state_space, action_space, hidden_dim).to(self.device)
+        # self.q_net2 = QNetwork(state_space, action_space, hidden_dim).to(self.device)
+        # self.target_q_net1 = QNetwork(state_space, action_space, hidden_dim).to(self.device)
+        # self.target_q_net2 = QNetwork(state_space, action_space, hidden_dim).to(self.device)
+        self.q_net1 = QNetwork(state_space, action_space, 128).to(self.device)
+        self.q_net2 = QNetwork(state_space, action_space, 128).to(self.device)
+        self.target_q_net1 = QNetwork(state_space, action_space, 128).to(self.device)
+        self.target_q_net2 = QNetwork(state_space, action_space, 128).to(self.device)
         policy_actf = kwargs.get('policy_actf', F.tanh)
         self.policy_net = PolicyNetwork(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
         self.target_policy_net = PolicyNetwork(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
@@ -119,13 +123,13 @@ class TD3_Trainer():
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()  
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
@@ -140,7 +144,7 @@ class TD3_Trainer():
 
             self.policy_optimizer.zero_grad()
             policy_loss.backward()
-            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
+            # nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
             self.policy_optimizer.step()
             if self.lr_scheduler:
                 self.scheduler_policy.step()
@@ -188,10 +192,14 @@ class TD3RNN_Trainer():
             policy = PolicyNetworkGRU
         else:
             assert NotImplementedError
-        self.q_net1 = qnet(state_space, action_space, hidden_dim).to(self.device)
-        self.q_net2 = qnet(state_space, action_space, hidden_dim).to(self.device)
-        self.target_q_net1 = qnet(state_space, action_space, hidden_dim).to(self.device)
-        self.target_q_net2 = qnet(state_space, action_space, hidden_dim).to(self.device)
+        # self.q_net1 = qnet(state_space, action_space, hidden_dim).to(self.device)
+        # self.q_net2 = qnet(state_space, action_space, hidden_dim).to(self.device)
+        # self.target_q_net1 = qnet(state_space, action_space, hidden_dim).to(self.device)
+        # self.target_q_net2 = qnet(state_space, action_space, hidden_dim).to(self.device)
+        self.q_net1 = qnet(state_space, action_space, 128).to(self.device)
+        self.q_net2 = qnet(state_space, action_space, 128).to(self.device)
+        self.target_q_net1 = qnet(state_space, action_space, 128).to(self.device)
+        self.target_q_net2 = qnet(state_space, action_space, 128).to(self.device)
         
         policy_actf = kwargs.get('policy_actf', F.tanh)
         self.policy_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
@@ -344,10 +352,14 @@ class TD3RNN_Trainer():
 class TD3RNN_Trainer2(TD3RNN_Trainer):
     def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN2', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=2, **kwargs):
         super().__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.strip('2'), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
-        self.q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
-        self.q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
-        self.target_q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
-        self.target_q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        # self.q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        # self.q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        # self.target_q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        # self.target_q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        self.q_net1 = QNetworkParam(state_space, action_space, param_num, 128).to(self.device)
+        self.q_net2 = QNetworkParam(state_space, action_space, param_num, 128).to(self.device)
+        self.target_q_net1 = QNetworkParam(state_space, action_space, param_num, 128).to(self.device)
+        self.target_q_net2 = QNetworkParam(state_space, action_space, param_num, 128).to(self.device)
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
@@ -405,13 +417,13 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
@@ -558,10 +570,14 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
             state_space, action_space, param_num, hidden_dim, goal_dim
 
         batchnorm = kwargs.get('batch_norm', False)
-        self.q_net1 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
-        self.q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
-        self.target_q_net1 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
-        self.target_q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
+        # self.q_net1 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
+        # self.q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
+        # self.target_q_net1 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
+        # self.target_q_net2 = QNetworkGoalParam(state_space, action_space, param_num, hidden_dim, goal_dim, batchnorm=batchnorm).to(self.device)
+        self.q_net1 = QNetworkGoalParam(state_space, action_space, param_num, 128, goal_dim, batchnorm=batchnorm).to(self.device)
+        self.q_net2 = QNetworkGoalParam(state_space, action_space, param_num, 128, goal_dim, batchnorm=batchnorm).to(self.device)
+        self.target_q_net1 = QNetworkGoalParam(state_space, action_space, param_num, 128, goal_dim, batchnorm=batchnorm).to(self.device)
+        self.target_q_net2 = QNetworkGoalParam(state_space, action_space, param_num, 128, goal_dim, batchnorm=batchnorm).to(self.device)
         if 'RNN' in self.rnn_type:
             policy = PolicyNetworkGoalRNN
         elif 'LSTM' in self.rnn_type:
@@ -641,13 +657,13 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
@@ -685,10 +701,14 @@ class TD3sHERRNN_Trainer(TD3RNN_Trainer):
         self.state_space, self.action_space, self.param_num, self.hidden_dim = \
             state_space, action_space, param_num, hidden_dim
 
-        self.q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
-        self.q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
-        self.target_q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
-        self.target_q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        # self.q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        # self.q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        # self.target_q_net1 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        # self.target_q_net2 = QNetworkParam(state_space, action_space, param_num, hidden_dim).to(self.device)
+        self.q_net1 = QNetworkParam(state_space, action_space, param_num, 128).to(self.device)
+        self.q_net2 = QNetworkParam(state_space, action_space, param_num, 128).to(self.device)
+        self.target_q_net1 = QNetworkParam(state_space, action_space, param_num, 128).to(self.device)
+        self.target_q_net2 = QNetworkParam(state_space, action_space, param_num, 128).to(self.device)
         if 'RNN' in self.rnn_type:
             policy = PolicyNetworkRNN
         elif 'LSTM' in self.rnn_type:
@@ -767,13 +787,13 @@ class TD3sHERRNN_Trainer(TD3RNN_Trainer):
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
