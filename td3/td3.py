@@ -123,13 +123,13 @@ class TD3_Trainer():
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()  
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
@@ -144,7 +144,7 @@ class TD3_Trainer():
 
             self.policy_optimizer.zero_grad()
             policy_loss.backward()
-            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
+            # nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
             self.policy_optimizer.step()
             if self.lr_scheduler:
                 self.scheduler_policy.step()
@@ -417,13 +417,13 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
@@ -657,13 +657,13 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
@@ -787,13 +787,13 @@ class TD3sHERRNN_Trainer(TD3RNN_Trainer):
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
