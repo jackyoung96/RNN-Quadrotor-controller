@@ -71,7 +71,7 @@ def train(args, hparam):
     hparam.update({"epsilon_pos":epsilon_pos,
                    "epsilon_ang":epsilon_ang})
 
-    batch_size  = 64 if args.rnn != "None" else 64 * max_steps
+    batch_size  = 128 if args.rnn != "None" else 128 * her_history_length
     nenvs = 1
     explore_noise_scale_init = 0.25
     eval_noise_scale_init = 0.25
@@ -350,7 +350,7 @@ def test(args, hparam):
         disp = Display(visible=False, size=(100, 60))
         disp.start()
     env_name = "takeoff-aviary-v0"
-    max_steps = 800
+    max_steps = 300
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     print("Device:",device)

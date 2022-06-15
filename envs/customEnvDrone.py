@@ -416,9 +416,9 @@ class customAviary(gym.Wrapper):
         elif self.task == 'stabilize2':
 
             coeff = {
-                'pos': self.reward_coeff['pos'], # 0~3
-                'vel': self.reward_coeff['vel'], # 10~13
-                'ang_vel': self.reward_coeff['ang_vel'], # 13~16
+                'pos': 6 * self.reward_coeff['pos'], # 0~3
+                'vel': 3 * self.reward_coeff['vel'], # 10~13
+                'ang_vel': 2*np.pi * self.reward_coeff['ang_vel'], # 13~16
                 'd_action': self.reward_coeff['d_action'], # 16~20
                 'rotation': self.reward_coeff['rotation']
             }
@@ -426,8 +426,7 @@ class customAviary(gym.Wrapper):
             vel = coeff['vel'] * np.linalg.norm(self._normalizeState(state[10:13],'vel'),ord=2)
             ang_vel = coeff['ang_vel'] * np.linalg.norm(self._normalizeState(state[13:16],'angular_vel'),ord=2)
             
-            r = R.from_quat(state[3:7])
-            rot = coeff['rotation'] * r.as_matrix().reshape((9,))[-1]
+            rot = coeff['rotation'] * self._normalizeState(state[3:7],'rotation')[-1]
             f_s = xyz + vel + ang_vel - rot
 
             d_action = coeff['d_action'] * np.linalg.norm(self._normalizeState(state[16:]-self.previous_state[16:],'rpm'),ord=2) if self.previous_state is not None else 0

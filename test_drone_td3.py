@@ -56,8 +56,8 @@ class dummyEnv:
         self.env.close()
 
 def main(hparam):
-    disp = Display(visible=False, size=(100, 60))
-    disp.start()
+    # disp = Display(visible=False, size=(100, 60))
+    # disp.start()
 
     env_name = "takeoff-aviary-v0"
     max_steps = 400  # 8.5 sec
@@ -84,7 +84,7 @@ def main(hparam):
     if 'waypoint' in hparam['task']:
         waypoints = [
             (np.array([[0,  0,  0.025]]),0),
-            (np.array([[0,  0,  1.025]]),400), # (pos, time)
+            (np.array([[0.5,  0,  1.025]]),400), # (pos, time)
             # (np.array([[0.5,0,  1.025]]),800),
             # (np.array([[0.5,0.5,1.025]]),1200),
             # (np.array([[0,  0.5,1.025]]),1600),
@@ -98,11 +98,11 @@ def main(hparam):
         max_steps = waypoints[-1][1]
     elif 'stabilize' in hparam['task']:
         waypoints = [
-            (np.array([[0,  0,  10000.0]]),0),
+            (np.array([[0,  0,  1.0]]),0),
             (None, 300), # (pos, time)
         ]
         initial_rpys = np.random.uniform(-np.pi, np.pi, size=(1,3))
-        rpy_noise = np.pi
+        rpy_noise = 180
         vel_noise = 1.0
         angvel_noise = np.pi/2
         max_steps = waypoints[-1][1]
@@ -118,7 +118,7 @@ def main(hparam):
         physics=Physics.PYB_GND_DRAG_DW,
         freq=200,
         aggregate_phy_steps=1,
-        gui=False,
+        gui=True,
         record=False,
         obs=ObservationType.KIN,
         act=ActionType.RPM)
@@ -127,7 +127,7 @@ def main(hparam):
         observable=['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel', 'rpm'],
         frame_stack=1,
         task='stabilize2',
-        reward_coeff={'pos':0.0, 'vel':0.0, 'ang_vel':0.0, 'd_action':0.0, 'rotation': 0.0},
+        reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.01, 'd_action':0.0, 'rotation': 0.5},
         episode_len_sec=max_steps/200,
         max_rpm=66535,
         initial_xyzs=waypoints[0][0], # Far from the ground
@@ -184,6 +184,7 @@ def main(hparam):
         step, success = 0,0
         e_ps, e_as = [],[]
         state_buffer, action_buffer, reward_buffer = [],[],[]
+        reward_sum = 0
         critic_buffer = []
         drone_state_buffer = pd.DataFrame()
 
@@ -217,10 +218,11 @@ def main(hparam):
                                                     deterministic=DETERMINISTIC, 
                                                     explore_noise_scale=0.0)
 
-            next_state, reward, done, _ = env.step(action) 
+            next_state, reward, done, info = env.step(action) 
+            reward_sum += reward
             env.render()
             print(action)
-            input()
+            # input()
 
 
             # critic_test = agent.q_net1(torch.Tensor(state[None,:]).to(device), torch.Tensor(action[None,:]).to(device), torch.Tensor(param[None,:]).to(device)).detach().cpu().item()
@@ -263,7 +265,7 @@ def main(hparam):
 
     print("EVALUATION ANGVEL ERROR[deg/s]:", np.linalg.norm((2*180*np.stack(state_buffer)[:,:,15:18]), axis=-1).mean())
 
-    disp.stop()
+    # disp.stop()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
