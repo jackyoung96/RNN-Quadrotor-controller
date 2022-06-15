@@ -209,7 +209,7 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
                     next_state_m = next_state[:,3:12].reshape((-1,3,3))
                     state_w = np.matmul(state_m, state[:,:3].reshape((-1,3,1)))
                     next_state_w = np.matmul(next_state_m, next_state[:,:3].reshape((-1,3,1)))
-                    goal = next_state_w[-1:]
+                    goal = next_state_w[-1:] # (1,3,1)
                     state_w[:] = state_w[:] - goal
                     next_state_w[:] = next_state_w[:] - goal
 

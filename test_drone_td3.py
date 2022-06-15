@@ -84,8 +84,8 @@ def main(hparam):
     if 'waypoint' in hparam['task']:
         waypoints = [
             (np.array([[0,  0,  0.025]]),0),
-            (np.array([[0.5,  0,  1.025]]),400), # (pos, time)
-            # (np.array([[0.5,0,  1.025]]),800),
+            (np.array([[0,  0,  0.525]]),400), # (pos, time)
+            (np.array([[0.5,0,  0.525]]),800),
             # (np.array([[0.5,0.5,1.025]]),1200),
             # (np.array([[0,  0.5,1.025]]),1600),
             # (np.array([[0,  0,  1.025]]),2000)
@@ -118,7 +118,7 @@ def main(hparam):
         physics=Physics.PYB_GND_DRAG_DW,
         freq=200,
         aggregate_phy_steps=1,
-        gui=True,
+        gui=hparam['render'],
         record=False,
         obs=ObservationType.KIN,
         act=ActionType.RPM)
@@ -218,11 +218,13 @@ def main(hparam):
                                                     deterministic=DETERMINISTIC, 
                                                     explore_noise_scale=0.0)
 
-            next_state, reward, done, info = env.step(action) 
+            next_state, reward, done, info = env.step(action)
             reward_sum += reward
-            env.render()
-            print(action)
-            # input()
+            
+            if hparam['render']:
+                print(action)
+                env.render()
+                input()
 
 
             # critic_test = agent.q_net1(torch.Tensor(state[None,:]).to(device), torch.Tensor(action[None,:]).to(device), torch.Tensor(param[None,:]).to(device)).detach().cpu().item()
@@ -261,7 +263,7 @@ def main(hparam):
     drone_state_buffer.to_csv('paperworks/%s.csv'%(hparam['rnn']+hparam['task']), header=False)
     print("EVALUATION SUCCESS RATE:", eval_success)
     print("EVALUATION POSITION ERROR[m]:", eval_position)
-    print("EVALUATION ANGLE ERROR[deg]:", np.rad2deg(eval_angle))
+    print("EVALUATION ANGLE ERROR[deg]:", eval_angle)
 
     print("EVALUATION ANGVEL ERROR[deg/s]:", np.linalg.norm((2*180*np.stack(state_buffer)[:,:,15:18]), axis=-1).mean())
 
@@ -280,6 +282,7 @@ if __name__ == '__main__':
                                   choices=['normal-waypoint','random-waypoint',
                                             'normal-stabilize','random-stabilize'],
                                   help='For takeoff-aviary-v0 environment')
+    parser.add_argument('--render', action='store_true')
     args = parser.parse_args()
 
     hparam = {
