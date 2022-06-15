@@ -484,13 +484,13 @@ class dynRandeEnv:
             initial_xyzs = [[0.0,0.0,10000.0]]
             rpy_noise=np.pi
             vel_noise=1.0
-            angvel_noise=2*np.pi
+            angvel_noise=180
             goal = None
         elif self.task == 'stabilize-record':
             initial_xyzs = [[0.0,0.0,1.5]]
             rpy_noise=np.pi
             vel_noise=1.0
-            angvel_noise=2*np.pi
+            angvel_noise=180
             goal = None
         elif self.task == 'takeoff':
             initial_xyzs = [[0.0,0.0,0.025]]
@@ -512,7 +512,7 @@ class dynRandeEnv:
             obs=ObservationType.KIN,
             act=ActionType.RPM)
         env = domainRandomAviary(env, self.tag+str(time.time_ns()), idx, self.seed+idx,
-            observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
+            observable=['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel', 'rpm'],
             frame_stack=1,
             task='stabilize2',
             # reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},

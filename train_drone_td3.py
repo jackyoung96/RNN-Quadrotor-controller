@@ -34,8 +34,8 @@ dyn_range = {
     # drones
     'mass_range': 0.3, # (1-n) ~ (1+n)
     'cm_range': 0.3, # (1-n) ~ (1+n)
-    'kf_range': 0.05, # (1-n) ~ (1+n)
-    'km_range': 0.05, # (1-n) ~ (1+n)
+    'kf_range': 0.3, # (1-n) ~ (1+n)
+    'km_range': 0.3, # (1-n) ~ (1+n)
     'i_range': 0.3,
     'battery_range': 0.3 # (1-n) ~ (1)
 }
@@ -47,8 +47,8 @@ hparam_set = {
     "q_lr": [1e-3],
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
-    "max_steps": [200],
-    "her_length": [200]
+    "max_steps": [400],
+    "her_length": [400]
 }
 
 def train(args, hparam):

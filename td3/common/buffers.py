@@ -204,12 +204,19 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
                 self.buffer.append(None)
             if self.env_name == 'takeoff-aviary-v0':
                 if i!=0:
-                    ####### Distribution mean -> 0 #################
-                    state[:,:3] = state[:,:3] - goal[:,:3]
-                    next_state[:,:3] = next_state[:,:3] - goal[:,:3]
-                    goal[:,:3] = 0
+                    ####### Relative observation ###################
+                    state_m = state[:,3:12].reshape((-1,3,3))
+                    next_state_m = next_state[:,3:12].reshape((-1,3,3))
+                    state_w = np.matmul(state_m, state[:,:3].reshape((-1,3,1)))
+                    next_state_w = np.matmul(next_state_m, next_state[:,:3].reshape((-1,3,1)))
+                    goal = next_state_w[-1:]
+                    state_w[:] = state_w[:] - goal
+                    next_state_w[:] = next_state_w[:] - goal
+
+                    state[:,:3] = np.matmul(np.swapaxes(state_m,1,2), state_w).reshape((-1,3))
+                    next_state[:,:3] = np.matmul(np.swapaxes(next_state_m,1,2), next_state_w).reshape((-1,3))
                     ################################################
-                pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
+                pos_achieve = np.linalg.norm(next_state[:,:3],axis=-1)<self.epsilon_pos
                 ang_value = np.clip(next_state[:,11],0,1) # 1: 0deg, 0: >90 deg, from vertical z-axis
                 ang_achieve = np.arccos(ang_value) < self.epsilon_ang
                 if self.positive_rew:
