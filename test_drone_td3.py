@@ -85,10 +85,10 @@ def main(hparam):
         waypoints = [
             (np.array([[0,  0,  0.025]]),0),
             (np.array([[0,  0,  1.025]]),400), # (pos, time)
-            (np.array([[0.5,0,  1.025]]),800),
-            (np.array([[0.5,0.5,1.025]]),1200),
-            (np.array([[0,  0.5,1.025]]),1600),
-            (np.array([[0,  0,  1.025]]),2000)
+            # (np.array([[0.5,0,  1.025]]),800),
+            # (np.array([[0.5,0.5,1.025]]),1200),
+            # (np.array([[0,  0.5,1.025]]),1600),
+            # (np.array([[0,  0,  1.025]]),2000)
         ]
         theta = np.random.uniform(0,2*np.pi)
         initial_rpys = np.array([[0.0,0.0,theta]])
@@ -112,7 +112,7 @@ def main(hparam):
     
 
     # Define environment
-    theta = np.random.uniform(0,0)
+    theta = np.random.uniform(0,2*np.pi)
     env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
         drone_model=DroneModel.CF2X,
         initial_xyzs=waypoints[0][0],
@@ -220,9 +220,11 @@ def main(hparam):
 
             next_state, reward, done, _ = env.step(action) 
             env.render()
+            print(action)
             input()
 
-            # critic_test = agent.q_net1(torch.Tensor(state[None,:]).to(device), torch.Tensor(action[None,:]).to(device), torch.Tensor(param[None,:]).to(device), torch.Tensor(goal[None,:]).to(device)).detach().cpu().item()
+
+            # critic_test = agent.q_net1(torch.Tensor(state[None,:]).to(device), torch.Tensor(action[None,:]).to(device), torch.Tensor(param[None,:]).to(device)).detach().cpu().item()
             # critic_buffer.append(critic_test)
 
             e_p = np.linalg.norm(6*next_state[0,:3]) # position (m)
