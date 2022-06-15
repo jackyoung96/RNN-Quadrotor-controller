@@ -109,24 +109,30 @@ class customAviary(gym.Wrapper):
         rng = np.inf
         low_dict = {
             'pos': [-rng] * 3,
+            'rel_pos': [-rng] * 3,
             'z': [-rng],
             'quaternion': [-rng] * 4,
             'rotation': [-rng] * 9,
             'rpy': [-rng] * 3,
             'vel': [-rng] * 3,
+            'rel_vel': [-rng] * 3,
             'vel_z': [-rng],
             'angular_vel': [-rng] * 3,
+            'rel_angular_vel': [-rng] * 3,
             'rpm': [-rng] * 4
         }
         high_dict = {
             'pos': [rng] * 3,
+            'rel_pos': [rng] * 3,
             'z': [rng],
             'quaternion': [rng] * 4,
             'rotation': [rng] * 9,
             'rpy': [rng] * 3,
             'vel': [rng] * 3,
+            'rel_vel': [rng] * 3,
             'vel_z': [rng],
             'angular_vel': [rng] * 3,
+            'rel_angular_vel': [rng] * 3,
             'rpm': [rng] * 4
         }
         low, high = [],[]
@@ -213,7 +219,7 @@ class customAviary(gym.Wrapper):
                                 linearVelocity = vel.tolist(),\
                                 angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
-            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:]+ 0.3 * vel * (1 + np.random.uniform(-1.0,1.0,size=3))
+            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] + np.random.uniform(-1.0,1.0,size=3)
 
 
         for i in range(self.env.NUM_DRONES):
@@ -234,13 +240,16 @@ class customAviary(gym.Wrapper):
     def _help_computeObs(self, obs_all):
         obs_idx_dict = {
             'pos': range(0,3),
+            'rel_pos': range(0,7),
             'z': [2],
             'quaternion': range(3,7),
             'rotation': range(3,7),
             'rpy': range(7,10),
             'vel': range(10,13),
+            'rel_vel': [10,11,12,3,4,5,6],
             'vel_z': [12],
             'angular_vel': range(13,16),
+            'rel_angular_vel': [13,14,15,3,4,5,6],
             'rpm': range(16,20)
         }
         obs = []
@@ -284,6 +293,12 @@ class customAviary(gym.Wrapper):
             # print("DEBUG", norm_state, self.goal_pos[0,:])
             norm_state = (norm_state - self.goal_pos[0,:]) / MAX_XYZ
 
+        elif type=='rel_pos':
+            r = R.from_quat(norm_state[-4:])
+            rot = r.as_matrix()
+            pos = (norm_state[:3] - self.goal_pos[0,:3]).reshape((3,1)) 
+            norm_state = np.matmul(rot.transpose(),pos).reshape((3,)) / MAX_XYZ
+
         elif type=='quaternion':
             # don't need normalization
             pass
@@ -299,9 +314,18 @@ class customAviary(gym.Wrapper):
         elif type=='vel':
             norm_state = state / MAX_LIN_VEL
 
+        elif type=='rel_vel':
+            r = R.from_quat(norm_state[-4:])
+            rot = r.as_matrix()
+            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) / MAX_LIN_VEL
+
         elif type=='angular_vel':
             norm_state = state / MAX_RPY_RATE
-            pass
+            
+        elif type=='rel_angular_vel':
+            r = R.from_quat(norm_state[-4:])
+            rot = r.as_matrix()
+            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) / MAX_RPY_RATE
 
         elif type=='rpm':
             norm_state = state * 2 / self.MAX_RPM - 1
@@ -666,7 +690,7 @@ class domainRandomAviary(customAviary):
                                 angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
             self.goal_pos[i,:] = \
-                self.env.INIT_XYZS[i,:] + 0.3 * vel * (1 + np.random.uniform(-1.0,1.0,size=3)) if self.goal is None \
+                self.env.INIT_XYZS[i,:] + np.random.uniform(-1.0,1.0,size=3) if self.goal is None \
                                                                 else self.goal
 
 

@@ -56,8 +56,8 @@ class dummyEnv:
         self.env.close()
 
 def main(hparam):
-    # disp = Display(visible=False, size=(100, 60))
-    # disp.start()
+    disp = Display(visible=False, size=(100, 60))
+    disp.start()
 
     env_name = "takeoff-aviary-v0"
     max_steps = 400  # 8.5 sec
@@ -98,10 +98,10 @@ def main(hparam):
         max_steps = waypoints[-1][1]
     elif 'stabilize' in hparam['task']:
         waypoints = [
-            (np.array([[0,  0,  1.0]]),0),
+            (np.array([[0,  0,  10000.0]]),0),
             (None, 300), # (pos, time)
         ]
-        initial_rpys = np.random.uniform(-np.pi/4, np.pi/4, size=(1,3))
+        initial_rpys = np.random.uniform(-np.pi, np.pi, size=(1,3))
         rpy_noise = np.pi
         vel_noise = 1.0
         angvel_noise = np.pi/2
@@ -110,9 +110,7 @@ def main(hparam):
         raise NotImplementedError
 
     
-
     # Define environment
-    theta = np.random.uniform(0,2*np.pi)
     env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
         drone_model=DroneModel.CF2X,
         initial_xyzs=waypoints[0][0],
@@ -120,12 +118,13 @@ def main(hparam):
         physics=Physics.PYB_GND_DRAG_DW,
         freq=200,
         aggregate_phy_steps=1,
-        gui=True,
+        gui=False,
         record=False,
         obs=ObservationType.KIN,
         act=ActionType.RPM)
     env = domainRandomAviary(env, "testCoRL", 0, 9999999,
-        observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
+        # observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
+        observable=['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel', 'rpm'],
         frame_stack=1,
         task='stabilize2',
         reward_coeff={'pos':0.0, 'vel':0.0, 'ang_vel':0.0, 'd_action':0.0, 'rotation': 0.0},
@@ -264,7 +263,7 @@ def main(hparam):
 
     print("EVALUATION ANGVEL ERROR[deg/s]:", np.linalg.norm((2*180*np.stack(state_buffer)[:,:,15:18]), axis=-1).mean())
 
-    # disp.stop()
+    disp.stop()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
