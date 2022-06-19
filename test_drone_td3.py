@@ -194,7 +194,7 @@ def main(hparam):
                 env.env.envs[0].goal_pos = goal_pos
                 # hidden_out = hidden_out_zero
                 # last_action = -np.ones_like(last_action)
-
+            goal = np.array([[0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0]])
             if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                 hidden_in = hidden_out
                 if not hasattr(agent.q_net1, '_goal_dim'):
