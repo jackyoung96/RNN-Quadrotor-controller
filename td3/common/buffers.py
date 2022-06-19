@@ -195,9 +195,21 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
             assert "env should be choosen among ['takeoff-aviary-v0', 'Pendulum-v0']"
     
     def push(self, state, action, last_action, reward, next_state, done, param):
-        gs = [np.array([[0,0,0]])]
+        gs = [np.zeros(3).reshape((1,3,1))]
         if np.random.random()<0.8:
-            gs.append(next_state[-1:,:3])
+            # last position
+            new_goal = np.matmul(next_state[-1,3:12].reshape((3,3)), next_state[-1,:3].reshape((3,1))).reshape((1,3,1))
+            gs.append(new_goal)
+            # best angle
+            idx = np.argmax(next_state[:,11])
+            new_goal = np.matmul(next_state[idx,3:12].reshape((3,3)), next_state[idx,:3].reshape((3,1))).reshape((1,3,1))
+            gs.append(new_goal)
+            # random position
+            for _ in range(2):
+                idx = np.random.randint(next_state.shape[0])
+                new_goal = np.matmul(next_state[idx,3:12].reshape((3,3)), next_state[idx,:3].reshape((3,1))).reshape((1,3,1))
+                gs.append(new_goal)
+
 
         for i,goal in enumerate(gs):
             if len(self.buffer) < self.capacity:
@@ -209,7 +221,7 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
                     next_state_m = next_state[:,3:12].reshape((-1,3,3))
                     state_w = np.matmul(state_m, state[:,:3].reshape((-1,3,1)))
                     next_state_w = np.matmul(next_state_m, next_state[:,:3].reshape((-1,3,1)))
-                    goal = next_state_w[-1:] # (1,3,1)
+                    
                     state_w[:] = state_w[:] - goal
                     next_state_w[:] = next_state_w[:] - goal
 

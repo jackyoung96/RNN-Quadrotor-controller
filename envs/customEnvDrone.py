@@ -320,12 +320,12 @@ class customAviary(gym.Wrapper):
             norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) / MAX_LIN_VEL
 
         elif type=='angular_vel':
-            norm_state = np.deg2rad(state) / MAX_RPY_RATE
+            norm_state = state / MAX_RPY_RATE
             
         elif type=='rel_angular_vel':
             r = R.from_quat(norm_state[-4:])
             rot = r.as_matrix()
-            norm_state = np.deg2rad(np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))) / MAX_RPY_RATE
+            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) / MAX_RPY_RATE
 
         elif type=='rpm':
             norm_state = state * 2 / self.MAX_RPM - 1

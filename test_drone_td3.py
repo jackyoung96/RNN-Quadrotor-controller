@@ -257,7 +257,8 @@ def main(hparam):
         eval_position = np.mean(e_ps)
         eval_angle = np.mean(e_as)
         
-        if np.sum(np.where(np.array(e_as) < 10, 1, 0)[-100:]) == 100: 
+        if np.sum(np.where(np.array(e_as) < 10, 1, 0)[-100:]) == 100\
+            and 'stabilize' in hparam['task']: 
             eval_success = 1
 
     drone_state_buffer.to_csv('paperworks/%s.csv'%(hparam['rnn']+hparam['task']), header=False)

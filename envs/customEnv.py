@@ -504,7 +504,7 @@ class dynRandeEnv:
             drone_model=DroneModel.CF2X,
             initial_xyzs=np.array(initial_xyzs),
             initial_rpys=np.array([[0.0,0.0,0.0]]),
-            physics=Physics.PYB_GND_DRAG_DW,
+            physics=Physics.PYB_DRAG,
             freq=200,
             aggregate_phy_steps=1,
             gui=False,

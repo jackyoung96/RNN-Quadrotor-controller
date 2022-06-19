@@ -57,7 +57,7 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(2e5)
+    max_episodes  = int(1e6)
     hidden_dim = hparam['hidden_dim']
     max_steps = hparam['max_steps']
     eval_max_steps = 300
