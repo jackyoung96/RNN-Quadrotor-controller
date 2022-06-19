@@ -406,6 +406,7 @@ if __name__=='__main__':
     parser.add_argument('--small_lr', action='store_true', help='use small lr')
     parser.add_argument('--behavior_path', default=None, help='path for behavior networks')
     parser.add_argument('--seed', type=int, default=0, help='seed')
+    parser.add_argument('--reward_scale', default=1.0, type=float, help="reward scale for sgHER")
 
     # Arguments for test
     parser.add_argument('--test', action='store_true')

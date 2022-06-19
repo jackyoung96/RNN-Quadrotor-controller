@@ -186,6 +186,7 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
         self.positive_rew = kwargs.get("positive_rew", False)
         self.angvel_goal = kwargs.get("angvel_goal", False)
         self.gamma = kwargs.get("her_gamma", 0.0)
+        self.reward_scale = kwargs.get("reward_scale", 1.0)
         self.her = True if self.gamma != 1.0 else False
         self.history_length = kwargs.get("her_length", 100)
         self.epsilon_pos = kwargs.get("epsilon_pos", 0.1/6)
@@ -237,10 +238,7 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
                 pos_achieve = np.linalg.norm(next_state_new[:,:3],axis=-1)<self.epsilon_pos
                 ang_value = np.clip(next_state_new[:,11],0,1) # 1: 0deg, 0: >90 deg, from vertical z-axis
                 ang_achieve = np.arccos(ang_value) < self.epsilon_ang
-                if self.positive_rew:
-                    reward_new = (1-self.gamma)*np.where(pos_achieve, ang_value, 0.0)+self.gamma*reward
-                else:
-                    reward_new = (1-self.gamma)*np.where(pos_achieve, ang_value-1, -1.0)+self.gamma*reward
+                reward_new = np.where(pos_achieve, self.reward_scale*ang_value -1, -1.0)
                 
                 done_new = np.where(pos_achieve , 1.0, 0.0)
 
