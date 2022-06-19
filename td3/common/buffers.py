@@ -210,33 +210,39 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
                 new_goal = np.matmul(next_state[idx,3:12].reshape((3,3)), next_state[idx,:3].reshape((3,1))).reshape((1,3,1))
                 gs.append(new_goal)
 
+        ###### Relative position ################
+        state_m = state[:,3:12].reshape((-1,3,3))
+        next_state_m = next_state[:,3:12].reshape((-1,3,3))
+        state_w = np.matmul(state_m, state[:,:3].reshape((-1,3,1)))
+        next_state_w = np.matmul(next_state_m, next_state[:,:3].reshape((-1,3,1)))
 
         for i,goal in enumerate(gs):
             if len(self.buffer) < self.capacity:
                 self.buffer.append(None)
             if self.env_name == 'takeoff-aviary-v0':
+                state_new = state.copy()
+                next_state_new = next_state.copy()
                 if i!=0:
                     ####### Relative observation ###################
-                    state_m = state[:,3:12].reshape((-1,3,3))
-                    next_state_m = next_state[:,3:12].reshape((-1,3,3))
-                    state_w = np.matmul(state_m, state[:,:3].reshape((-1,3,1)))
-                    next_state_w = np.matmul(next_state_m, next_state[:,:3].reshape((-1,3,1)))
-                    
-                    state_w[:] = state_w[:] - goal
-                    next_state_w[:] = next_state_w[:] - goal
+                    state_new = state_new[:,:,None]
+                    next_state_new = next_state_new[:,:,None]
+                    state_new[:,:3] = state_w - goal
+                    next_state_new[:,:3] = next_state_w - goal
 
-                    state[:,:3] = np.matmul(np.swapaxes(state_m,1,2), state_w).reshape((-1,3))
-                    next_state[:,:3] = np.matmul(np.swapaxes(next_state_m,1,2), next_state_w).reshape((-1,3))
+                    state_new[:,:3] = np.matmul(np.swapaxes(state_m,1,2), state_new[:,:3])
+                    next_state_new[:,:3] = np.matmul(np.swapaxes(next_state_m,1,2), next_state_new[:,:3])
+                    state_new = state_new[:,:,0]
+                    next_state_new = next_state_new[:,:,0]
                     ################################################
-                pos_achieve = np.linalg.norm(next_state[:,:3],axis=-1)<self.epsilon_pos
-                ang_value = np.clip(next_state[:,11],0,1) # 1: 0deg, 0: >90 deg, from vertical z-axis
+                pos_achieve = np.linalg.norm(next_state_new[:,:3],axis=-1)<self.epsilon_pos
+                ang_value = np.clip(next_state_new[:,11],0,1) # 1: 0deg, 0: >90 deg, from vertical z-axis
                 ang_achieve = np.arccos(ang_value) < self.epsilon_ang
                 if self.positive_rew:
-                    reward = (1-self.gamma)*np.where(pos_achieve, ang_value, 0.0)+self.gamma*reward
+                    reward_new = (1-self.gamma)*np.where(pos_achieve, ang_value, 0.0)+self.gamma*reward
                 else:
-                    reward = (1-self.gamma)*np.where(pos_achieve, ang_value-1, -1.0)+self.gamma*reward
+                    reward_new = (1-self.gamma)*np.where(pos_achieve, ang_value-1, -1.0)+self.gamma*reward
                 
-                done = np.where(pos_achieve , 1.0, 0.0)
+                done_new = np.where(pos_achieve , 1.0, 0.0)
 
             elif self.env_name == 'Pendulum-v0':
                 theta = np.arctan2(next_state[:,1:2],next_state[:,0:1])
@@ -245,7 +251,7 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
                 reward = (1-self.gamma)*np.where(ang_achieve ,0.0, -1.0)+self.gamma*reward
                 # done = np.where(pos_achieve , 1.0, 0.0)
             # ang_achieve = np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)<self.epsilon_ang
-            self.buffer[self.position] = (state, action, last_action, reward, next_state, done, param)
+            self.buffer[self.position] = (state_new, action, last_action, reward_new, next_state_new, done_new, param)
             self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
 
     def push_batch(self, state, action, last_action, reward, next_state, done, param):
