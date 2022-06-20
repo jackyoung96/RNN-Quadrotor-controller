@@ -111,6 +111,7 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
         self.history_length = kwargs.get("her_length", 100)
         self.epsilon_pos = kwargs.get("epsilon_pos", 0.1/6)
         self.epsilon_ang = kwargs.get("epsilon_ang", np.deg2rad(10))
+        self.single_pos = kwargs.get("single_pos", False)
         self.env_name = env_name
         if not self.env_name in ['takeoff-aviary-v0', 'Pendulum-v0']:
             assert "env should be choosen among ['takeoff-aviary-v0', 'Pendulum-v0']"
@@ -118,12 +119,27 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
     def push(self, state, action, last_action, reward, next_state, done, param, goal):
         gs = [goal[None,:]]
         if np.random.random()<0.8 and self.her:
-            gs.append(next_state[-1:,:])
+            gs.append(next_state[-1:,:].copy())
 
         for i,goal in enumerate(gs):
             if len(self.buffer) < self.capacity:
                 self.buffer.append(None)
             if self.env_name == 'takeoff-aviary-v0':
+                if i!=0 and self.single_pos:
+                    ####### Relative observation ###################
+                    state_m = state[:,3:12].reshape((-1,3,3))
+                    next_state_m = next_state[:,3:12].reshape((-1,3,3))
+                    state_w = np.matmul(state_m, state[:,:3].reshape((-1,3,1)))
+                    next_state_w = np.matmul(next_state_m, next_state[:,:3].reshape((-1,3,1)))
+
+                    goal = next_state_w[-1:].copy()
+
+                    state_w = state_w - goal
+                    next_state_w = next_state_w - goal
+
+                    state[:,:3] = np.matmul(np.swapaxes(state_m,1,2), state_w[:,:3]).reshape((-1,3))
+                    next_state[:,:3] = np.matmul(np.swapaxes(next_state_m,1,2), next_state_w[:,:3]).reshape((-1,3))
+                    ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
                 ang_value = rot_matrix_z_similarity(next_state[:,3:12],goal[:,3:12]) # 1: 0deg, 0: >90 deg, from vertical z-axis
                 ang_achieve = ang_value < self.epsilon_ang
@@ -187,6 +203,7 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
         self.angvel_goal = kwargs.get("angvel_goal", False)
         self.gamma = kwargs.get("her_gamma", 0.0)
         self.reward_scale = kwargs.get("reward_scale", 1.0)
+        self.maintain_length = kwargs.get("maintain_length", 1)
         self.her = True if self.gamma != 1.0 else False
         self.history_length = kwargs.get("her_length", 100)
         self.epsilon_pos = kwargs.get("epsilon_pos", 0.1/6)
@@ -235,10 +252,15 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
                     state_new = state_new[:,:,0]
                     next_state_new = next_state_new[:,:,0]
                     ################################################
-                pos_achieve = np.linalg.norm(next_state_new[:,:3],axis=-1)<self.epsilon_pos
+                pos_achieve = np.linalg.norm(next_state_new[:,:3],axis=-1) < self.epsilon_pos
                 ang_value = np.clip(next_state_new[:,11],0,1) # 1: 0deg, 0: >90 deg, from vertical z-axis
                 ang_achieve = np.arccos(ang_value) < self.epsilon_ang
-                reward_new = np.where(pos_achieve, self.reward_scale*ang_value -1, -1.0)
+
+                # Cumulative rewards
+                cum_ang_value = np.cumsum(ang_value)
+                for i in range(ang_value.shape[0]-1, -1, -1):
+                    cum_ang_value[i] = cum_ang_value[i]-cum_ang_value[max(i-self.maintain_length,0)]
+                reward_new = np.where(pos_achieve, self.reward_scale*cum_ang_value -1, -1.0)
                 
                 done_new = np.where(pos_achieve , 1.0, 0.0)
 

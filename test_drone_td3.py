@@ -117,6 +117,7 @@ def main(hparam):
         initial_xyzs=waypoints[0][0],
         initial_rpys=initial_rpys,
         physics=Physics.PYB_GND_DRAG_DW,
+        # physics=Physics.PYB_DRAG,
         freq=200,
         aggregate_phy_steps=1,
         gui=hparam['render'],

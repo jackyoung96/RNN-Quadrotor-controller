@@ -57,7 +57,7 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(1e6)
+    max_episodes  = int(3e5)
     hidden_dim = hparam['hidden_dim']
     max_steps = hparam['max_steps']
     eval_max_steps = 300
@@ -406,7 +406,11 @@ if __name__=='__main__':
     parser.add_argument('--small_lr', action='store_true', help='use small lr')
     parser.add_argument('--behavior_path', default=None, help='path for behavior networks')
     parser.add_argument('--seed', type=int, default=0, help='seed')
+
+    parser.add_argument('--single_pos', action='store_true', help="Single pose for HER")
+
     parser.add_argument('--reward_scale', default=1.0, type=float, help="reward scale for sgHER")
+    parser.add_argument('--maintain_length', default=1, type=int, help="maintain_length for sgHER")
 
     # Arguments for test
     parser.add_argument('--test', action='store_true')
