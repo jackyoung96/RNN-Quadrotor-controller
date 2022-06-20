@@ -91,6 +91,7 @@ def main(hparam):
             # (np.array([[0,  0,  1.025]]),2000)
         ]
         theta = np.random.uniform(0,2*np.pi)
+        theta = np.deg2rad(30)
         initial_rpys = np.array([[0.0,0.0,theta]])
         rpy_noise = 0
         vel_noise = 0

@@ -255,9 +255,7 @@ class customAviary(gym.Wrapper):
         obs = []
         for otype in self.observable:
             if otype == 'rotation':
-                quat = obs_all[obs_idx_dict['quaternion']]
-                r = R.from_quat(quat)
-                o = r.as_matrix().reshape((9,))
+                o = obs_all[obs_idx_dict[otype]]
             else:
                 o = obs_all[obs_idx_dict[otype]]
             obs.append(self._normalizeState(o, otype))
@@ -305,6 +303,8 @@ class customAviary(gym.Wrapper):
 
         elif type=='rotation':
             # don't need normalization
+            r = R.from_quat(norm_state)
+            norm_state = r.as_matrix().reshape((9,))
             pass
 
         elif type=='rpy':
@@ -325,7 +325,8 @@ class customAviary(gym.Wrapper):
         elif type=='rel_angular_vel':
             r = R.from_quat(norm_state[-4:])
             rot = r.as_matrix()
-            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) / MAX_RPY_RATE
+            # norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) / MAX_RPY_RATE
+            norm_state = np.deg2rad(np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))) / MAX_RPY_RATE
 
         elif type=='rpm':
             norm_state = state * 2 / self.MAX_RPM - 1
