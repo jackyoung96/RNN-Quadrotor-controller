@@ -119,7 +119,9 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
     def push(self, state, action, last_action, reward, next_state, done, param, goal):
         gs = [goal[None,:]]
         if np.random.random()<0.8 and self.her:
-            gs.append(next_state[-1:,:].copy())
+            goal = next_state[-1:,:].copy()
+            goal[:,:3] = 0
+            gs.append(goal)
 
         for i,goal in enumerate(gs):
             if len(self.buffer) < self.capacity:
@@ -132,10 +134,8 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
                     state_w = np.matmul(state_m, state[:,:3].reshape((-1,3,1)))
                     next_state_w = np.matmul(next_state_m, next_state[:,:3].reshape((-1,3,1)))
 
-                    goal = next_state_w[-1:].copy()
-
-                    state_w = state_w - goal
-                    next_state_w = next_state_w - goal
+                    state_w = state_w - next_state_w[-1:].copy()
+                    next_state_w = next_state_w - next_state_w[-1:].copy()
 
                     state[:,:3] = np.matmul(np.swapaxes(state_m,1,2), state_w[:,:3]).reshape((-1,3))
                     next_state[:,:3] = np.matmul(np.swapaxes(next_state_m,1,2), next_state_w[:,:3]).reshape((-1,3))
