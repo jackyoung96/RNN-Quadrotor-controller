@@ -28,4 +28,13 @@ python train_pendulum_td3.py --policy_actf tanh --reward_norm --gpu 0 --rnn None
 > python train_drone_td3.py --policy_actf tanh --her_gamma 0.0 --tb_log --gpu 0 --rnn LSTMHER
 
 ### HERbhv
-> python train_drone_td3.py --policy_actf tanh --her_gamma 0.0 --her_length 10 --tb_log --gpu 0 --rnn RNNbhvHER --behavior_path artifacts/agent-22Jun01050026:v15/iter0055000
+
+> python train_drone_td3.py --policy_actf tanh --her_gamma 0.0 --her_length 100 --tb_log --gpu 0 --rnn RNNbhvHER --behavior_path artifacts/agent-22Jun01050026:v15/iter0055000
+
+## Test drone in real world
+
+> roslaunch sim2real sim2real.launch
+> rostopic echo /crazyflie/log1
+
+
+controller.c, estimate.c -> Default controller, Default estimate modifying -> flashing

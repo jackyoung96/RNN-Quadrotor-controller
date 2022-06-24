@@ -44,6 +44,7 @@ hparam_set = {
     "param_num": [14],
     "hidden_dim": [48],
 
+
     "q_lr": [1e-3],
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
@@ -374,6 +375,9 @@ def test(args, hparam):
     td3_trainer.load_model(args.path)
     td3_trainer.policy_net.eval()
     
+    action, hidden1 = td3_trainer.policy_net.get_action(np.ones((1,22)),np.zeros((1,4)),torch.zeros((1,1,32)),np.array([[0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0]]),True,0.0)
+    action2, hidden2 = td3_trainer.policy_net.get_action(np.concatenate([np.ones((1,18)),action[None,:]], axis=-1),action[None,:],hidden1,np.array([[0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0]]),True,0.0)
+
     eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, max_steps=max_steps, test_itr=10, record=args.record, log=True)
     print("EVALUATION REWARD:",eval_rew)
     print("EVALUATION SUCCESS RATE:",eval_success)

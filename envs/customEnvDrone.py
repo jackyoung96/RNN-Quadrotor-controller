@@ -54,12 +54,16 @@ class customAviary(gym.Wrapper):
         self.reward_coeff = kwargs.get('reward_coeff', None)
 
         self.env.EPISODE_LEN_SEC = kwargs.get('episode_len_sec', 2)
-        self.MAX_RPM = kwargs.get('max_rpm', 2*16-1)
+        self.MAX_RPM = kwargs.get('max_rpm', 2**16-1)
         self.env.SIM_FREQ = kwargs.get('freq', 240)
 
         if not self.task in TASK_LIST:
             raise "Wrong task!!"
+        print("DEBUG",self.env._computeObs)
+        print(self._computeObs)
         self.env._computeObs = self._computeObs
+        print("DEBUG",self.env._computeObs)
+        print(self._computeObs)
         self.env._preprocessAction = self._preprocessAction
         self.env._computeReward = self._computeReward
         self.env._computeDone = self._computeDone
@@ -206,7 +210,7 @@ class customAviary(gym.Wrapper):
             init_rpy = self.env.INIT_RPYS[i,:] + self.rpy_noise*np.random.uniform(-1.0,1.0,self.env.INIT_RPYS[i,:].shape)
             # init_rpy[i,-1] = init_rpy[i,-1] + np.random.uniform(-np.pi, np.pi) # random yaw
             init_rpys.append(init_rpy)
-        self.env.DRONE_IDS = np.array([p.loadURDF(os.path.dirname(os.path.abspath(__file__))+"/../../../gym_pybullet_drones/assets/"+self.env.URDF,
+        self.env.DRONE_IDS = np.array([p.loadURDF(os.path.dirname(os.path.abspath(__file__))+"/../gym-pybullet-drones/gym_pybullet_drones/assets/"+self.env.URDF,
                                               self.env.INIT_XYZS[i,:],
                                               p.getQuaternionFromEuler(init_rpys[i]),
                                               flags = p.URDF_USE_INERTIA_FROM_FILE,
@@ -600,7 +604,7 @@ class domainRandomAviary(customAviary):
         self.env.DRAG_COEFF, \
         self.env.DW_COEFF_1, \
         self.env.DW_COEFF_2, \
-        self.env.DW_COEFF_3 = self.env._parseURDFParameters()
+        self.env.DW_COEFF_3 = self.env.env._parseURDFParameters()
 
         self.battery = self.orig_params['BATTERY'] * np.random.uniform(1.0-self.battery_range, 1.0)
         if self.battery_range != 0:

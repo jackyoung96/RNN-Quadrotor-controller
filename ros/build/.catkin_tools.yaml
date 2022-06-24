@@ -1,0 +1,6 @@
+devel_space: /home/jack/crazyflie/sim-to-real-TD3/ros/devel
+install: false
+install_space: /home/jack/crazyflie/sim-to-real-TD3/ros/install
+profile: default
+source_space: /home/jack/crazyflie/sim-to-real-TD3/ros/src
+workspace: /home/jack/crazyflie/sim-to-real-TD3/ros
