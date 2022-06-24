@@ -113,24 +113,30 @@ class customAviary(gym.Wrapper):
         rng = np.inf
         low_dict = {
             'pos': [-rng] * 3,
+            'rel_pos': [-rng] * 3,
             'z': [-rng],
             'quaternion': [-rng] * 4,
             'rotation': [-rng] * 9,
             'rpy': [-rng] * 3,
             'vel': [-rng] * 3,
+            'rel_vel': [-rng] * 3,
             'vel_z': [-rng],
             'angular_vel': [-rng] * 3,
+            'rel_angular_vel': [-rng] * 3,
             'rpm': [-rng] * 4
         }
         high_dict = {
             'pos': [rng] * 3,
+            'rel_pos': [rng] * 3,
             'z': [rng],
             'quaternion': [rng] * 4,
             'rotation': [rng] * 9,
             'rpy': [rng] * 3,
             'vel': [rng] * 3,
+            'rel_vel': [rng] * 3,
             'vel_z': [rng],
             'angular_vel': [rng] * 3,
+            'rel_angular_vel': [rng] * 3,
             'rpm': [rng] * 4
         }
         low, high = [],[]
@@ -217,7 +223,7 @@ class customAviary(gym.Wrapper):
                                 linearVelocity = vel.tolist(),\
                                 angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
-            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] + 0.3 * vel * (1 + np.random.uniform(-1.0,1.0,size=3))
+            self.goal_pos[i,:] = self.env.INIT_XYZS[i,:] + np.random.uniform(-1.0,1.0,size=3)
 
 
         for i in range(self.env.NUM_DRONES):
@@ -238,21 +244,22 @@ class customAviary(gym.Wrapper):
     def _help_computeObs(self, obs_all):
         obs_idx_dict = {
             'pos': range(0,3),
+            'rel_pos': range(0,7),
             'z': [2],
             'quaternion': range(3,7),
             'rotation': range(3,7),
             'rpy': range(7,10),
             'vel': range(10,13),
+            'rel_vel': [10,11,12,3,4,5,6],
             'vel_z': [12],
             'angular_vel': range(13,16),
+            'rel_angular_vel': [13,14,15,3,4,5,6],
             'rpm': range(16,20)
         }
         obs = []
         for otype in self.observable:
             if otype == 'rotation':
-                quat = obs_all[obs_idx_dict['quaternion']]
-                r = R.from_quat(quat)
-                o = r.as_matrix().reshape((9,))
+                o = obs_all[obs_idx_dict[otype]]
             else:
                 o = obs_all[obs_idx_dict[otype]]
             obs.append(self._normalizeState(o, otype))
@@ -288,12 +295,20 @@ class customAviary(gym.Wrapper):
             # print("DEBUG", norm_state, self.goal_pos[0,:])
             norm_state = (norm_state - self.goal_pos[0,:]) / MAX_XYZ
 
+        elif type=='rel_pos':
+            r = R.from_quat(norm_state[-4:])
+            rot = r.as_matrix()
+            pos = (norm_state[:3] - self.goal_pos[0,:3]).reshape((3,1)) 
+            norm_state = np.matmul(rot.transpose(),pos).reshape((3,)) / MAX_XYZ
+
         elif type=='quaternion':
             # don't need normalization
             pass
 
         elif type=='rotation':
             # don't need normalization
+            r = R.from_quat(norm_state)
+            norm_state = r.as_matrix().reshape((9,))
             pass
 
         elif type=='rpy':
@@ -303,9 +318,19 @@ class customAviary(gym.Wrapper):
         elif type=='vel':
             norm_state = state / MAX_LIN_VEL
 
+        elif type=='rel_vel':
+            r = R.from_quat(norm_state[-4:])
+            rot = r.as_matrix()
+            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) / MAX_LIN_VEL
+
         elif type=='angular_vel':
             norm_state = state / MAX_RPY_RATE
-            pass
+            
+        elif type=='rel_angular_vel':
+            r = R.from_quat(norm_state[-4:])
+            rot = r.as_matrix()
+            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) / MAX_RPY_RATE
+            # norm_state = np.deg2rad(np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))) / MAX_RPY_RATE
 
         elif type=='rpm':
             norm_state = state * 2 / self.MAX_RPM - 1
@@ -396,15 +421,18 @@ class customAviary(gym.Wrapper):
         elif self.task == 'stabilize2':
 
             coeff = {
-                'pos': self.reward_coeff['pos'], # 0~3
-                'vel': self.reward_coeff['vel'], # 10~13
-                'ang_vel': self.reward_coeff['ang_vel'], # 13~16
-                'd_action': self.reward_coeff['d_action'] # 16~20
+                'pos': 6 * self.reward_coeff['pos'], # 0~3
+                'vel': 3 * self.reward_coeff['vel'], # 10~13
+                'ang_vel': 2*np.pi * self.reward_coeff['ang_vel'], # 13~16
+                'd_action': self.reward_coeff['d_action'], # 16~20
+                'rotation': self.reward_coeff['rotation']
             }
             xyz = coeff['pos'] * np.linalg.norm(self._normalizeState(state[:3],'pos'), ord=2) # for single agent temporarily
             vel = coeff['vel'] * np.linalg.norm(self._normalizeState(state[10:13],'vel'),ord=2)
             ang_vel = coeff['ang_vel'] * np.linalg.norm(self._normalizeState(state[13:16],'angular_vel'),ord=2)
-            f_s = xyz + vel + ang_vel
+            
+            rot = coeff['rotation'] * self._normalizeState(state[3:7],'rotation')[-1]
+            f_s = xyz + vel + ang_vel - rot
 
             d_action = coeff['d_action'] * np.linalg.norm(self._normalizeState(state[16:]-self.previous_state[16:],'rpm'),ord=2) if self.previous_state is not None else 0
             f_a = d_action
@@ -484,7 +512,6 @@ class customAviary(gym.Wrapper):
             Whether the current episode is done.
 
         """
-        state = self.env._getDroneStateVector(0)
         if self.step_counter/self.SIM_FREQ > self.EPISODE_LEN_SEC:
         # Alternative done condition, see PR #32
         # if (self.step_counter/self.SIM_FREQ > (self.EPISODE_LEN_SEC)) or ((self._getDroneStateVector(0))[2] < 0.05):
@@ -651,7 +678,7 @@ class domainRandomAviary(customAviary):
         init_rpys = []
         for i in range(self.env.NUM_DRONES):
             init_rpy = self.env.INIT_RPYS[i,:] + self.rpy_noise*np.random.uniform(-1.0,1.0,self.env.INIT_RPYS[i,:].shape)
-            init_rpy[-1] = init_rpy[-1] + np.random.uniform(-np.pi, np.pi) # random yaw
+            # init_rpy[-1] = init_rpy[-1] + np.random.uniform(-np.pi, np.pi) # random yaw
             init_rpys.append(init_rpy)
         self.env.DRONE_IDS = np.array([p.loadURDF(os.path.dirname(os.path.abspath(__file__))+"/assets/"+self.URDF,
                                               self.env.INIT_XYZS[i,:],
@@ -667,8 +694,7 @@ class domainRandomAviary(customAviary):
                                 angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.env.CLIENT)
             self.goal_pos[i,:] = \
-                self.env.INIT_XYZS[i,:] + \
-                0.3 * vel *(1+np.random.uniform(-1.0,1.0,size=3)) if self.goal is None \
+                self.env.INIT_XYZS[i,:] + np.random.uniform(-1.0,1.0,size=3) if self.goal is None \
                                                                 else self.goal
 
 

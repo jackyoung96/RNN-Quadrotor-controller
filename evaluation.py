@@ -470,7 +470,7 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
             state, param = eval_env.reset()
             total_rew = 0
             last_action = eval_env.env.action_space.sample()[None,:]
-            last_action = np.zeros_like(last_action)
+            last_action = -np.ones_like(last_action)
             if hasattr(agent, 'rnn_type'):
                 if 'LSTM' == agent.rnn_type:
                     hidden_out = (torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device), \
@@ -504,8 +504,10 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
                                                             explore_noise_scale=0.0)
                 else:
                     action = agent.policy_net.get_action(state, 
+                                                        last_action,
                                                         deterministic=DETERMINISTIC, 
                                                         explore_noise_scale=0.0)
+
                 time_buffer.append(time.time()-start)
                 action = action[None,:]
                 next_state, reward, done, _ = eval_env.step(action) 
@@ -516,10 +518,10 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
                 e_a = np.arccos(np.clip(unnormed_state[0,11], -1.0, 1.0)) # angle (rad)
                 e_ps.append(e_p)
                 e_as.append(e_a)
-                pos_achieve = e_p < np.linalg.norm([0.1]*3)
+                pos_achieve = e_p < 0.1
                 ang_achieve = e_a < np.deg2rad(10)
-                if hasattr(agent.q_net1, '_goal_dim'):
-                    reward = 0.0 if pos_achieve and ang_achieve else -1.0
+
+                reward = 0.0 if pos_achieve and ang_achieve else -1.0
 
                 # Success test
                 if pos_achieve and ang_achieve:
@@ -559,3 +561,4 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
             eval_success / test_itr, \
             eval_position / test_itr, \
             eval_angle / test_itr
+

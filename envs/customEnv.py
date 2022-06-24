@@ -472,6 +472,7 @@ class dynRandeEnv:
         self.episode_len = episode_len
 
         self.obs_norm = obs_norm
+        self.last_action = -np.ones((4,))[None,:]
 
         envs = []
         for idx in range(nenvs):
@@ -487,19 +488,20 @@ class dynRandeEnv:
         else:
             self.env = VecNormalize(self.env, norm_obs=self.obs_norm, norm_reward=False)
         self.env = VecDynRandEnv(self.env, self.env_name, self.dyn_range)
+        self.env.seed(self.seed)
 
     def drone_env(self, idx):  
         if self.task == 'stabilize':
             initial_xyzs = [[0.0,0.0,10000.0]]
-            rpy_noise=np.pi/4
-            vel_noise=2.0
-            angvel_noise=np.pi/2
+            rpy_noise=np.pi
+            vel_noise=1.0
+            angvel_noise=180
             goal = None
         elif self.task == 'stabilize-record':
             initial_xyzs = [[0.0,0.0,1.5]]
-            rpy_noise=np.pi/4
-            vel_noise=2.0
-            angvel_noise=np.pi/2
+            rpy_noise=np.pi
+            vel_noise=1.0
+            angvel_noise=180
             goal = None
         elif self.task == 'takeoff':
             initial_xyzs = [[0.0,0.0,0.025]]
@@ -513,7 +515,7 @@ class dynRandeEnv:
             drone_model=DroneModel.CF2X,
             initial_xyzs=np.array(initial_xyzs),
             initial_rpys=np.array([[0.0,0.0,0.0]]),
-            physics=Physics.PYB_GND_DRAG_DW,
+            physics=Physics.PYB_DRAG,
             freq=200,
             aggregate_phy_steps=1,
             gui=False,
@@ -521,14 +523,16 @@ class dynRandeEnv:
             obs=ObservationType.KIN,
             act=ActionType.RPM)
         env = domainRandomAviary(env, self.tag+str(time.time_ns()), idx, self.seed+idx,
-            observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
+            observable=['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel', 'rpm'],
             frame_stack=1,
             task='stabilize2',
             # reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
-            reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.002},
+            # reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.0, 'rotation': 0.05},
+            reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.0, 'rotation': 0.5},
             episode_len_sec=self.episode_len,
             max_rpm=66535,
-            initial_xyzs=initial_xyzs, # Far from the ground
+            initial_xyzs=np.array(initial_xyzs), # Far from the ground
+            initial_rpys=np.array([[0.0,0.0,0.0]]),
             freq=200,
             rpy_noise=rpy_noise,
             vel_noise=vel_noise,
@@ -545,9 +549,12 @@ class dynRandeEnv:
         return env
 
     def reset(self):
+        self.last_action = -np.ones((4,))[None,:]
         return self.env.reset()
 
     def step(self, action):
+        action = 4*(1/200)/0.15 * (action-self.last_action) + self.last_action
+        self.last_action = action
         return self.env.step(action)
     
     def normalize_obs(self, obs):

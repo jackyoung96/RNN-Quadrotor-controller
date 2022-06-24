@@ -42,12 +42,14 @@ dyn_range = {
 hparam_set = {
     "goal_dim": [18],
     "param_num": [14],
-    "hidden_dim": [32],
+    "hidden_dim": [48],
 
-    "q_lr": [3e-4, 1e-3, 1e-4],
-    "policy_lr": [3e-4, 1e-3, 1e-4],
+
+    "q_lr": [1e-3],
+    "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
-    "her_length": [400, 100, 50]
+    "max_steps": [200],
+    "her_length": [200]
 }
 
 def train(args, hparam):
@@ -56,34 +58,34 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(1e5)
+    max_episodes  = int(3e5)
     hidden_dim = hparam['hidden_dim']
-    max_steps = 400
-    eval_max_steps = 500
+    max_steps = hparam['max_steps']
+    eval_max_steps = 300
     goal_dim = hparam['goal_dim']
     param_num = hparam['param_num']
     her_history_length = hparam['her_length']
     her_gamma = hparam['her_gamma'] # if 1 -> dense reward , 0 -> sparse reward
     policy_target_update_interval = hparam['policy_target_update_interval'] # delayed update for the policy network and target networks
-    epsilon_pos = np.sqrt(3*(0.1**2))/6 # 10 cm error
-    epsilon_ang = np.deg2rad(10) # 5 deg error
+    epsilon_pos = 0.05/6 # 5 cm error
+    epsilon_ang = np.deg2rad(10) # 10 deg error
     hparam.update({"epsilon_pos":epsilon_pos,
                    "epsilon_ang":epsilon_ang})
 
-    batch_size  = 128 if args.rnn != "None" else 128 * max_steps
-    nenvs = 2
+    batch_size  = 128 if args.rnn != "None" else 128 * her_history_length
+    nenvs = 1
     explore_noise_scale_init = 0.25
     eval_noise_scale_init = 0.25
     explore_noise_scale = explore_noise_scale_init
     eval_noise_scale = eval_noise_scale_init
     best_score = -np.inf
     frame_idx   = 0
-    replay_buffer_size = 3e5 if args.rnn != "None" else 3e5 * max_steps
-    explore_episode = 500
+    replay_buffer_size = 2e5 if args.rnn != "None" else 2e5 * max_steps
+    explore_episode = 1000
     update_itr = 2
-    writer_interval = 100
-    eval_freq = 1000
-    eval_itr = 20
+    writer_interval = 200
+    eval_freq = 2000
+    eval_itr = 25
 
     DETERMINISTIC=True  # DDPG: deterministic policy gradient
     
@@ -114,19 +116,20 @@ def train(args, hparam):
         writer = SummaryWriter(tbpath)
 
         # wandb
-        wandb.init(project="TD3-drone", config=hparam)
+        wandb.init(project="TD3-drone-final", config=hparam)
         wandb.run.name = "%s_%s"%(rnn_tag, now)
         wandb.run.save()
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
+    torch.cuda.set_device(device)
     print("Device:",device)
 
     ####################################
     # Define environment and agent #####
     ####################################
 
-    envs = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=nenvs, dyn_range=dyn_range, episode_len=max_steps/200, seed=0)
-    eval_env = dynRandeEnv(env_name=env_name, obs_norm=args.obs_norm, tag="%s%s%seval"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=1, dyn_range=dyn_range, episode_len=max_steps/200, seed=1234567)
+    envs = dynRandeEnv(env_name=env_name, obs_norm=False, tag="%s%s%s"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=nenvs, dyn_range=dyn_range, episode_len=max_steps/200, seed=args.seed)
+    eval_env = dynRandeEnv(env_name=env_name, obs_norm=False, tag="%s%s%seval"%(algorithm_name, tag, rnn_tag), task='stabilize', nenvs=1, dyn_range=dyn_range, episode_len=max_steps/200, seed=args.seed+1234567)
     td3_trainer = td3_agent(env=envs,
                 rnn=args.rnn,
                 device=device,
@@ -146,7 +149,7 @@ def train(args, hparam):
         
         state, param = envs.reset()
         last_action = np.stack([envs.env.action_space.sample() for _ in range(nenvs)],axis=0).squeeze()
-        last_action = np.zeros_like(last_action)
+        last_action = -np.ones_like(last_action)[None,:]
         episode_state = []
         episode_action = []
         episode_last_action = []
@@ -177,10 +180,11 @@ def train(args, hparam):
             if args.rnn == "None":
                 action = \
                     td3_trainer.get_action(state, 
+                                            last_action,
                                             deterministic=DETERMINISTIC, 
                                             explore_noise_scale=explore_noise_scale)
                 hidden_in = hidden_out = None
-            elif "HER" in args.rnn:
+            elif args.rnn in ["RNNHER", "LSTMHER","GRUHER"]:
                 action, hidden_out = \
                         td3_trainer.get_action(state, 
                                     last_action, 
@@ -196,6 +200,7 @@ def train(args, hparam):
                                 deterministic=DETERMINISTIC, 
                                 explore_noise_scale=explore_noise_scale)
             next_state, reward, done, _ = envs.step(action) 
+
             episode_state.append(envs.unnormalize_obs(state))
             episode_action.append(action)
             episode_last_action.append(last_action)
@@ -208,7 +213,7 @@ def train(args, hparam):
             frame_idx += 1
         
         # Push into Experience replay buffer
-        if "HER" in args.rnn:
+        if args.rnn in ["RNNHER","LSTMHER","GRUHER"]:
             td3_trainer.replay_buffer.push_batch(episode_state, 
                             episode_action, 
                             episode_last_action,
@@ -285,7 +290,8 @@ def train(args, hparam):
                 wandb.log({'loss/position[m]': np.linalg.norm((6*np.stack(unnormed_state)[:,:,:3]), axis=-1).mean(),
                         'loss/velocity[m_s]': np.linalg.norm((3*np.stack(unnormed_state)[:,:,12:15]), axis=-1).mean(),
                         'loss/ang_velocity[deg_s]': np.linalg.norm((2*180*np.stack(unnormed_state)[:,:,15:18]), axis=-1).mean(),
-                        'loss/angle[deg]': 180/np.pi*np.arccos(np.clip(np.stack(unnormed_state)[:,:,11].flatten(),-1.0,1.0)).mean()},
+                        'loss/angle[deg]': 180/np.pi*np.arccos(np.clip(np.stack(unnormed_state)[:,:,11].flatten(),-1.0,1.0)).mean(),
+                        'loss/rpm': (1+np.stack(unnormed_state)[:,:,-4:]).mean()},
                          step=i_episode)
                 
 
@@ -295,8 +301,6 @@ def train(args, hparam):
         ######################################
 
         if i_episode % eval_freq == 0 and i_episode != 0:
-            envs.save(os.path.join(savepath+"eval"))
-            eval_env.load(os.path.join(savepath+"eval"))
             eval_env.env.training = False
             td3_trainer.policy_net.eval()
             eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, max_steps=eval_max_steps, test_itr=eval_itr, record=False)
@@ -316,18 +320,20 @@ def train(args, hparam):
         ### Model save #########################
         ########################################
 
-        if i_episode % 5000 == 0:
+        if i_episode % 2000 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
             td3_trainer.save_model(os.path.join(savepath,"iter%07d"%i_episode))
             envs.save(os.path.join(savepath,"iter%07d"%i_episode))
-            artifact = wandb.Artifact('agent-%s'%now, type='model')
-            artifact.add_dir(savepath+"/")
-            wandb.log_artifact(artifact)
 
         if np.mean(scores_window)>=best_score: 
             td3_trainer.save_model(os.path.join(savepath,"best"))
             envs.save(os.path.join(savepath,"best"))
             best_score = np.mean(scores_window)
+
+        if i_episode % 10000 == 0:
+            artifact = wandb.Artifact('agent-%s'%now, type='model')
+            artifact.add_dir(savepath+"/")
+            wandb.log_artifact(artifact)
         
     td3_trainer.save_model(os.path.join(savepath,"final"))
     print('\rFinal\tAverage Score: {:.2f}'.format(np.mean(scores_window)))
@@ -345,13 +351,10 @@ def test(args, hparam):
         disp = Display(visible=False, size=(100, 60))
         disp.start()
     env_name = "takeoff-aviary-v0"
-    max_steps = 800
+    max_steps = 300
     
     device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     print("Device:",device)
-
-    if not os.path.isdir(os.path.split(args.path)[0]):
-        wandb_artifact("TD3-drone", args.path.split('/')[1])
 
     # Define environment
     eval_env = dynRandeEnv(env_name=env_name, 
@@ -360,8 +363,9 @@ def test(args, hparam):
                        task=args.task,
                        episode_len=max_steps/200,
                        nenvs=1, 
-                       dyn_range=dyn_range, 
-                       seed=int(123456789),
+                    #    dyn_range=dyn_range, 
+                       dyn_range=dict(),
+                       seed=int(args.seed+123456789),
                        record=args.record)
     eval_env.env.training = False
     td3_trainer = td3_agent(env=eval_env,
@@ -391,7 +395,7 @@ if __name__=='__main__':
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--rnn', choices=['None','RNN2','GRU2','LSTM2',
                                             'RNNHER','GRUHER','LSTMHER',
-                                            'RNNbhvHER','GRUbhvHER','LSTMbhvHER']
+                                            'RNNsHER','GRUsHER','LSTMsHER']
                                 , default='None', help='Use memory network (LSTM)')
     parser.add_argument('--policy_actf', type=str, default='tanh', help="policy activation function")
     parser.add_argument('--obs_norm', action='store_true', help='use batchnorm for input normalization')
@@ -401,10 +405,16 @@ if __name__=='__main__':
     parser.add_argument('--hparam', action='store_true', help="find hparam set")
     parser.add_argument('--lr_scheduler', action='store_true', help="Use lr scheduler")
     parser.add_argument('--reward_norm', action='store_true', help="reward normalization")
-    parser.add_argument('--her_gamma', default=0.0, type=float)
+    parser.add_argument('--her_gamma', default=0.0, type=float, help="if 0 only her, if 1 no her")
     parser.add_argument('--positive_rew', action='store_true', help="use [0,1] reward instead of [-1,0]")
     parser.add_argument('--small_lr', action='store_true', help='use small lr')
     parser.add_argument('--behavior_path', default=None, help='path for behavior networks')
+    parser.add_argument('--seed', type=int, default=0, help='seed')
+
+    parser.add_argument('--single_pos', action='store_true', help="Single pose for HER")
+
+    parser.add_argument('--reward_scale', default=1.0, type=float, help="reward scale for sgHER")
+    parser.add_argument('--maintain_length', default=1, type=int, help="maintain_length for sgHER")
 
     # Arguments for test
     parser.add_argument('--test', action='store_true')
