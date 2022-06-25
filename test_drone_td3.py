@@ -103,9 +103,9 @@ def main(hparam):
             (None, 300), # (pos, time)
         ]
         initial_rpys = np.random.uniform(-np.pi, np.pi, size=(1,3))
-        rpy_noise = 180
+        rpy_noise = np.pi
         vel_noise = 1.0
-        angvel_noise = np.pi/2
+        angvel_noise = 2*np.pi
         max_steps = waypoints[-1][1]
     else:
         raise NotImplementedError

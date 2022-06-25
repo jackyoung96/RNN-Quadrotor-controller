@@ -258,8 +258,8 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
 
                 # Cumulative rewards
                 cum_ang_value = np.cumsum(ang_value)
-                for i in range(ang_value.shape[0]-1, -1, -1):
-                    cum_ang_value[i] = cum_ang_value[i]-cum_ang_value[max(i-self.maintain_length,0)]
+                for i in range(ang_value.shape[0]-1, 0, -1):
+                    cum_ang_value[i] = max(1,self.maintain_length/i) * (cum_ang_value[i]-cum_ang_value[max(i-self.maintain_length,0)])
                 reward_new = np.where(pos_achieve, self.reward_scale*cum_ang_value -1, -1.0)
                 
                 done_new = np.where(pos_achieve , 1.0, 0.0)

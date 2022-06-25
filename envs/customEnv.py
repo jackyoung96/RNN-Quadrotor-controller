@@ -484,13 +484,13 @@ class dynRandeEnv:
             initial_xyzs = [[0.0,0.0,10000.0]]
             rpy_noise=np.pi
             vel_noise=1.0
-            angvel_noise=180
+            angvel_noise=2*np.pi
             goal = None
         elif self.task == 'stabilize-record':
             initial_xyzs = [[0.0,0.0,1.5]]
             rpy_noise=np.pi
             vel_noise=1.0
-            angvel_noise=180
+            angvel_noise=2*np.pi
             goal = None
         elif self.task == 'takeoff':
             initial_xyzs = [[0.0,0.0,0.025]]
