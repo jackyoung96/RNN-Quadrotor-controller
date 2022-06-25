@@ -84,14 +84,17 @@ def main(hparam):
     if 'waypoint' in hparam['task']:
         waypoints = [
             (np.array([[0,  0,  0.025]]),0),
-            (np.array([[0,  0,  0.525]]),400), # (pos, time)
-            (np.array([[0.5,0,  0.525]]),800),
+            (np.array([[0,  0,  1.025]]),200), # (pos, time)
+            (np.array([[1.0,0,  1.025]]),400),
             # (np.array([[0.5,0.5,1.025]]),1200),
             # (np.array([[0,  0.5,1.025]]),1600),
             # (np.array([[0,  0,  1.025]]),2000)
         ]
+        waypoints = [
+            (np.array([[0,  0,  0.025+i/400]]),i) for i in range(401) if i%5==0
+        ]
         theta = np.random.uniform(0,2*np.pi)
-        theta = np.deg2rad(30)
+        # theta = np.deg2rad(30)
         initial_rpys = np.array([[0.0,0.0,theta]])
         rpy_noise = 0
         vel_noise = 0
@@ -100,7 +103,7 @@ def main(hparam):
     elif 'stabilize' in hparam['task']:
         waypoints = [
             (np.array([[0,  0,  1.0]]),0),
-            (None, 300), # (pos, time)
+            (np.array([[0,  0,  1.0]]), 300), # (pos, time)
         ]
         initial_rpys = np.random.uniform(-np.pi, np.pi, size=(1,3))
         rpy_noise = np.pi
@@ -129,7 +132,7 @@ def main(hparam):
         observable=['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel', 'rpm'],
         frame_stack=1,
         task='stabilize2',
-        reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.01, 'd_action':0.0, 'rotation': 0.5},
+        reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.0, 'rotation': 0.5},
         episode_len_sec=max_steps/200,
         max_rpm=66535,
         initial_xyzs=waypoints[0][0], # Far from the ground
@@ -161,7 +164,7 @@ def main(hparam):
     eval_position = 0 
     eval_angle = 0
 
-    theta = np.random.uniform(0,2*np.pi)
+    # theta = np.random.uniform(0,2*np.pi)
     goal = np.array([[0,0,0, # pos
                     np.cos(theta),-np.sin(theta),0,
                     np.sin(theta),np.cos(theta),0,
@@ -196,7 +199,9 @@ def main(hparam):
                 env.env.envs[0].goal_pos = goal_pos
                 # hidden_out = hidden_out_zero
                 # last_action = -np.ones_like(last_action)
-            goal = np.array([[0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0]])
+            # if i_step % 50 == 0:
+            #     hidden_out = hidden_out_zero
+            #     last_action = -np.ones_like(last_action)
             if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                 hidden_in = hidden_out
                 if not hasattr(agent.q_net1, '_goal_dim'):
@@ -256,8 +261,8 @@ def main(hparam):
             last_action = action
 
 
-        eval_position = np.mean(e_ps)
-        eval_angle = np.mean(e_as)
+        eval_position = np.mean(e_ps[-100:])
+        eval_angle = np.mean(e_as[-100:])
         
         if np.sum(np.where(np.array(e_as) < 10, 1, 0)[-100:]) == 100\
             and 'stabilize' in hparam['task']: 
@@ -268,7 +273,7 @@ def main(hparam):
     print("EVALUATION POSITION ERROR[m]:", eval_position)
     print("EVALUATION ANGLE ERROR[deg]:", eval_angle)
 
-    print("EVALUATION ANGVEL ERROR[deg/s]:", np.linalg.norm((2*180*np.stack(state_buffer)[:,:,15:18]), axis=-1).mean())
+    print("EVALUATION ANGVEL ERROR[deg/s]:", np.linalg.norm((2*180*np.stack(state_buffer)[:,:,15:18]), axis=-1)[-100:].mean())
 
     # disp.stop()
 
