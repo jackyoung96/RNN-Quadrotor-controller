@@ -1,0 +1,20 @@
+Not searching for unused variables given on the command line.
+Using ROS (catkin_make)
+[31m[1mCMake Error[0m at /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyflie_tools/ROS.cmake:12 (add_subdirectory):
+  The source directory
+
+    /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyflie_tools/crazyflie_cpp
+
+  does not contain a CMakeLists.txt file.
+[36mCall Stack (most recent call first):[0m
+  CMakeLists.txt:6 (include)
+
+
+[31m[1mCMake Error[0m at /home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyflie_tools/ROS.cmake:23 (catkin_package):
+  Unknown CMake command "catkin_package".
+[36mCall Stack (most recent call first):[0m
+  CMakeLists.txt:6 (include)
+
+
+[36m--[0m Configuring incomplete, errors occurred!
+See also "/home/jack/crazyflie/sim-to-real-TD3/ros/build/crazyflie_tools/CMakeFiles/CMakeOutput.log".

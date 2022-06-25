@@ -3,6 +3,7 @@ import gym
 
 import numpy as np
 import gym
+from gym.spaces import Box
 import os
 from multiprocessing import Process, Pipe
 from abc import ABC, abstractmethod
@@ -438,6 +439,16 @@ class VecDynRandEnv(VecEnvWrapper):
     def step_wait(self) -> VecEnvStepReturn:
         obs, reward, done, info = self.venv.step_wait()
         return obs, reward, done, info
+
+
+class dummyEnv:
+    def __init__(self, observation_dim, action_dim):
+        class dummy:
+            def __init__(self, observation_dim, action_dim):
+                self.observation_space = Box(-np.inf, np.inf,(observation_dim,))
+                self.action_space = Box(-np.inf, np.inf,(action_dim,))
+        self.env = dummy(observation_dim, action_dim)
+        self.env_name = "dummy"
 
 class dynRandeEnv:
     def __init__(self, 
