@@ -141,14 +141,13 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
                     next_state[:,:3] = np.matmul(np.swapaxes(next_state_m,1,2), next_state_w[:,:3]).reshape((-1,3))
                     ################################################
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
-                ang_value = rot_matrix_z_similarity(next_state[:,3:12],goal[:,3:12]) # 1: 0deg, 0: >90 deg, from vertical z-axis
+                ang_value = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12]) # 1: 0deg, 0: >90 deg, from vertical z-axis
                 ang_achieve = ang_value < self.epsilon_ang
-                if self.positive_rew:
-                    reward = (1-self.gamma)*np.where(pos_achieve, 1.0, 0.0)+self.gamma*reward
-                else:
-                    reward = (1-self.gamma)*np.where(pos_achieve, 0.0, -1.0)+self.gamma*reward
+                angvel_achieve = np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)<self.epsilon_ang
+
+                reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve, angvel_achieve), 0.0, -1.0)+self.gamma*reward
                 
-                done = np.where(np.logical_and(pos_achieve, ang_achieve) , 1.0, 0.0)
+                done = np.where(np.logical_and(pos_achieve, ang_achieve, angvel_achieve) , 1.0, 0.0)
 
             elif self.env_name == 'Pendulum-v0':
                 theta = np.arctan2(next_state[:,1:2],next_state[:,0:1])
@@ -253,13 +252,14 @@ class SingleHindsightReplayBufferRNN(ReplayBufferRNN):
                     next_state_new = next_state_new[:,:,0]
                     ################################################
                 pos_achieve = np.linalg.norm(next_state_new[:,:3],axis=-1) < self.epsilon_pos
-                ang_value = np.clip(next_state_new[:,11],0,1) # 1: 0deg, 0: >90 deg, from vertical z-axis
+                ang_value = next_state_new[:,11] # 1: 0deg, -1: 180 deg, from vertical z-axis
                 ang_achieve = np.arccos(ang_value) < self.epsilon_ang
 
                 # Cumulative rewards
                 cum_ang_value = np.cumsum(ang_value)
-                for i in range(ang_value.shape[0]-1, -1, -1):
-                    cum_ang_value[i] = cum_ang_value[i]-cum_ang_value[max(i-self.maintain_length,0)]
+                for j in range(ang_value.shape[0]-1, 0, -1):
+                    cum_ang_value[j] = max(1,self.maintain_length/j) * (cum_ang_value[j]-cum_ang_value[max(j-self.maintain_length,0)])
+                    # cum_ang_value[j] = cum_ang_value[j]-cum_ang_value[max(j-self.maintain_length,0)]
                 reward_new = np.where(pos_achieve, self.reward_scale*cum_ang_value -1, -1.0)
                 
                 done_new = np.where(pos_achieve , 1.0, 0.0)

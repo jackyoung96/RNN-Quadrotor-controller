@@ -119,8 +119,12 @@ def train(args, hparam):
         wandb.run.name = "%s_%s"%(rnn_tag, now)
         wandb.run.save()
     
-    device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
-    torch.cuda.set_device(device)
+    if args.gpu >= 0:
+        device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
+        torch.cuda.set_device(device)
+    else:
+        device=torch.device('cpu')
+    
     print("Device:",device)
 
     ####################################
