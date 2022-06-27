@@ -80,7 +80,7 @@ def train(args, hparam):
     eval_noise_scale = eval_noise_scale_init
     best_score = -np.inf
     frame_idx   = 0
-    replay_buffer_size = 2e5 if args.rnn != "None" else 2e5 * max_steps
+    replay_buffer_size = 2e5 if args.rnn != "None" else 2e5
     explore_episode = 1000
     update_itr = 2
     writer_interval = 200
@@ -177,7 +177,7 @@ def train(args, hparam):
                         0,0,1,
                         0,0,0, # velocity
                         0,0,0,# angular velocity
-                        0,0,0,0] for theta in thetas]) # dummy action goal
+                        ] for theta in thetas]) # dummy action goal
 
         for step in range(max_steps):
             hidden_in = hidden_out

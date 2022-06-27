@@ -509,7 +509,7 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
                                                         explore_noise_scale=0.0)
 
                 time_buffer.append(time.time()-start)
-                action = action[None,:]
+
                 next_state, reward, done, _ = eval_env.step(action) 
                 
                 # Metric (position, angle error)
