@@ -517,7 +517,7 @@ def generate_ff_helper(path, state_dim, action_dim, output_path=None):
 						bias2str(model['linear2.bias']) + ";\n"
 
 	# linear_3_weight
-	structure += """static const float linear_3_weight[%d][%d] = """%(hidden_dim,2)+\
+	structure += """static const float linear_3_weight[%d][%d] = """%(hidden_dim,hidden_dim)+\
 						weight2str(model['linear3.weight']) + ";\n"
 	# linear_3_bias
 	structure += """static const float linear_3_bias[%d] = """%(hidden_dim)+\
@@ -648,10 +648,10 @@ if __name__ == "__main__" :
 	# generate_lstm_helper(path, 22, 4, 0, output_path=output_path)
 
 	# None 
-	generate_ff_helper(path, 22, 4, output_path=output_path)
+	generate_ff_helper("../artifacts/agent-22Jun23162349:v21/iter0220000_policy.pt", 22, 4, output_path="models/FF_network.c")
 	# RNN2
-	generate_rnn_helper(path, 22, 4, 0, output_path=output_path)
-	# RNN-HER
-	generate_rnn_helper(path, 22, 4, 18, output_path=output_path)
-	# RNN-sgHER
-	generate_rnn_helper(path, 22, 4, 0, output_path=output_path)
+	# generate_rnn_helper(path, 22, 4, 0, output_path=output_path)
+	# # RNN-HER
+	# generate_rnn_helper(path, 22, 4, 18, output_path=output_path)
+	# # RNN-sgHER
+	# generate_rnn_helper(path, 22, 4, 0, output_path=output_path)

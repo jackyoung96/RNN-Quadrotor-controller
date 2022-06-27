@@ -307,7 +307,6 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
             goal = self.bm_g(goal.view(B*L,-1)).view(*g_shape)
 
         sg_cat = torch.cat([state,goal], dim=-1)
-        print(sg_cat.shape, state.shape, goal.shape)
         fc_x = self.actf(self.linear1(sg_cat))  
         # fc_x = F.relu(self.linear2(fc_x)) 
         sa_cat = torch.cat([state,last_action], dim=-1)

@@ -83,19 +83,20 @@ def main(hparam):
 
     if 'waypoint' in hparam['task']:
         waypoints = [
-            (np.array([[0,  0,  0.025]]),0),
-            (np.array([[0,  0,  1.025]]),200), # (pos, time)
-            (np.array([[1.0,0,  1.025]]),400),
+            (np.array([[0,  0,  0.125]]),0),
+            (np.array([[0,  0,  1.025]]),400), # (pos, time)
+            # (np.array([[1.0,0,  1.025]]),400),
             # (np.array([[0.5,0.5,1.025]]),1200),
             # (np.array([[0,  0.5,1.025]]),1600),
             # (np.array([[0,  0,  1.025]]),2000)
         ]
-        waypoints = [
-            (np.array([[0,  0,  0.025+i/400]]),i) for i in range(401) if i%5==0
-        ]
+        # waypoints = [
+        #     (np.array([[0,  0,  0.025+i/400]]),i) for i in range(401) if i%5==0
+        # ]
         theta = np.random.uniform(0,2*np.pi)
         # theta = np.deg2rad(30)
-        initial_rpys = np.array([[0.0,0.0,theta]])
+        # initial_rpys = np.array([[0.0,0.0,theta]])
+        initial_rpys = np.array([[np.pi/6,0.0,0.0]])
         rpy_noise = 0
         vel_noise = 0
         angvel_noise = 0
@@ -191,6 +192,7 @@ def main(hparam):
         state_buffer, action_buffer, reward_buffer = [],[],[]
         reward_sum = 0
         critic_buffer = []
+        hidden_buffer = []
         drone_state_buffer = pd.DataFrame()
 
         for i_step in range(max_steps):
@@ -202,6 +204,8 @@ def main(hparam):
             # if i_step % 50 == 0:
             #     hidden_out = hidden_out_zero
             #     last_action = -np.ones_like(last_action)
+
+
             if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                 hidden_in = hidden_out
                 if not hasattr(agent.q_net1, '_goal_dim'):
@@ -220,11 +224,20 @@ def main(hparam):
                                                         deterministic=DETERMINISTIC, 
                                                         explore_noise_scale=0.0)
             else:
+                # state = np.array([
+                #     0, -0.075, -0.1299,
+                #     1,0,0,
+                #     0,0.866,-0.5,
+                #     0,0.5,0.866,
+                #     0,0,0,
+                #     0,0,0,
+                #     -0.7,-0.7,-0.7,-0.7
+                # ])[None,:]
                 action = agent.policy_net.get_action(state, 
                                                     last_action,
                                                     deterministic=DETERMINISTIC, 
                                                     explore_noise_scale=0.0)
-
+            
             next_state, reward, done, info = env.step(action)
             reward_sum += reward
             
@@ -254,6 +267,7 @@ def main(hparam):
 
             state_buffer.append(state)
             action_buffer.append(action)
+            hidden_buffer.append(hidden_out.detach().cpu().numpy())
             if not isinstance(action, np.ndarray):
                 action = np.array([action])
 
@@ -268,6 +282,8 @@ def main(hparam):
             and 'stabilize' in hparam['task']: 
             eval_success = 1
 
+    np.savetxt('state.txt', np.concatenate(state_buffer).squeeze(), delimiter=' ')
+    np.savetxt('action.txt', np.concatenate(action_buffer).squeeze(), delimiter=' ')
     drone_state_buffer.to_csv('paperworks/%s.csv'%(hparam['rnn']+hparam['task']), header=False)
     print("EVALUATION SUCCESS RATE:", eval_success)
     print("EVALUATION POSITION ERROR[m]:", eval_position)
