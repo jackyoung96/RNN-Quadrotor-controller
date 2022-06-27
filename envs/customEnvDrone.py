@@ -54,7 +54,7 @@ class customAviary(gym.Wrapper):
         self.reward_coeff = kwargs.get('reward_coeff', None)
 
         self.env.EPISODE_LEN_SEC = kwargs.get('episode_len_sec', 2)
-        self.MAX_RPM = kwargs.get('max_rpm', 2**16-1)
+        self.MAX_RPM = kwargs.get('max_rpm', 24000)
         self.env.SIM_FREQ = kwargs.get('freq', 240)
 
         if not self.task in TASK_LIST:
@@ -85,6 +85,7 @@ class customAviary(gym.Wrapper):
         
         self.reward_buf = []
         self.reward_steps = 0
+        self.angvel_bias = np.zeros(3)
 
         # Recording
         if self.env.RECORD:
@@ -176,6 +177,7 @@ class customAviary(gym.Wrapper):
 
         """
         #### Initialize/reset counters and zero-valued variables ###
+        self.angvel_bias = np.zeros(3)
         self.env.RESET_TIME = time.time()
         self.env.step_counter = 0
         self.env.first_render_call = True
@@ -275,31 +277,46 @@ class customAviary(gym.Wrapper):
 
         return np.hstack(self.frame_buffer).reshape((obs_len * self.frame_stack,))
 
+    def _angvel_noise(self, angvel, ANGVEL_NOISE):
+        dt = 1 / self.env.SIM_FREQ
+        sigma_g_d = ANGVEL_NOISE[0] / (dt**0.5)
+        sigma_b_g_d = (-(sigma_g_d**2) * (ANGVEL_NOISE[2] / 2) * (np.exp(-2*dt/ANGVEL_NOISE[2]) - 1))**0.5
+        pi_g_d = np.exp(-dt / ANGVEL_NOISE[2])
+
+        self.angvel_bias = pi_g_d * self.angvel_bias + sigma_b_g_d * np.random.normal(0, 1, 3)
+        return angvel + self.angvel_bias + ANGVEL_NOISE[1] * np.random.normal(0, 1, 3) # + self.gyro_turn_on_bias_sigma * normal(0, 1, 3)
+
     def _normalizeState(self,
                                 state,
                                 type
                                ):
         MAX_LIN_VEL = 3 
-
         MAX_XYZ = MAX_LIN_VEL * 2# * self.env.EPISODE_LEN_SEC
-
         MAX_ROLL_YAW = np.pi
         MAX_PITCH = np.pi/2
-
         MAX_RPY_RATE = 2 * np.pi # temporary
+
+        # Noise
+        POS_NOISE = 0.005
+        VEL_NOISE = 0.01
+        ROT_NOISE = 0.0
+        ANGVEL_NOISE = [0.000175, 0.0105, 1000.] # MPU-9250 gyroscope spec / ref https://github.com/amolchanov86/quad_sim2multireal/blob/master/quad_sim/sensor_noise.py#L58
+        # noise density, random walk, bias correlation_time
 
         norm_state = state.copy()
 
         if type=='pos':
-            # norm_state = norm_state - self.env.INIT_XYZS[0,:]
-            # print("DEBUG", norm_state, self.goal_pos[0,:])
-            norm_state = (norm_state - self.goal_pos[0,:]) / MAX_XYZ
+            norm_state = (norm_state - self.goal_pos[0,:]) 
+            norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            norm_state = norm_state / MAX_XYZ
 
         elif type=='rel_pos':
             r = R.from_quat(norm_state[-4:])
             rot = r.as_matrix()
             pos = (norm_state[:3] - self.goal_pos[0,:3]).reshape((3,1)) 
-            norm_state = np.matmul(rot.transpose(),pos).reshape((3,)) / MAX_XYZ
+            norm_state = np.matmul(rot.transpose(),pos).reshape((3,))
+            norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            norm_state = norm_state / MAX_XYZ
 
         elif type=='quaternion':
             # don't need normalization
@@ -309,27 +326,33 @@ class customAviary(gym.Wrapper):
             # don't need normalization
             r = R.from_quat(norm_state)
             norm_state = r.as_matrix().reshape((9,))
-            pass
 
         elif type=='rpy':
-            norm_state[::2] = state[::2] / MAX_ROLL_YAW
-            norm_state[1:2] = state[1:2] / MAX_PITCH
+            norm_state[::2] = norm_state[::2] / MAX_ROLL_YAW
+            norm_state[1:2] = norm_state[1:2] / MAX_PITCH
             
         elif type=='vel':
-            norm_state = state / MAX_LIN_VEL
+            norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            norm_state = norm_state / MAX_LIN_VEL
 
         elif type=='rel_vel':
             r = R.from_quat(norm_state[-4:])
             rot = r.as_matrix()
-            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) / MAX_LIN_VEL
+            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) 
+            norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            norm_state = norm_state / MAX_LIN_VEL
 
         elif type=='angular_vel':
-            norm_state = state / MAX_RPY_RATE
+            norm_state = state.copy()
+            norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
+            norm_state = norm_state / MAX_RPY_RATE
             
         elif type=='rel_angular_vel':
             r = R.from_quat(norm_state[-4:])
             rot = r.as_matrix()
-            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) / MAX_RPY_RATE
+            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))
+            norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
+            norm_state = norm_state / MAX_RPY_RATE
             # norm_state = np.deg2rad(np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))) / MAX_RPY_RATE
 
         elif type=='rpm':
@@ -434,8 +457,8 @@ class customAviary(gym.Wrapper):
             rot = coeff['rotation'] * self._normalizeState(state[3:7],'rotation')[-1]
             f_s = xyz + vel + ang_vel - rot
 
-            d_action = coeff['d_action'] * np.linalg.norm(self._normalizeState(state[16:]-self.previous_state[16:],'rpm'),ord=2) if self.previous_state is not None else 0
-            f_a = d_action
+            # d_action = coeff['d_action'] * np.linalg.norm(self._normalizeState(state[16:]-self.previous_state[16:],'rpm'),ord=2) if self.previous_state is not None else 0
+            # f_a = d_action
             # print("XYZ",xyz/coeff['pos'],np.linalg.norm(state[:3]-self.goal_pos[0,:]),"\n",
             #     "RPY",np.linalg.norm(state[7:10]),"\n",
             #     "VEL",vel/coeff['vel'],np.linalg.norm(state[10:13]),"\n",
@@ -451,7 +474,6 @@ class customAviary(gym.Wrapper):
             #     print(self.step_counter, self.SIM_FREQ, self.EPISODE_LEN_SEC)
             #     done_reward = self.step_counter/self.SIM_FREQ - self.EPISODE_LEN_SEC
 
-            self.reward_buf.append([xyz,vel,ang_vel,d_action])
             summary_freq = self.env.EPISODE_LEN_SEC * self.env.SIM_FREQ
             # summary_freq = 1
             if len(self.reward_buf) >= summary_freq and self.reward_steps != 0:
@@ -463,7 +485,7 @@ class customAviary(gym.Wrapper):
                 self.reward_buf = []
             self.reward_steps += 1
                 
-            return -(f_s + f_a) # + done_reward
+            return -(f_s) # + done_reward
 
         elif self.task == 'stabilize3':
             # No position constrain

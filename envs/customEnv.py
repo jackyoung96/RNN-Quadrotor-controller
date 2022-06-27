@@ -316,7 +316,7 @@ class domainRandeEnv(parallelEnv):
                     task='stabilize2',
                     reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
                     episode_len_sec=2,
-                    max_rpm=66535,
+                    max_rpm=24000,
                     initial_xyzs=[[0.0,0.0,10000.0]], # Far from the ground
                     freq=200,
                     rpy_noise=np.pi/4,
@@ -495,13 +495,13 @@ class dynRandeEnv:
             initial_xyzs = [[0.0,0.0,10000.0]]
             rpy_noise=np.pi
             vel_noise=1.0
-            angvel_noise=180
+            angvel_noise=2*np.pi
             goal = None
         elif self.task == 'stabilize-record':
             initial_xyzs = [[0.0,0.0,1.5]]
             rpy_noise=np.pi
             vel_noise=1.0
-            angvel_noise=180
+            angvel_noise=2*np.pi
             goal = None
         elif self.task == 'takeoff':
             initial_xyzs = [[0.0,0.0,0.025]]
@@ -523,14 +523,14 @@ class dynRandeEnv:
             obs=ObservationType.KIN,
             act=ActionType.RPM)
         env = domainRandomAviary(env, self.tag+str(time.time_ns()), idx, self.seed+idx,
-            observable=['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel', 'rpm'],
+            observable=['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel'],
             frame_stack=1,
             task='stabilize2',
             # reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
             # reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.0, 'rotation': 0.05},
             reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.0, 'rotation': 0.5},
             episode_len_sec=self.episode_len,
-            max_rpm=66535,
+            max_rpm=24000,
             initial_xyzs=np.array(initial_xyzs), # Far from the ground
             initial_rpys=np.array([[0.0,0.0,0.0]]),
             freq=200,
