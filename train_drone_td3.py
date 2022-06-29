@@ -48,8 +48,8 @@ hparam_set = {
     "q_lr": [1e-3],
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
-    "max_steps": [200],
-    "her_length": [200]
+    "max_steps": [800],
+    "her_length": [800]
 }
 
 def train(args, hparam):
@@ -61,7 +61,7 @@ def train(args, hparam):
     max_episodes  = int(3e5)
     hidden_dim = hparam['hidden_dim']
     max_steps = hparam['max_steps']
-    eval_max_steps = 300
+    eval_max_steps = 1000
     goal_dim = hparam['goal_dim']
     param_num = hparam['param_num']
     her_history_length = hparam['her_length']
@@ -82,7 +82,7 @@ def train(args, hparam):
     frame_idx   = 0
     replay_buffer_size = 2e5 if args.rnn != "None" else 2e5
     explore_episode = 1000
-    update_itr = 2
+    update_itr = 100
     writer_interval = 200
     eval_freq = 2000
     eval_itr = 25
