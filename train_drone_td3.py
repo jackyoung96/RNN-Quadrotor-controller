@@ -44,11 +44,12 @@ hparam_set = {
     "param_num": [14],
     "hidden_dim": [48],
 
+
     "q_lr": [1e-3],
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
-    "max_steps": [200],
-    "her_length": [200]
+    "max_steps": [800],
+    "her_length": [800]
 }
 
 def train(args, hparam):
@@ -57,10 +58,10 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(2e5)
+    max_episodes  = int(3e5)
     hidden_dim = hparam['hidden_dim']
     max_steps = hparam['max_steps']
-    eval_max_steps = 300
+    eval_max_steps = 1000
     goal_dim = hparam['goal_dim']
     param_num = hparam['param_num']
     her_history_length = hparam['her_length']
@@ -71,7 +72,7 @@ def train(args, hparam):
     hparam.update({"epsilon_pos":epsilon_pos,
                    "epsilon_ang":epsilon_ang})
 
-    batch_size  = 128 if args.rnn != "None" else 128 * her_history_length
+    batch_size  = 128 if args.rnn != "None" else 128
     nenvs = 1
     explore_noise_scale_init = 0.25
     eval_noise_scale_init = 0.25
@@ -79,9 +80,9 @@ def train(args, hparam):
     eval_noise_scale = eval_noise_scale_init
     best_score = -np.inf
     frame_idx   = 0
-    replay_buffer_size = 2e5 if args.rnn != "None" else 2e5 * max_steps
+    replay_buffer_size = 2e5 if args.rnn != "None" else 2e5
     explore_episode = 1000
-    update_itr = 2
+    update_itr = 100
     writer_interval = 200
     eval_freq = 2000
     eval_itr = 25
@@ -119,8 +120,12 @@ def train(args, hparam):
         wandb.run.name = "%s_%s"%(rnn_tag, now)
         wandb.run.save()
     
-    device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
-    torch.cuda.set_device(device)
+    if args.gpu >= 0:
+        device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
+        torch.cuda.set_device(device)
+    else:
+        device=torch.device('cpu')
+    
     print("Device:",device)
 
     ####################################
@@ -172,7 +177,7 @@ def train(args, hparam):
                         0,0,1,
                         0,0,0, # velocity
                         0,0,0,# angular velocity
-                        0,0,0,0] for theta in thetas]) # dummy action goal
+                        ] for theta in thetas]) # dummy action goal
 
         for step in range(max_steps):
             hidden_in = hidden_out
@@ -290,7 +295,7 @@ def train(args, hparam):
                         'loss/velocity[m_s]': np.linalg.norm((3*np.stack(unnormed_state)[:,:,12:15]), axis=-1).mean(),
                         'loss/ang_velocity[deg_s]': np.linalg.norm((2*180*np.stack(unnormed_state)[:,:,15:18]), axis=-1).mean(),
                         'loss/angle[deg]': 180/np.pi*np.arccos(np.clip(np.stack(unnormed_state)[:,:,11].flatten(),-1.0,1.0)).mean(),
-                        'loss/rpm': (1+np.stack(unnormed_state)[:,:,-4:]).mean()},
+                        'loss/rpm': (1+np.stack(unnormed_state)[:,:,-4:]).mean()/2},
                          step=i_episode)
                 
 
@@ -374,6 +379,9 @@ def test(args, hparam):
     td3_trainer.load_model(args.path)
     td3_trainer.policy_net.eval()
     
+    action, hidden1 = td3_trainer.policy_net.get_action(np.ones((1,22)),np.zeros((1,4)),torch.zeros((1,1,32)),np.array([[0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0]]),True,0.0)
+    action2, hidden2 = td3_trainer.policy_net.get_action(np.concatenate([np.ones((1,18)),action[None,:]], axis=-1),action[None,:],hidden1,np.array([[0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0]]),True,0.0)
+
     eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, max_steps=max_steps, test_itr=10, record=args.record, log=True)
     print("EVALUATION REWARD:",eval_rew)
     print("EVALUATION SUCCESS RATE:",eval_success)
@@ -406,6 +414,11 @@ if __name__=='__main__':
     parser.add_argument('--small_lr', action='store_true', help='use small lr')
     parser.add_argument('--behavior_path', default=None, help='path for behavior networks')
     parser.add_argument('--seed', type=int, default=0, help='seed')
+
+    parser.add_argument('--single_pos', action='store_true', help="Single pose for HER")
+
+    parser.add_argument('--reward_scale', default=1.0, type=float, help="reward scale for sgHER")
+    parser.add_argument('--maintain_length', default=1, type=int, help="maintain_length for sgHER")
 
     # Arguments for test
     parser.add_argument('--test', action='store_true')

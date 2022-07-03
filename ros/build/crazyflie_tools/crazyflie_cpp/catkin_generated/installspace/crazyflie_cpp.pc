@@ -1,0 +1,8 @@
+prefix=/home/jack/crazyflie/sim-to-real-TD3/ros/install
+
+Name: crazyflie_cpp
+Description: Description of crazyflie_cpp
+Version: 0.0.1
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib -lcrazyflie_cpp
+Requires: 

@@ -83,15 +83,20 @@ def main(hparam):
 
     if 'waypoint' in hparam['task']:
         waypoints = [
-            (np.array([[0,  0,  0.025]]),0),
-            (np.array([[0,  0,  0.525]]),400), # (pos, time)
-            (np.array([[0.5,0,  0.525]]),800),
+            (np.array([[0,  0,  0.125]]),0),
+            (np.array([[0,  0,  1.025]]),400), # (pos, time)
+            # (np.array([[1.0,0,  1.025]]),400),
             # (np.array([[0.5,0.5,1.025]]),1200),
             # (np.array([[0,  0.5,1.025]]),1600),
             # (np.array([[0,  0,  1.025]]),2000)
         ]
+        # waypoints = [
+        #     (np.array([[0,  0,  0.025+i/400]]),i) for i in range(401) if i%5==0
+        # ]
         theta = np.random.uniform(0,2*np.pi)
-        initial_rpys = np.array([[0.0,0.0,theta]])
+        # theta = np.deg2rad(30)
+        # initial_rpys = np.array([[0.0,0.0,theta]])
+        initial_rpys = np.array([[np.pi/6,0.0,0.0]])
         rpy_noise = 0
         vel_noise = 0
         angvel_noise = 0
@@ -99,12 +104,12 @@ def main(hparam):
     elif 'stabilize' in hparam['task']:
         waypoints = [
             (np.array([[0,  0,  1.0]]),0),
-            (None, 300), # (pos, time)
+            (np.array([[0,  0,  1.0]]), 300), # (pos, time)
         ]
         initial_rpys = np.random.uniform(-np.pi, np.pi, size=(1,3))
-        rpy_noise = 180
+        rpy_noise = np.pi
         vel_noise = 1.0
-        angvel_noise = np.pi/2
+        angvel_noise = 2*np.pi
         max_steps = waypoints[-1][1]
     else:
         raise NotImplementedError
@@ -116,6 +121,7 @@ def main(hparam):
         initial_xyzs=waypoints[0][0],
         initial_rpys=initial_rpys,
         physics=Physics.PYB_GND_DRAG_DW,
+        # physics=Physics.PYB_DRAG,
         freq=200,
         aggregate_phy_steps=1,
         gui=hparam['render'],
@@ -124,12 +130,12 @@ def main(hparam):
         act=ActionType.RPM)
     env = domainRandomAviary(env, "testCoRL", 0, 9999999,
         # observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
-        observable=['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel', 'rpm'],
+        observable=['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel'],
         frame_stack=1,
         task='stabilize2',
-        reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.01, 'd_action':0.0, 'rotation': 0.5},
+        reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'rotation': 0.5},
         episode_len_sec=max_steps/200,
-        max_rpm=66535,
+        max_rpm=24000,
         initial_xyzs=waypoints[0][0], # Far from the ground
         initial_rpys=initial_rpys,
         freq=200,
@@ -159,14 +165,14 @@ def main(hparam):
     eval_position = 0 
     eval_angle = 0
 
-    theta = np.random.uniform(0,2*np.pi)
+    # theta = np.random.uniform(0,2*np.pi)
     goal = np.array([[0,0,0, # pos
                     np.cos(theta),-np.sin(theta),0,
                     np.sin(theta),np.cos(theta),0,
                     0,0,1, # rotation matrix
                     0,0,0, # vel
                     0,0,0, # ang vel
-                    0,0,0,0]]) # dummy action
+                    ]])
 
     with torch.no_grad():
         env.env.envs[0].goal = getgoal(waypoints, 0)
@@ -186,6 +192,7 @@ def main(hparam):
         state_buffer, action_buffer, reward_buffer = [],[],[]
         reward_sum = 0
         critic_buffer = []
+        hidden_buffer = []
         drone_state_buffer = pd.DataFrame()
 
         for i_step in range(max_steps):
@@ -194,6 +201,10 @@ def main(hparam):
                 env.env.envs[0].goal_pos = goal_pos
                 # hidden_out = hidden_out_zero
                 # last_action = -np.ones_like(last_action)
+            # if i_step % 50 == 0:
+            #     hidden_out = hidden_out_zero
+            #     last_action = -np.ones_like(last_action)
+
 
             if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                 hidden_in = hidden_out
@@ -213,11 +224,20 @@ def main(hparam):
                                                         deterministic=DETERMINISTIC, 
                                                         explore_noise_scale=0.0)
             else:
+                # state = np.array([
+                #     0, -0.075, -0.1299,
+                #     1,0,0,
+                #     0,0.866,-0.5,
+                #     0,0.5,0.866,
+                #     0,0,0,
+                #     0,0,0,
+                #     -0.7,-0.7,-0.7,-0.7
+                # ])[None,:]
                 action = agent.policy_net.get_action(state, 
                                                     last_action,
                                                     deterministic=DETERMINISTIC, 
                                                     explore_noise_scale=0.0)
-
+            
             next_state, reward, done, info = env.step(action)
             reward_sum += reward
             
@@ -247,6 +267,7 @@ def main(hparam):
 
             state_buffer.append(state)
             action_buffer.append(action)
+            hidden_buffer.append(hidden_out.detach().cpu().numpy())
             if not isinstance(action, np.ndarray):
                 action = np.array([action])
 
@@ -254,18 +275,21 @@ def main(hparam):
             last_action = action
 
 
-        eval_position = np.mean(e_ps)
-        eval_angle = np.mean(e_as)
+        eval_position = np.mean(e_ps[-100:])
+        eval_angle = np.mean(e_as[-100:])
         
-        if np.sum(np.where(np.array(e_as) < 10, 1, 0)[-100:]) == 100: 
+        if np.sum(np.where(np.array(e_as) < 10, 1, 0)[-100:]) == 100\
+            and 'stabilize' in hparam['task']: 
             eval_success = 1
 
+    np.savetxt('state.txt', np.concatenate(state_buffer).squeeze(), delimiter=' ')
+    np.savetxt('action.txt', np.concatenate(action_buffer).squeeze(), delimiter=' ')
     drone_state_buffer.to_csv('paperworks/%s.csv'%(hparam['rnn']+hparam['task']), header=False)
     print("EVALUATION SUCCESS RATE:", eval_success)
     print("EVALUATION POSITION ERROR[m]:", eval_position)
     print("EVALUATION ANGLE ERROR[deg]:", eval_angle)
 
-    print("EVALUATION ANGVEL ERROR[deg/s]:", np.linalg.norm((2*180*np.stack(state_buffer)[:,:,15:18]), axis=-1).mean())
+    print("EVALUATION ANGVEL ERROR[deg/s]:", np.linalg.norm((2*180*np.stack(state_buffer)[:,:,15:18]), axis=-1)[-100:].mean())
 
     # disp.stop()
 
