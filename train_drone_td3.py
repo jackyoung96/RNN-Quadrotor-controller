@@ -72,7 +72,7 @@ def train(args, hparam):
     hparam.update({"epsilon_pos":epsilon_pos,
                    "epsilon_ang":epsilon_ang})
 
-    batch_size  = 128 if args.rnn != "None" else 128 * her_history_length
+    batch_size  = 128 if args.rnn != "None" else 128
     nenvs = 1
     explore_noise_scale_init = 0.25
     eval_noise_scale_init = 0.25

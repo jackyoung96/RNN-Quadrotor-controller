@@ -402,16 +402,21 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
         else:
             hidden_in = torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device)
 
-        predicted_q_value1 = self.q_net1(state, action, param)
-        predicted_q_value2 = self.q_net2(state, action, param)
         new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_in, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
+        # I.I.D condition for non-recurrent critic
+        iid = [[i for i in range(B)],list(np.random.randint(0,L,B))]
+        
+        predicted_q_value1 = self.q_net1(state[iid], action[iid], param[iid])
+        predicted_q_value2 = self.q_net2(state[iid], action[iid], param[iid])
+
         # Training Q Function
-        predicted_target_q1 = self.target_q_net1(next_state, new_next_action, param)
-        predicted_target_q2 = self.target_q_net2(next_state, new_next_action, param)
+        predicted_target_q1 = self.target_q_net1(next_state[iid], new_next_action[iid], param[iid])
+        predicted_target_q2 = self.target_q_net2(next_state[iid], new_next_action[iid], param[iid])
+
         target_q_min = torch.min(predicted_target_q1, predicted_target_q2)
 
-        target_q_value = reward + (1 - done) * gamma * target_q_min # if done==1, only reward
+        target_q_value = reward[iid] + (1 - done[iid]) * gamma * target_q_min # if done==1, only reward
 
         q_value_loss1 = ((predicted_q_value1 - target_q_value.detach())**2).mean()  # detach: no gradients for the variable
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         
@@ -437,7 +442,7 @@ class TD3RNN_Trainer2(TD3RNN_Trainer):
             policy_loss = - predicted_new_q_value.mean()
             self.policy_optimizer.zero_grad()
             policy_loss.backward()
-            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
+            # nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
             self.policy_optimizer.step()
             if self.lr_scheduler:
                 self.scheduler_policy.step()
