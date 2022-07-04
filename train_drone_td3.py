@@ -49,7 +49,7 @@ hparam_set = {
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
     "max_steps": [800],
-    "her_length": [800]
+    "her_length": [8]
 }
 
 def train(args, hparam):
@@ -215,6 +215,8 @@ def train(args, hparam):
             state = next_state
             last_action = action
             frame_idx += 1
+
+        episode_done[-1] = np.ones_like(episode_done[-1])
         
         # Push into Experience replay buffer
         if args.rnn in ["RNNHER","LSTMHER","GRUHER"]:
@@ -398,6 +400,7 @@ if __name__=='__main__':
     # Common arguments
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--rnn', choices=['None','RNN2','GRU2','LSTM2',
+                                            'RNN3','GRU3','LSTM3',
                                             'RNNHER','GRUHER','LSTMHER',
                                             'RNNsHER','GRUsHER','LSTMsHER']
                                 , default='None', help='Use memory network (LSTM)')
