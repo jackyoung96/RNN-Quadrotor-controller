@@ -446,13 +446,13 @@ class customAviary(gym.Wrapper):
             coeff = {
                 'pos': 6 * self.reward_coeff['pos'], # 0~3
                 'vel': 3 * self.reward_coeff['vel'], # 10~13
-                'ang_vel': 2*np.pi * self.reward_coeff['ang_vel'], # 13~16
+                'ang_vel': self.reward_coeff['ang_vel'], # 13~16
                 'd_action': self.reward_coeff['d_action'], # 16~20
                 'rotation': self.reward_coeff['rotation']
             }
             xyz = coeff['pos'] * np.linalg.norm(self._normalizeState(state[:3],'pos'), ord=2) # for single agent temporarily
             vel = coeff['vel'] * np.linalg.norm(self._normalizeState(state[10:13],'vel'),ord=2)
-            ang_vel = coeff['ang_vel'] * np.linalg.norm(self._normalizeState(state[13:16],'angular_vel'),ord=2)
+            ang_vel = coeff['ang_vel'] * np.linalg.norm(state[13:16],ord=2)
             
             rot = coeff['rotation'] * self._normalizeState(state[3:7],'rotation')[-1]
             f_s = xyz + vel + ang_vel - rot

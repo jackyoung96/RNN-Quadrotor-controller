@@ -83,9 +83,9 @@ def main(hparam):
 
     if 'waypoint' in hparam['task']:
         waypoints = [
-            (np.array([[0,  0,  0.125]]),0),
+            (np.array([[0,  0,  0.025]]),0),
             (np.array([[0,  0,  1.025]]),400), # (pos, time)
-            # (np.array([[1.0,0,  1.025]]),400),
+            (np.array([[1.0,0,  1.025]]),800),
             # (np.array([[0.5,0.5,1.025]]),1200),
             # (np.array([[0,  0.5,1.025]]),1600),
             # (np.array([[0,  0,  1.025]]),2000)
@@ -95,8 +95,8 @@ def main(hparam):
         # ]
         theta = np.random.uniform(0,2*np.pi)
         # theta = np.deg2rad(30)
-        # initial_rpys = np.array([[0.0,0.0,theta]])
-        initial_rpys = np.array([[np.pi/6,0.0,0.0]])
+        initial_rpys = np.array([[0.0,0.0,theta]])
+        # initial_rpys = np.array([[0.0,0.0,0.0]])
         rpy_noise = 0
         vel_noise = 0
         angvel_noise = 0
@@ -104,8 +104,9 @@ def main(hparam):
     elif 'stabilize' in hparam['task']:
         waypoints = [
             (np.array([[0,  0,  1.0]]),0),
-            (np.array([[0,  0,  1.0]]), 300), # (pos, time)
+            (np.array([[0,  0,  1.0]]), 1000), # (pos, time)
         ]
+        theta = 0
         initial_rpys = np.random.uniform(-np.pi, np.pi, size=(1,3))
         rpy_noise = np.pi
         vel_noise = 1.0
@@ -130,12 +131,12 @@ def main(hparam):
         act=ActionType.RPM)
     env = domainRandomAviary(env, "testCoRL", 0, 9999999,
         # observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
-        observable=['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel', 'rpm'],
+        observable=['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel'],
         frame_stack=1,
         task='stabilize2',
-        reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.0, 'rotation': 0.5},
+        reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action': 0.0, 'rotation': 0.5},
         episode_len_sec=max_steps/200,
-        max_rpm=66535,
+        max_rpm=24000,
         initial_xyzs=waypoints[0][0], # Far from the ground
         initial_rpys=initial_rpys,
         freq=200,
@@ -172,7 +173,7 @@ def main(hparam):
                     0,0,1, # rotation matrix
                     0,0,0, # vel
                     0,0,0, # ang vel
-                    0,0,0,0]]) # dummy action
+                    ]])
 
     with torch.no_grad():
         env.env.envs[0].goal = getgoal(waypoints, 0)
