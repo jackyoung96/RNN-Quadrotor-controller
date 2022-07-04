@@ -48,8 +48,8 @@ hparam_set = {
     "q_lr": [1e-3],
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
-    "max_steps": [200],
-    "her_length": [200]
+    "max_steps": [800],
+    "her_length": [8]
 }
 
 def train(args, hparam):
@@ -61,7 +61,7 @@ def train(args, hparam):
     max_episodes  = int(3e5)
     hidden_dim = hparam['hidden_dim']
     max_steps = hparam['max_steps']
-    eval_max_steps = 300
+    eval_max_steps = 1000
     goal_dim = hparam['goal_dim']
     param_num = hparam['param_num']
     her_history_length = hparam['her_length']
@@ -72,7 +72,7 @@ def train(args, hparam):
     hparam.update({"epsilon_pos":epsilon_pos,
                    "epsilon_ang":epsilon_ang})
 
-    batch_size  = 128 if args.rnn != "None" else 128 * her_history_length
+    batch_size  = 128 if args.rnn != "None" else 128
     nenvs = 1
     explore_noise_scale_init = 0.25
     eval_noise_scale_init = 0.25
@@ -82,7 +82,7 @@ def train(args, hparam):
     frame_idx   = 0
     replay_buffer_size = 2e5 if args.rnn != "None" else 2e5
     explore_episode = 1000
-    update_itr = 2
+    update_itr = 100
     writer_interval = 200
     eval_freq = 2000
     eval_itr = 25
@@ -215,6 +215,8 @@ def train(args, hparam):
             state = next_state
             last_action = action
             frame_idx += 1
+
+        episode_done[-1] = np.ones_like(episode_done[-1])
         
         # Push into Experience replay buffer
         if args.rnn in ["RNNHER","LSTMHER","GRUHER"]:
@@ -398,6 +400,7 @@ if __name__=='__main__':
     # Common arguments
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--rnn', choices=['None','RNN2','GRU2','LSTM2',
+                                            'RNN3','GRU3','LSTM3',
                                             'RNNHER','GRUHER','LSTMHER',
                                             'RNNsHER','GRUsHER','LSTMsHER']
                                 , default='None', help='Use memory network (LSTM)')

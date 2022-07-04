@@ -118,9 +118,10 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
     
     def push(self, state, action, last_action, reward, next_state, done, param, goal):
         gs = [goal[None,:]]
-        if np.random.random()<0.8 and self.her:
-            goal = next_state[-1:,:].copy()
-            goal[:,:3] = 0
+        if np.random.random()<0.8:
+            goal = next_state[-1:,:].copy() # Achieved goal
+            if self.single_pos:
+                goal[:,:3] = 0 # Single goal
             gs.append(goal)
 
         for i,goal in enumerate(gs):
@@ -147,7 +148,7 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
 
                 reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve, angvel_achieve), 0.0, -1.0)+self.gamma*reward
                 
-                done = np.where(np.logical_and(pos_achieve, ang_achieve, angvel_achieve) , 1.0, 0.0)
+                # done = np.where(np.logical_and(pos_achieve, ang_achieve, angvel_achieve) , 1.0, 0.0)
 
             elif self.env_name == 'Pendulum-v0':
                 theta = np.arctan2(next_state[:,1:2],next_state[:,0:1])
