@@ -132,7 +132,13 @@ class QNetworkGoalParam(QNetworkBase):
         else:
             assert True, "Something wrong"
 
-        goal = goal[:,:,:self._goal_dim]
+        if len(goal.shape)==2:
+            goal = goal[:,:self._goal_dim]
+        elif len(goal.shape)==3:
+            goal = goal[:,:,:self._goal_dim]
+        else:
+            raise "Something wrong"
+
         if self.batchnorm:
             s_shape, g_shape = state.shape, goal.shape
             state = self.bm_s(state.view(B*L,-1)).view(*s_shape)

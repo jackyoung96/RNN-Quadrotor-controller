@@ -306,8 +306,8 @@ class customAviary(gym.Wrapper):
         norm_state = state.copy()
 
         if type=='pos':
-            norm_state = (norm_state - self.goal_pos[0,:]) 
-            norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            norm_state = (norm_state - self.goal_pos[0,:3]) 
+            # norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
             norm_state = norm_state / MAX_XYZ
 
         elif type=='rel_pos':
@@ -332,7 +332,7 @@ class customAviary(gym.Wrapper):
             norm_state[1:2] = norm_state[1:2] / MAX_PITCH
             
         elif type=='vel':
-            norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            # norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
             norm_state = norm_state / MAX_LIN_VEL
 
         elif type=='rel_vel':
@@ -344,7 +344,7 @@ class customAviary(gym.Wrapper):
 
         elif type=='angular_vel':
             norm_state = state.copy()
-            norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
+            # norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
             norm_state = norm_state / MAX_RPY_RATE
             
         elif type=='rel_angular_vel':
@@ -446,13 +446,13 @@ class customAviary(gym.Wrapper):
             coeff = {
                 'pos': 6 * self.reward_coeff['pos'], # 0~3
                 'vel': 3 * self.reward_coeff['vel'], # 10~13
-                'ang_vel': 2*np.pi * self.reward_coeff['ang_vel'], # 13~16
+                'ang_vel': self.reward_coeff['ang_vel'], # 13~16
                 'd_action': self.reward_coeff['d_action'], # 16~20
                 'rotation': self.reward_coeff['rotation']
             }
             xyz = coeff['pos'] * np.linalg.norm(self._normalizeState(state[:3],'pos'), ord=2) # for single agent temporarily
             vel = coeff['vel'] * np.linalg.norm(self._normalizeState(state[10:13],'vel'),ord=2)
-            ang_vel = coeff['ang_vel'] * np.linalg.norm(self._normalizeState(state[13:16],'angular_vel'),ord=2)
+            ang_vel = coeff['ang_vel'] * np.linalg.norm(state[13:16],ord=2)
             
             rot = coeff['rotation'] * self._normalizeState(state[3:7],'rotation')[-1]
             f_s = xyz + vel + ang_vel - rot
