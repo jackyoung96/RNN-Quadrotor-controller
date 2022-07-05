@@ -144,9 +144,9 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
                 pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
                 ang_value = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12]) # 1: 0deg, 0: >90 deg, from vertical z-axis
                 ang_achieve = ang_value < self.epsilon_ang
-                angvel_achieve = np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)<self.epsilon_ang
+                angvel_achieve = 2*180*np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)< 18*self.epsilon_ang # 180 deg/s 
 
-                reward = (1-self.gamma)*np.where(np.logical_and(pos_achieve, ang_achieve, angvel_achieve), 0.0, -1.0)+self.gamma*reward
+                reward = np.where(np.logical_and(pos_achieve, ang_achieve, angvel_achieve), 0.0, -1.0)
                 
                 # done = np.where(np.logical_and(pos_achieve, ang_achieve, angvel_achieve) , 1.0, 0.0)
 
