@@ -461,22 +461,18 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
     def __init__(self, replay_buffer, state_space, action_space, hidden_dim, param_num, rnn_type='RNN3', out_actf=None, action_scale=1.0, device='cpu', policy_target_update_interval=2, **kwargs):
         super(TD3RNN_Trainer3, self).__init__(replay_buffer, state_space, action_space, hidden_dim, rnn_type=rnn_type.strip('3'), out_actf=out_actf, action_scale=action_scale,device=device, policy_target_update_interval=policy_target_update_interval, **kwargs)
         if 'RNN' in self.rnn_type:
-            self.q_net1 = QNetworkRNNParam(state_space, action_space, hidden_dim, param_num).to(self.device)
-            self.q_net2 = QNetworkRNNParam(state_space, action_space, hidden_dim, param_num).to(self.device)
-            self.target_q_net1 = QNetworkRNNParam(state_space, action_space, hidden_dim, param_num).to(self.device)
-            self.target_q_net2 = QNetworkRNNParam(state_space, action_space, hidden_dim, param_num).to(self.device)
+            qnet = QNetworkRNNParam
         elif 'LSTM' in self.rnn_type:
-            self.q_net1 = QNetworkLSTMParam(state_space, action_space, hidden_dim, param_num).to(self.device)
-            self.q_net2 = QNetworkLSTMParam(state_space, action_space, hidden_dim, param_num).to(self.device)
-            self.target_q_net1 = QNetworkLSTMParam(state_space, action_space, hidden_dim, param_num).to(self.device)
-            self.target_q_net2 = QNetworkLSTMParam(state_space, action_space, hidden_dim, param_num).to(self.device)
+            qnet = QNetworkLSTMParam
         elif 'GRU' in self.rnn_type:
-            self.q_net1 = QNetworkGRUParam(state_space, action_space, hidden_dim, param_num).to(self.device)
-            self.q_net2 = QNetworkGRUParam(state_space, action_space, hidden_dim, param_num).to(self.device)
-            self.target_q_net1 = QNetworkGRUParam(state_space, action_space, hidden_dim, param_num).to(self.device)
-            self.target_q_net2 = QNetworkGRUParam(state_space, action_space, hidden_dim, param_num).to(self.device)
+            qnet = QNetworkGRUParam
         else:
             assert NotImplementedError
+
+        self.q_net1 = qnet(state_space, action_space, 128, param_num).to(self.device)
+        self.q_net2 = qnet(state_space, action_space, 128, param_num).to(self.device)
+        self.target_q_net1 = qnet(state_space, action_space, 128, param_num).to(self.device)
+        self.target_q_net2 = qnet(state_space, action_space, 128, param_num).to(self.device)
         
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
@@ -515,16 +511,19 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
         if "LSTM" in self.rnn_type:
             hidden_in = (torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device), \
                         torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device))  # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
+            hidden_in_q = (torch.zeros([1, B, 128], dtype=torch.float).to(self.device), \
+                        torch.zeros([1, B, 128], dtype=torch.float).to(self.device))
         else:
             hidden_in = torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device)
+            hidden_in_q = torch.zeros([1, B, 128], dtype=torch.float).to(self.device)
 
-        predicted_q_value1, _ = self.q_net1(state, action, last_action, hidden_in, param)
-        predicted_q_value2, _ = self.q_net2(state, action, last_action, hidden_in, param)
+        predicted_q_value1, _ = self.q_net1(state, action, last_action, hidden_in_q, param)
+        predicted_q_value2, _ = self.q_net2(state, action, last_action, hidden_in_q, param)
         new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_in, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
         # Training Q Function
-        predicted_target_q1, _ = self.target_q_net1(next_state, new_next_action, action, hidden_in, param)
-        predicted_target_q2, _ = self.target_q_net2(next_state, new_next_action, action, hidden_in, param)
+        predicted_target_q1, _ = self.target_q_net1(next_state, new_next_action, action, hidden_in_q, param)
+        predicted_target_q2, _ = self.target_q_net2(next_state, new_next_action, action, hidden_in_q, param)
         target_q_min = torch.min(predicted_target_q1, predicted_target_q2)
 
         target_q_value = reward + (1 - done) * gamma * target_q_min # if done==1, only reward
@@ -533,13 +532,13 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net1.parameters(), 0.5)
         self.q_optimizer1.step()
         if self.lr_scheduler:
             self.scheduler_q1.step()
         self.q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
+        # nn.utils.clip_grad_norm_(self.q_net2.parameters(), 0.5)
         self.q_optimizer2.step()
         if self.lr_scheduler:
             self.scheduler_q2.step()
@@ -548,12 +547,12 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
         if self.update_cnt%self.policy_target_update_interval==0:
 
             new_action, *_= self.policy_net.evaluate(state, last_action, hidden_in, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
-            predicted_new_q_value, _ = self.q_net1(state, new_action, last_action, hidden_in, param)
+            predicted_new_q_value, _ = self.q_net1(state, new_action, last_action, hidden_in_q, param)
 
             policy_loss = - predicted_new_q_value.mean()
             self.policy_optimizer.zero_grad()
             policy_loss.backward()
-            nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
+            # nn.utils.clip_grad_norm_(self.policy_net.parameters(), 0.5)
             self.policy_optimizer.step()
             if self.lr_scheduler:
                 self.scheduler_policy.step()
@@ -647,16 +646,21 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         else:
             hidden_in = torch.zeros([1, B, self.hidden_dim], dtype=torch.float).to(self.device)
 
-        predicted_q_value1 = self.q_net1(state, action, param, goal)
-        predicted_q_value2 = self.q_net2(state, action, param, goal)
         new_next_action, *_ = self.target_policy_net.evaluate(next_state, action, hidden_in, goal, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
+        # I.I.D condition for non-recurrent critic
+        iid = [[i for i in range(B)],list(np.random.randint(0,L,B))]
+        
+        predicted_q_value1 = self.q_net1(state[iid], action[iid], param[iid], goal[iid])
+        predicted_q_value2 = self.q_net2(state[iid], action[iid], param[iid], goal[iid])
+
         # Training Q Function
-        predicted_target_q1 = self.target_q_net1(next_state, new_next_action, param, goal)
-        predicted_target_q2 = self.target_q_net2(next_state, new_next_action, param, goal)
+        predicted_target_q1 = self.target_q_net1(next_state[iid], new_next_action[iid], param[iid], goal[iid])
+        predicted_target_q2 = self.target_q_net2(next_state[iid], new_next_action[iid], param[iid], goal[iid])
+
         target_q_min = torch.min(predicted_target_q1, predicted_target_q2)
 
-        target_q_value = reward + (1 - done) * gamma * target_q_min # if done==1, only reward
+        target_q_value = reward[iid] + (1 - done[iid]) * gamma * target_q_min # if done==1, only reward
 
         q_value_loss1 = ((predicted_q_value1 - target_q_value.detach())**2).mean()  # detach: no gradients for the variable
         q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         

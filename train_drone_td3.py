@@ -81,7 +81,7 @@ def train(args, hparam):
     best_score = -np.inf
     frame_idx   = 0
     replay_buffer_size = 2e5 if args.rnn != "None" else 2e5
-    explore_episode = 1000
+    explore_episode = 128 # 1000
     update_itr = 100
     writer_interval = 200
     eval_freq = 2000
@@ -215,6 +215,8 @@ def train(args, hparam):
             state = next_state
             last_action = action
             frame_idx += 1
+
+        episode_done[-1] = np.ones_like(episode_done[-1])
         
         # Push into Experience replay buffer
         if args.rnn in ["RNNHER","LSTMHER","GRUHER"]:
@@ -398,6 +400,7 @@ if __name__=='__main__':
     # Common arguments
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
     parser.add_argument('--rnn', choices=['None','RNN2','GRU2','LSTM2',
+                                            'RNN3','GRU3','LSTM3',
                                             'RNNHER','GRUHER','LSTMHER',
                                             'RNNsHER','GRUsHER','LSTMsHER']
                                 , default='None', help='Use memory network (LSTM)')
