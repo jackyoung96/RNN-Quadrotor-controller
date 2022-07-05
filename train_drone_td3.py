@@ -49,7 +49,7 @@ hparam_set = {
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
     "max_steps": [800],
-    "her_length": [8]
+    "her_length": [100]
 }
 
 def train(args, hparam):
@@ -81,7 +81,7 @@ def train(args, hparam):
     best_score = -np.inf
     frame_idx   = 0
     replay_buffer_size = 2e5 if args.rnn != "None" else 2e5
-    explore_episode = 1000
+    explore_episode = 128 # 1000
     update_itr = 100
     writer_interval = 200
     eval_freq = 2000

@@ -54,6 +54,7 @@ class ReplayBufferRNN:
         self.capacity = capacity
         self.buffer = []
         self.position = 0
+        self.history_length = kwargs.get("her_length", 100)
 
     def push(self, state, action, last_action, reward, next_state, done, param):
         if len(self.buffer) < self.capacity:
@@ -62,12 +63,13 @@ class ReplayBufferRNN:
         self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
 
     def push_batch(self, state, action, last_action, reward, next_state, done, param):
-        np.stack(last_action,axis=1)
+        B,L = state[0].shape[0], len(state)
         state, action, last_action, reward, next_state, done = \
             map(lambda x: np.stack(x, axis=1),[state, action, last_action, reward, next_state, done])
         assert all(state.shape[0] == x.shape[0] for x in [action, last_action, reward, next_state, done]), "Somethings wrong on dimension"
         for s,a,la,r,ns,d,p in zip(state, action, last_action, reward, next_state, done,param):
-            self.push(s,a,la,r,ns,d,p)
+            for i in range(0,L+1-self.history_length,self.history_length):
+                self.push(*map(lambda x:x[i:i+self.history_length],[s,a,la,r,ns,d]),p)
 
     def sample(self, batch_size):
         s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst, p_lst=[],[],[],[],[],[],[]
@@ -123,6 +125,11 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
             if self.single_pos:
                 goal[:,:3] = 0 # Single goal
             gs.append(goal)
+
+            for _ in range(3):
+                idx = np.random.randint(next_state.shape[0])
+                goal = next_state[idx:idx+1,:].copy()
+                gs.append(goal)
 
         for i,goal in enumerate(gs):
             if len(self.buffer) < self.capacity:

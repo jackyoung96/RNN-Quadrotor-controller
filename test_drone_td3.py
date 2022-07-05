@@ -202,7 +202,7 @@ def main(hparam):
                 env.env.envs[0].goal_pos = goal_pos
                 # hidden_out = hidden_out_zero
                 # last_action = -np.ones_like(last_action)
-            # if i_step % 50 == 0:
+            # if i_step % 5 == 0:
             #     hidden_out = hidden_out_zero
             #     last_action = -np.ones_like(last_action)
 
@@ -244,6 +244,8 @@ def main(hparam):
             
             if hparam['render']:
                 print(action)
+                # print(hidden_in)
+                # print(hidden_out)
                 env.render()
                 input()
 
@@ -268,7 +270,7 @@ def main(hparam):
 
             state_buffer.append(state)
             action_buffer.append(action)
-            hidden_buffer.append(hidden_out.detach().cpu().numpy())
+            # hidden_buffer.append(hidden_out.detach().cpu().numpy())
             if not isinstance(action, np.ndarray):
                 action = np.array([action])
 

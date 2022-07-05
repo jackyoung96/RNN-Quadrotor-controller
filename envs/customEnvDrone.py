@@ -306,8 +306,8 @@ class customAviary(gym.Wrapper):
         norm_state = state.copy()
 
         if type=='pos':
-            norm_state = (norm_state - self.goal_pos[0,:]) 
-            norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            norm_state = (norm_state - self.goal_pos[0,:3]) 
+            # norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
             norm_state = norm_state / MAX_XYZ
 
         elif type=='rel_pos':
@@ -332,7 +332,7 @@ class customAviary(gym.Wrapper):
             norm_state[1:2] = norm_state[1:2] / MAX_PITCH
             
         elif type=='vel':
-            norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            # norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
             norm_state = norm_state / MAX_LIN_VEL
 
         elif type=='rel_vel':
@@ -344,7 +344,7 @@ class customAviary(gym.Wrapper):
 
         elif type=='angular_vel':
             norm_state = state.copy()
-            norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
+            # norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
             norm_state = norm_state / MAX_RPY_RATE
             
         elif type=='rel_angular_vel':
