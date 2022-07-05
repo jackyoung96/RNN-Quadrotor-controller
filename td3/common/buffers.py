@@ -123,13 +123,20 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
         if np.random.random()<0.8:
             goal = next_state[-1:,:].copy() # Achieved goal
             if self.single_pos:
-                goal[:,:3] = 0 # Single goal
+                goal[:,:3] = np.matmul(next_state[-1:,3:12].reshape((3,3)), goal[:,:3].reshape((3,1))).reshape((1,3))
             gs.append(goal)
 
             for _ in range(3):
                 idx = np.random.randint(next_state.shape[0])
                 goal = next_state[idx:idx+1,:].copy()
+                if self.single_pos:
+                    goal[:,:3] = np.matmul(next_state[idx:idx+1,3:12].reshape((3,3)), goal[:,:3].reshape((3,1))).reshape((1,3))
                 gs.append(goal)
+
+        state_m = state[:,3:12].reshape((-1,3,3))
+        next_state_m = next_state[:,3:12].reshape((-1,3,3))
+        state_w = np.matmul(state_m, state[:,:3].reshape((-1,3,1)))
+        next_state_w = np.matmul(next_state_m, next_state[:,:3].reshape((-1,3,1)))
 
         for i,goal in enumerate(gs):
             if len(self.buffer) < self.capacity:
@@ -137,18 +144,16 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
             if self.env_name == 'takeoff-aviary-v0':
                 if i!=0 and self.single_pos:
                     ####### Relative observation ###################
-                    state_m = state[:,3:12].reshape((-1,3,3))
-                    next_state_m = next_state[:,3:12].reshape((-1,3,3))
-                    state_w = np.matmul(state_m, state[:,:3].reshape((-1,3,1)))
-                    next_state_w = np.matmul(next_state_m, next_state[:,:3].reshape((-1,3,1)))
+                    state_new = state_w - goal[:,:3,None]
+                    next_state_new = next_state_w - goal[:,:3,None]
 
-                    state_w = state_w - next_state_w[-1:].copy()
-                    next_state_w = next_state_w - next_state_w[-1:].copy()
-
-                    state[:,:3] = np.matmul(np.swapaxes(state_m,1,2), state_w[:,:3]).reshape((-1,3))
-                    next_state[:,:3] = np.matmul(np.swapaxes(next_state_m,1,2), next_state_w[:,:3]).reshape((-1,3))
+                    state[:,:3] = np.matmul(np.swapaxes(state_m,1,2), state_new[:,:3]).reshape((-1,3))
+                    next_state[:,:3] = np.matmul(np.swapaxes(next_state_m,1,2), next_state_new[:,:3]).reshape((-1,3))
                     ################################################
-                pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
+                if self.single_pos:
+                    pos_achieve = np.linalg.norm(next_state[:,:3],axis=-1)<self.epsilon_pos
+                else:
+                    pos_achieve = np.linalg.norm(next_state[:,:3]-goal[:,:3],axis=-1)<self.epsilon_pos
                 ang_value = rot_matrix_similarity(next_state[:,3:12],goal[:,3:12]) # 1: 0deg, 0: >90 deg, from vertical z-axis
                 ang_achieve = ang_value < self.epsilon_ang
                 angvel_achieve = 2*180*np.linalg.norm(next_state[:,15:18]-goal[:,15:18],axis=-1)< 18*self.epsilon_ang # 180 deg/s 
