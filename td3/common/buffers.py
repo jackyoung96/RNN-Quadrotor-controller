@@ -49,6 +49,79 @@ class ReplayBuffer:
     def get_length(self):
         return len(self.buffer)
 
+class HindsightReplayBuffer(ReplayBuffer):
+    """ 
+    Replay buffer for agent with LSTM network additionally storing previous action, 
+    initial input hidden state and output hidden state of LSTM.
+    And each sample contains the whole episode instead of a single step.
+    'hidden_in' and 'hidden_out' are only the initial hidden state for each episode, for LSTM initialization.
+
+    """
+    def __init__(self, capacity, env_name='takeoff-aviary-v0', **kwargs):
+        super().__init__(capacity, **kwargs)
+        self.epsilon_pos = kwargs.get("epsilon_pos", 0.1/6)
+        self.epsilon_ang = kwargs.get("epsilon_ang", np.deg2rad(10))
+        self.single_pos = kwargs.get("single_pos", False)
+        self.env_name = env_name
+        if not self.env_name in ['takeoff-aviary-v0', 'Pendulum-v0']:
+            assert "env should be choosen among ['takeoff-aviary-v0', 'Pendulum-v0']"
+    
+    def push(self, state, action, last_action, reward, next_state, done, param, goal):
+        if len(self.buffer) < self.capacity:
+            self.buffer.append(None)
+        self.buffer[self.position] = (state, action, last_action, reward, next_state, done, goal)
+        self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
+
+    def push_batch(self, state, action, last_action, reward, next_state, done, param, goal):
+        np.stack(last_action,axis=1)
+        state, action, last_action, reward, next_state, done = \
+            map(lambda x: np.concatenate(x, axis=0),[state, action, last_action, reward, next_state, done])
+        assert all(state.shape[0] == x.shape[0] for x in [action, last_action, reward, next_state, done]), "Somethings wrong on dimension"
+        
+        gs = [goal[None,:]]
+        if np.random.random()<0.8:
+            goal = next_state[-1:].copy() # Achieved goal
+            if self.single_pos:
+                goal[:,:,:3] = np.matmul(next_state[-1:,:,3:12].reshape((3,3)), goal[:,:,:3].reshape((3,1))).reshape((1,3))
+            gs.append(goal)
+
+            for _ in range(3):
+                idx = np.random.randint(next_state.shape[0])
+                goal = next_state[idx:idx+1].copy()
+                if self.single_pos:
+                    goal[:,:,:3] = np.matmul(next_state[idx:idx+1,:,3:12].reshape((3,3)), goal[:,:,:3].reshape((3,1))).reshape((1,3))
+                gs.append(goal)
+
+            state_m = state[:,:,3:12].reshape((-1,3,3))
+            next_state_m = next_state[:,:,3:12].reshape((-1,3,3))
+            state_w = np.matmul(state_m, state[:,:,:3].reshape((-1,3,1)))
+            next_state_w = np.matmul(next_state_m, next_state[:,:,:3].reshape((-1,3,1)))
+
+            for goal in gs:
+                if self.single_pos:
+                    ####### Relative observation ###################
+                    state_new = state_w - goal[:,:3,None]
+                    next_state_new = next_state_w - goal[:,:3,None]
+
+                    state[:,:,:3] = np.matmul(np.swapaxes(state_m,1,2), state_new[:,:3]).reshape((-1,3))
+                    next_state[:,:,:3] = np.matmul(np.swapaxes(next_state_m,1,2), next_state_new[:,:3]).reshape((-1,3))
+                    ################################################
+                if self.single_pos:
+                    pos_achieve = np.linalg.norm(next_state[:,:,:3],axis=-1)<self.epsilon_pos
+                else:
+                    pos_achieve = np.linalg.norm(next_state[:,:,:3]-goal[:,:,:3],axis=-1)<self.epsilon_pos
+                ang_value = rot_matrix_similarity(next_state[:,:,3:12],goal[:,:,3:12]) # 1: 0deg, 0: >90 deg, from vertical z-axis
+                ang_achieve = ang_value < self.epsilon_ang
+                angvel_achieve = 2*180*np.linalg.norm(next_state[:,:,15:18]-goal[:,:,15:18],axis=-1)< 18*self.epsilon_ang # 180 deg/s 
+
+                reward = np.where(np.logical_and(pos_achieve, ang_achieve, angvel_achieve), 0.0, -1.0)
+
+                for s,a,la,r,ns,d in zip(state, action, last_action, reward, next_state, done):
+                    self.push(s,a,la,r,ns,d,None, goal)
+
+
+
+
 class ReplayBufferRNN:
     def __init__(self, capacity, **kwargs):
         self.capacity = capacity
@@ -142,6 +215,7 @@ class HindsightReplayBufferRNN(ReplayBufferRNN):
             if len(self.buffer) < self.capacity:
                 self.buffer.append(None)
             if self.env_name == 'takeoff-aviary-v0':
+                
                 if i!=0 and self.single_pos:
                     ####### Relative observation ###################
                     state_new = state_w - goal[:,:3,None]

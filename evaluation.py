@@ -521,7 +521,7 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
                 pos_achieve = e_p < 0.1
                 ang_achieve = e_a < np.deg2rad(10)
 
-                reward = 0.0 if pos_achieve and ang_achieve else -1.0
+                # reward = 0.0 if pos_achieve and ang_achieve else -1.0
 
                 # Success test
                 if pos_achieve and ang_achieve:
