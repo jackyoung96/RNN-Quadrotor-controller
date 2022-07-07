@@ -81,7 +81,7 @@ def train(args, hparam):
     eval_noise_scale = eval_noise_scale_init
     best_score = -np.inf
     frame_idx   = 0
-    replay_buffer_size = 1e5 if args.rnn != "None" else 1e5
+    replay_buffer_size = 1e5 if args.rnn != "None" else 1e5*max_steps
     explore_episode = 1000 # 1000
     update_itr = 100
     writer_interval = 200
@@ -290,6 +290,7 @@ def train(args, hparam):
 
             if 'aviary' in env_name:
                 unnormed_state = np.stack(episode_state)
+                unnormed_action = np.stack(episode_action)
                 writer.add_scalar('loss/position[m]', np.linalg.norm((6*np.stack(unnormed_state)[:,:,:3]), axis=-1).mean(), i_episode)
                 writer.add_scalar('loss/velocity[m_s]', np.linalg.norm((3*np.stack(unnormed_state)[:,:,12:15]), axis=-1).mean(), i_episode)
                 writer.add_scalar('loss/ang_velocity[deg_s]', np.linalg.norm((2*180*np.stack(unnormed_state)[:,:,15:18]), axis=-1).mean(), i_episode)
@@ -298,7 +299,7 @@ def train(args, hparam):
                         'loss/velocity[m_s]': np.linalg.norm((3*np.stack(unnormed_state)[:,:,12:15]), axis=-1).mean(),
                         'loss/ang_velocity[deg_s]': np.linalg.norm((2*180*np.stack(unnormed_state)[:,:,15:18]), axis=-1).mean(),
                         'loss/angle[deg]': 180/np.pi*np.arccos(np.clip(np.stack(unnormed_state)[:,:,11].flatten(),-1.0,1.0)).mean(),
-                        'loss/rpm': (1+np.stack(unnormed_state)[:,:,-4:]).mean()/2},
+                        'loss/rpm': (1+episode_action).mean()/2},
                          step=i_episode)
                 
 
