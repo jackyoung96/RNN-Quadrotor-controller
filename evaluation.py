@@ -454,6 +454,8 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
     eval_reward = 0
     eval_position = 0 
     eval_angle = 0
+    eval_vel = 0
+    eval_angvel = 0
 
     goal = np.array([[0,0,0, # pos
                     1,0,0,
@@ -480,6 +482,7 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
 
             step, success = 0,0
             e_ps, e_as = [],[]
+            e_vs, e_ws = [],[]
             state_buffer, action_buffer, reward_buffer = [],[],[]
             time_buffer = []
 
@@ -516,8 +519,12 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
                 unnormed_state = eval_env.unnormalize_obs(next_state)
                 e_p = np.linalg.norm(6*unnormed_state[0,:3]) # position (m)
                 e_a = np.arccos(np.clip(unnormed_state[0,11], -1.0, 1.0)) # angle (rad)
+                e_v = np.linalg.norm(3*unnormed_state[0,12:15])
+                e_w = np.linalg.norm(2*180*unnormed_state[0,15:18])
                 e_ps.append(e_p)
                 e_as.append(e_a)
+                e_vs.append(e_v)
+                e_ws.append(e_w)
                 pos_achieve = e_p < 0.1
                 ang_achieve = e_a < np.deg2rad(10)
 
@@ -544,6 +551,8 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
             eval_reward += total_rew
             eval_position += np.mean(e_ps[-100:])
             eval_angle += np.mean(e_as[-100:])
+            eval_vel += np.mean(e_vs[-100:])
+            eval_angvel += np.mean(e_ws[-100:])
 
             if log:
                 print("%d iteration \n\
@@ -560,5 +569,7 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
     return eval_reward / test_itr, \
             eval_success / test_itr, \
             eval_position / test_itr, \
-            eval_angle / test_itr
+            eval_angle / test_itr, \
+            eval_vel / test_itr, \
+            eval_angvel / test_itr
 

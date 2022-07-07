@@ -311,7 +311,7 @@ def train(args, hparam):
         if i_episode % eval_freq == 0 and i_episode != 0:
             eval_env.env.training = False
             td3_trainer.policy_net.eval()
-            eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, max_steps=eval_max_steps, test_itr=eval_itr, record=False)
+            eval_rew, eval_success, eval_position, eval_angle, eval_vel, eval_angvel = drone_test(eval_env, agent=td3_trainer, max_steps=eval_max_steps, test_itr=eval_itr, record=False)
             td3_trainer.policy_net.train()
             if writer is not None:
                 writer.add_scalar('eval/reward', eval_rew, i_episode)
@@ -321,7 +321,9 @@ def train(args, hparam):
                 wandb.log({'eval/reward':eval_rew,
                             'eval/success_rate':eval_success,
                             'eval/position': eval_position,
-                            'eval/angle': np.rad2deg(eval_angle)},
+                            'eval/angle': np.rad2deg(eval_angle),
+                            'eval_vel': eval_vel,
+                            'eval_angvel': eval_angvel},
                             step=i_episode)
 
         ########################################
