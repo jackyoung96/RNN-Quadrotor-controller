@@ -357,6 +357,9 @@ class customAviary(gym.Wrapper):
 
         elif type=='rpm':
             norm_state = state * 2 / self.MAX_RPM - 1
+        
+        elif type=='action':
+            norm_state = state / self.MAX_RPM
 
         return norm_state
 
@@ -457,8 +460,8 @@ class customAviary(gym.Wrapper):
             rot = coeff['rotation'] * self._normalizeState(state[3:7],'rotation')[-1]
             f_s = xyz + vel + ang_vel - rot
 
-            # d_action = coeff['d_action'] * np.linalg.norm(self._normalizeState(state[16:]-self.previous_state[16:],'rpm'),ord=2) if self.previous_state is not None else 0
-            # f_a = d_action
+            d_action = coeff['d_action'] * np.linalg.norm(self._normalizeState(state[16:],'action'),ord=2)
+            f_a = d_action
             # print("XYZ",xyz/coeff['pos'],np.linalg.norm(state[:3]-self.goal_pos[0,:]),"\n",
             #     "RPY",np.linalg.norm(state[7:10]),"\n",
             #     "VEL",vel/coeff['vel'],np.linalg.norm(state[10:13]),"\n",
@@ -485,7 +488,7 @@ class customAviary(gym.Wrapper):
                 self.reward_buf = []
             self.reward_steps += 1
                 
-            return -(f_s)*(1/self.env.SIM_FREQ) # + done_reward
+            return -(f_s+f_a) * (1/self.env.SIM_FREQ) # + done_reward
 
         elif self.task == 'stabilize3':
             # No position constrain
