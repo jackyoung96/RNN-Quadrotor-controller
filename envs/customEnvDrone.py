@@ -55,7 +55,7 @@ class customAviary(gym.Wrapper):
 
         self.env.EPISODE_LEN_SEC = kwargs.get('episode_len_sec', 2)
         self.MAX_RPM = kwargs.get('max_rpm', 24000)
-        self.env.SIM_FREQ = kwargs.get('freq', 240)
+        self.env.SIM_FREQ = kwargs.get('freq', 200)
 
         if not self.task in TASK_LIST:
             raise "Wrong task!!"
@@ -315,7 +315,7 @@ class customAviary(gym.Wrapper):
             rot = r.as_matrix()
             pos = (norm_state[:3] - self.goal_pos[0,:3]).reshape((3,1)) 
             norm_state = np.matmul(rot.transpose(),pos).reshape((3,))
-            norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            norm_state += np.random.normal(0, POS_NOISE, size=norm_state.shape) # add noise
             norm_state = norm_state / MAX_XYZ
 
         elif type=='quaternion':
@@ -339,7 +339,7 @@ class customAviary(gym.Wrapper):
             r = R.from_quat(norm_state[-4:])
             rot = r.as_matrix()
             norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) 
-            norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            norm_state += np.random.normal(0, VEL_NOISE, size=norm_state.shape) # add noise
             norm_state = norm_state / MAX_LIN_VEL
 
         elif type=='angular_vel':
@@ -485,7 +485,7 @@ class customAviary(gym.Wrapper):
                 self.reward_buf = []
             self.reward_steps += 1
                 
-            return -(f_s) # + done_reward
+            return -(f_s)*(1/self.env.SIM_FREQ) # + done_reward
 
         elif self.task == 'stabilize3':
             # No position constrain
@@ -559,6 +559,7 @@ class customAviary(gym.Wrapper):
 
     def step(self, action, **kwargs):
         # action = action * self.MAX_RPM
+        action += np.random.normal(0, 0.05, action.shape) # Action noise 
         obs, rews, dones, infos = self.env.step(action, **kwargs)
         return obs, rews, dones, infos
 
@@ -631,6 +632,8 @@ class domainRandomAviary(customAviary):
         self.battery = self.orig_params['BATTERY'] * np.random.uniform(1.0-self.battery_range, 1.0)
         if self.battery_range != 0:
             norm_battery = 2*(self.battery-(1-self.battery_range))/(self.battery_range)-1
+        else:
+            norm_battery = 0
         self.env.KF = self.orig_params['KF'] * np.random.uniform(1.0-self.kf_range, 1.0+self.kf_range, size=(4,))
         self.env.KM = self.orig_params['KM'] * np.random.uniform(1.0-self.km_range, 1.0+self.km_range, size=(4,))
         if self.kf_range != 0:

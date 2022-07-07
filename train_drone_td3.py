@@ -37,7 +37,7 @@ dyn_range = {
     'kf_range': 0.3, # (1-n) ~ (1+n)
     'km_range': 0.3, # (1-n) ~ (1+n)
     'i_range': 0.3,
-    'battery_range': 0.3 # (1-n) ~ (1)
+    'battery_range': 0.0 # (1-n) ~ (1)
 }
 hparam_set = {
     "goal_dim": [18],
@@ -49,7 +49,8 @@ hparam_set = {
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
     "max_steps": [800],
-    "her_length": [800]
+    "her_length": [800],
+    "rnn_dropout": [0.0]
 }
 
 def train(args, hparam):
@@ -58,7 +59,7 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(3e5)
+    max_episodes  = int(5e4)
     hidden_dim = hparam['hidden_dim']
     max_steps = hparam['max_steps']
     eval_max_steps = 1000
@@ -80,7 +81,7 @@ def train(args, hparam):
     eval_noise_scale = eval_noise_scale_init
     best_score = -np.inf
     frame_idx   = 0
-    replay_buffer_size = 2e5 if args.rnn != "None" else 2e5
+    replay_buffer_size = 1e5 if args.rnn != "None" else 1e5
     explore_episode = 1000 # 1000
     update_itr = 100
     writer_interval = 200

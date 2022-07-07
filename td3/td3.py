@@ -202,9 +202,10 @@ class TD3RNN_Trainer():
         self.target_q_net2 = qnet(state_space, action_space, 128).to(self.device)
         
         policy_actf = kwargs.get('policy_actf', F.tanh)
-        self.policy_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
-        self.target_policy_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
-        self.behavior_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
+        rnn_dropout = kwargs.get('rnn_dropout', 0.5)
+        self.policy_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale, rnn_dropout=rnn_dropout).to(self.device)
+        self.target_policy_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale, rnn_dropout=rnn_dropout).to(self.device)
+        self.behavior_net = policy(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale, rnn_dropout=rnn_dropout).to(self.device)
         self.is_behavior = False
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
@@ -469,10 +470,11 @@ class TD3RNN_Trainer3(TD3RNN_Trainer):
         else:
             assert NotImplementedError
 
-        self.q_net1 = qnet(state_space, action_space, 128, param_num).to(self.device)
-        self.q_net2 = qnet(state_space, action_space, 128, param_num).to(self.device)
-        self.target_q_net1 = qnet(state_space, action_space, 128, param_num).to(self.device)
-        self.target_q_net2 = qnet(state_space, action_space, 128, param_num).to(self.device)
+        rnn_dropout = kwargs('rnn_dropout', 0.5)
+        self.q_net1 = qnet(state_space, action_space, 128, param_num, rnn_dropout=rnn_dropout).to(self.device)
+        self.q_net2 = qnet(state_space, action_space, 128, param_num, rnn_dropout=rnn_dropout).to(self.device)
+        self.target_q_net1 = qnet(state_space, action_space, 128, param_num, rnn_dropout=rnn_dropout).to(self.device)
+        self.target_q_net2 = qnet(state_space, action_space, 128, param_num, rnn_dropout=rnn_dropout).to(self.device)
         
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)
         self.target_q_net2 = self.target_ini(self.q_net2, self.target_q_net2)
@@ -589,9 +591,10 @@ class TD3HERRNN_Trainer(TD3RNN_Trainer):
         elif 'GRU' in self.rnn_type:
             policy = PolicyNetworkGoalGRU
         policy_actf = kwargs.get('policy_actf', F.tanh)
-        self.policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
-        self.target_policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
-        self.behavior_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale).to(self.device)
+        rnn_dropout = kwargs.get('rnn_dropout', 0.5)
+        self.policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale, rnn_dropout=rnn_dropout).to(self.device)
+        self.target_policy_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale, rnn_dropout=rnn_dropout).to(self.device)
+        self.behavior_net = policy(state_space, action_space, hidden_dim, goal_dim, device, batchnorm=batchnorm, actf=policy_actf, out_actf=out_actf, action_scale=action_scale, rnn_dropout=rnn_dropout).to(self.device)
         self.is_behavior = False
 
         self.target_q_net1 = self.target_ini(self.q_net1, self.target_q_net1)

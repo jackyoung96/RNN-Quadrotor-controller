@@ -125,7 +125,7 @@ class PolicyNetwork(PolicyNetworkBase):
         return action
 
 class PolicyNetworkRNN(PolicyNetworkBase):
-    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2), rnn_dropout=0.5):
         super().__init__(state_space, action_space, device)
         
         self.log_std_min = log_std_min
@@ -135,6 +135,7 @@ class PolicyNetworkRNN(PolicyNetworkBase):
         # self.linear2 = nn.Linear(hidden_size, hidden_size)
         self.linear_rnn = nn.Linear(self._state_dim+self._action_dim, hidden_size)
         self.rnn = nn.RNN(hidden_size, hidden_size, batch_first=True)
+        self.rnn_dropout = nn.Dropout(p=rnn_dropout)
         self.linear3 = nn.Linear(2*hidden_size, hidden_size)
         self.linear4 = nn.Linear(hidden_size, hidden_size)
 
@@ -167,7 +168,7 @@ class PolicyNetworkRNN(PolicyNetworkBase):
         sa_cat = torch.cat([state,last_action], dim=-1)
         rnn_x = self.actf(self.linear_rnn(sa_cat)).view(B,L,-1)
         rnn_out, rnn_hidden = self.rnn(rnn_x, hidden_in)
-        rnn_x = rnn_out.contiguous().view(*fc_x.shape)
+        rnn_x = self.rnn_dropout(rnn_out.contiguous().view(*fc_x.shape)) # Dropout for make RNN weaker
         merged_x = torch.cat([fc_x, rnn_x],dim=-1)
         x = self.actf(self.linear3(merged_x))
         x = self.actf(self.linear4(x))
@@ -253,7 +254,7 @@ class PolicyNetworkGRU(PolicyNetworkRNN):
 
 
 class PolicyNetworkGoalRNN(PolicyNetworkBase):
-    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.tanh ,out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.tanh ,out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2), rnn_dropout=0.5):
         super().__init__(state_space, action_space, device)
         self._goal_dim = goal_dim
         
@@ -269,6 +270,7 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         # self.linear2 = nn.Linear(hidden_size, hidden_size)
         self.linear_rnn = nn.Linear(self._state_dim+self._action_dim, hidden_size)
         self.rnn = nn.RNN(hidden_size, hidden_size, batch_first=True)
+        self.rnn_dropout = nn.Dropout(p=rnn_dropout)
         self.linear3 = nn.Linear(2*hidden_size, hidden_size)
         self.linear4 = nn.Linear(hidden_size, hidden_size)
 
@@ -312,7 +314,7 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         sa_cat = torch.cat([state,last_action], dim=-1)
         rnn_x = self.actf(self.linear_rnn(sa_cat)).view(B,L,-1)
         rnn_out, rnn_hidden = self.rnn(rnn_x, hidden_in)
-        rnn_x = rnn_out.contiguous().view(*fc_x.shape)
+        rnn_x = self.rnn_dropout(rnn_out.contiguous().view(*fc_x.shape))
         merged_x = torch.cat([fc_x, rnn_x],dim=-1)
         x = self.actf(self.linear3(merged_x))
         x = self.actf(self.linear4(x))
