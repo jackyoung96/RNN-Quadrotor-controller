@@ -37,7 +37,7 @@ dyn_range = {
     'kf_range': 0.3, # (1-n) ~ (1+n)
     'km_range': 0.3, # (1-n) ~ (1+n)
     'i_range': 0.3,
-    'battery_range': 0.3 # (1-n) ~ (1)
+    'battery_range': 0.0 # (1-n) ~ (1)
 }
 hparam_set = {
     "goal_dim": [18],
@@ -49,7 +49,8 @@ hparam_set = {
     "policy_lr": [3e-4],
     "policy_target_update_interval": [2],
     "max_steps": [800],
-    "her_length": [100]
+    "her_length": [800],
+    "rnn_dropout": [0.0]
 }
 
 def train(args, hparam):
@@ -58,7 +59,7 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(3e5)
+    max_episodes  = int(5e4)
     hidden_dim = hparam['hidden_dim']
     max_steps = hparam['max_steps']
     eval_max_steps = 1000
@@ -80,7 +81,7 @@ def train(args, hparam):
     eval_noise_scale = eval_noise_scale_init
     best_score = -np.inf
     frame_idx   = 0
-    replay_buffer_size = 2e5 if args.rnn != "None" else 2e5
+    replay_buffer_size = 1e5 if args.rnn != "None" else 1e5*max_steps
     explore_episode = 1000 # 1000
     update_itr = 100
     writer_interval = 200
@@ -246,8 +247,8 @@ def train(args, hparam):
                 q_loss_2.append(loss_dict['q_loss_2'])
 
         # Noise decay
-        explore_noise_scale = (0.9 * (1-i_episode/max_episodes) + 0.1) * explore_noise_scale_init
-        eval_noise_scale = (0.9 * (1-i_episode/max_episodes) + 0.1) * eval_noise_scale_init
+        # explore_noise_scale = (0.9 * (1-i_episode/max_episodes) + 0.1) * explore_noise_scale_init
+        # eval_noise_scale = (0.9 * (1-i_episode/max_episodes) + 0.1) * eval_noise_scale_init
 
         loss_storage['policy_loss'].append(np.mean(policy_loss))
         loss_storage['q_loss_1'].append(np.mean(q_loss_1))
@@ -289,6 +290,7 @@ def train(args, hparam):
 
             if 'aviary' in env_name:
                 unnormed_state = np.stack(episode_state)
+                unnormed_action = np.stack(episode_action)
                 writer.add_scalar('loss/position[m]', np.linalg.norm((6*np.stack(unnormed_state)[:,:,:3]), axis=-1).mean(), i_episode)
                 writer.add_scalar('loss/velocity[m_s]', np.linalg.norm((3*np.stack(unnormed_state)[:,:,12:15]), axis=-1).mean(), i_episode)
                 writer.add_scalar('loss/ang_velocity[deg_s]', np.linalg.norm((2*180*np.stack(unnormed_state)[:,:,15:18]), axis=-1).mean(), i_episode)
@@ -297,7 +299,7 @@ def train(args, hparam):
                         'loss/velocity[m_s]': np.linalg.norm((3*np.stack(unnormed_state)[:,:,12:15]), axis=-1).mean(),
                         'loss/ang_velocity[deg_s]': np.linalg.norm((2*180*np.stack(unnormed_state)[:,:,15:18]), axis=-1).mean(),
                         'loss/angle[deg]': 180/np.pi*np.arccos(np.clip(np.stack(unnormed_state)[:,:,11].flatten(),-1.0,1.0)).mean(),
-                        'loss/rpm': (1+np.stack(unnormed_state)[:,:,-4:]).mean()/2},
+                        'loss/rpm': (1+unnormed_action).mean()/2},
                          step=i_episode)
                 
 
