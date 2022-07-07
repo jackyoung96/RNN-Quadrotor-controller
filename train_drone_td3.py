@@ -299,7 +299,7 @@ def train(args, hparam):
                         'loss/velocity[m_s]': np.linalg.norm((3*np.stack(unnormed_state)[:,:,12:15]), axis=-1).mean(),
                         'loss/ang_velocity[deg_s]': np.linalg.norm((2*180*np.stack(unnormed_state)[:,:,15:18]), axis=-1).mean(),
                         'loss/angle[deg]': 180/np.pi*np.arccos(np.clip(np.stack(unnormed_state)[:,:,11].flatten(),-1.0,1.0)).mean(),
-                        'loss/rpm': (1+episode_action).mean()/2},
+                        'loss/rpm': (1+unnormed_action).mean()/2},
                          step=i_episode)
                 
 
