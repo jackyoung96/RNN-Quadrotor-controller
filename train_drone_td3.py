@@ -247,8 +247,8 @@ def train(args, hparam):
                 q_loss_2.append(loss_dict['q_loss_2'])
 
         # Noise decay
-        explore_noise_scale = (0.9 * (1-i_episode/max_episodes) + 0.1) * explore_noise_scale_init
-        eval_noise_scale = (0.9 * (1-i_episode/max_episodes) + 0.1) * eval_noise_scale_init
+        # explore_noise_scale = (0.9 * (1-i_episode/max_episodes) + 0.1) * explore_noise_scale_init
+        # eval_noise_scale = (0.9 * (1-i_episode/max_episodes) + 0.1) * eval_noise_scale_init
 
         loss_storage['policy_loss'].append(np.mean(policy_loss))
         loss_storage['q_loss_1'].append(np.mean(q_loss_1))
