@@ -488,7 +488,7 @@ class customAviary(gym.Wrapper):
                 self.reward_buf = []
             self.reward_steps += 1
                 
-            return -(f_s+f_a) * (1/self.env.SIM_FREQ) # + done_reward
+            return -(f_s+f_a) # * (1/self.env.SIM_FREQ) # + done_reward
 
         elif self.task == 'stabilize3':
             # No position constrain
@@ -562,7 +562,7 @@ class customAviary(gym.Wrapper):
 
     def step(self, action, **kwargs):
         # action = action * self.MAX_RPM
-        action += np.random.normal(0, 0.05, action.shape) # Action noise 
+        action += np.clip(np.random.normal(0, 0.05, action.shape),-0.1,0.1) # Action noise 
         obs, rews, dones, infos = self.env.step(action, **kwargs)
         return obs, rews, dones, infos
 
