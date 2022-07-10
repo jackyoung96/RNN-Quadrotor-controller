@@ -59,11 +59,7 @@ class customAviary(gym.Wrapper):
 
         if not self.task in TASK_LIST:
             raise "Wrong task!!"
-        print("DEBUG",self.env._computeObs)
-        print(self._computeObs)
         self.env._computeObs = self._computeObs
-        print("DEBUG",self.env._computeObs)
-        print(self._computeObs)
         self.env._preprocessAction = self._preprocessAction
         self.env._computeReward = self._computeReward
         self.env._computeDone = self._computeDone
@@ -570,22 +566,6 @@ class customAviary(gym.Wrapper):
 class domainRandomAviary(customAviary):
     def __init__(self, env, tag, idx, seed=0, **kwargs):
         super().__init__(env, **kwargs)
-        self.idx = idx
-        self.URDF = "%s/cf2x_random_%d.urdf"%(tag, idx)
-
-        self.mass_range = kwargs.get('mass_range', 0.0)
-        self.cm_range = kwargs.get('cm_range', 0.0)
-        self.i_range = kwargs.get('i_range', 0.0)
-        self.kf_range = kwargs.get('kf_range', 0.0) # percentage
-        self.km_range = kwargs.get('km_range', 0.0) # percentage
-        self.battery_range = kwargs.get('battery_range', 0.0)
-        self.train = True
-        np.random.seed(seed+idx)
-        self.orig_params = {"M":self.env.M,
-                            "L":self.env.L,
-                            "KF":self.env.KF,
-                            "KM":self.env.KM,
-                            "BATTERY":1.0}
         self.random_urdf()
         self.env._housekeeping = self._housekeeping
         self.goal = kwargs.get('goal', None)
@@ -630,7 +610,7 @@ class domainRandomAviary(customAviary):
         self.env.DRAG_COEFF, \
         self.env.DW_COEFF_1, \
         self.env.DW_COEFF_2, \
-        self.env.DW_COEFF_3 = self.env._parseURDFParameters()
+        self.env.DW_COEFF_3 = self.env.env._parseURDFParameters()
 
         self.battery = self.orig_params['BATTERY'] * np.random.uniform(1.0-self.battery_range, 1.0)
         if self.battery_range != 0:

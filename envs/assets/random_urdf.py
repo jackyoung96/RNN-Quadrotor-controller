@@ -6,7 +6,7 @@ import os
 
 def generate_urdf(path, mass=0.027, x_cm=0, y_cm=0, i_xx=1, i_yy=1, z_cm=0):
 
-    tree = ET.parse(os.path.dirname(os.path.abspath(__file__))+"/cf2x_default.urdf")
+    tree = ET.parse(os.path.dirname(os.path.abspath(__file__))+"/cf2x.urdf")
     root = tree.getroot()
 
     # thrust to weight values    

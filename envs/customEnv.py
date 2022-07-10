@@ -14,570 +14,431 @@ from gym_pybullet_drones.envs.single_agent_rl.BaseSingleAgentAviary import Actio
 import gym_pybullet_drones
 import time
 
+import pybullet as p
+import pybullet_data
+from datetime import datetime
+from .assets.random_urdf import generate_urdf
+from scipy.spatial.transform import Rotation as R
+
 from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 from stable_baselines3.common.vec_env.vec_normalize import VecNormalize
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvStepReturn, VecEnvWrapper
 
-class CloudpickleWrapper(object):
-    """
-    Uses cloudpickle to serialize contents (otherwise multiprocessing tries to use pickle)
-    """
-
-    def __init__(self, x):
-        self.x = x
-
-    def __getstate__(self):
-        import cloudpickle
-        return cloudpickle.dumps(self.x)
-
-    def __setstate__(self, ob):
-        import pickle
-        self.x = pickle.loads(ob)
-
-class VecEnv(ABC):
-    """
-    An abstract asynchronous, vectorized environment.
-    """
-
-    def __init__(self, num_envs, observation_space, action_space):
-        self.num_envs = num_envs
-        self.observation_space = observation_space
-        self.action_space = action_space
-
-    @abstractmethod
-    def reset(self):
-        """
-        Reset all the environments and return an array of
-        observations, or a dict of observation arrays.
-        If step_async is still doing work, that work will
-        be cancelled and step_wait() should not be called
-        until step_async() is invoked again.
-        """
-        pass
-
-    @abstractmethod
-    def step_async(self, actions):
-        """
-        Tell all the environments to start taking a step
-        with the given actions.
-        Call step_wait() to get the results of the step.
-        You should not call this if a step_async run is
-        already pending.
-        """
-        pass
-
-    @abstractmethod
-    def step_wait(self):
-        """
-        Wait for the step taken with step_async().
-        Returns (obs, rews, dones, infos):
-         - obs: an array of observations, or a dict of
-                arrays of observations.
-         - rews: an array of rewards
-         - dones: an array of "episode done" booleans
-         - infos: a sequence of info objects
-        """
-        pass
-
-    @abstractmethod
-    def close(self):
-        """
-        Clean up the environments' resources.
-        """
-        pass
-
-    def step(self, actions):
-        """
-        Step the environments synchronously.
-        This is available for backwards compatibility.
-        """
-        self.step_async(actions)
-        return self.step_wait()
-
-    def render(self, mode='human'):
-        #logger.warn('Render not defined for %s' % self)
-        pass
-        
-    @property
-    def unwrapped(self):
-        if isinstance(self, VecEnvWrapper):
-            return self.venv.unwrapped
-        else:
-            return self
+from gym_pybullet_drones.envs.single_agent_rl.TakeoffAviary import TakeoffAviary
 
 
-def worker(remote, parent_remote, env_fn_wrapper):
-    parent_remote.close()
-    env = env_fn_wrapper.x
-    while True:
-        cmd, data = remote.recv()
-        if cmd == 'step':
-            ob, reward, done, info = env.step(data)
-            if done:
-                ob = env.reset()
-            remote.send((ob, reward, done, info))
-        elif cmd == 'reset':
-            ob = env.reset()
-            remote.send(ob)
-        elif cmd == 'reset_task':
-            ob = env.reset_task()
-            remote.send(ob)
-        elif cmd == 'close':
-            remote.close()
-            break
-        elif cmd == 'get_spaces':
-            remote.send((env.observation_space, env.action_space))
-        else:
-            raise NotImplementedError
+class dynRandeEnv(TakeoffAviary):
+    """Custom Environment that follows gym interface"""
 
-
-class parallelEnv(VecEnv):
-    def __init__(self, env_name='PongDeterministic-v4',
-                 n=4, seed=None,
-                 spaces=None):
-
-        env_fns = [ gym.make(env_name) for _ in range(n) ]
-
-        if seed is not None:
-            for i,e in enumerate(env_fns):
-                e.seed(i+seed)
-        
-        """
-        envs: list of gym environments to run in subprocesses
-        adopted from openai baseline
-        """
-        self.waiting = False
-        self.closed = False
-        nenvs = len(env_fns)
-        self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
-        self.ps = [Process(target=worker, args=(work_remote, remote, CloudpickleWrapper(env_fn)))
-            for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
-        for p in self.ps:
-            p.daemon = True # if the main process crashes, we should not cause things to hang
-            p.start()
-        for remote in self.work_remotes:
-            remote.close()
-
-        self.remotes[0].send(('get_spaces', None))
-        observation_space, action_space = self.remotes[0].recv()
-        VecEnv.__init__(self, len(env_fns), observation_space, action_space)
-
-    def step_async(self, actions):
-        for remote, action in zip(self.remotes, actions):
-            remote.send(('step', action))
-        self.waiting = True
-
-    def step_wait(self):
-        results = [remote.recv() for remote in self.remotes]
-        self.waiting = False
-        obs, rews, dones, infos = zip(*results)
-        return np.stack(obs), np.stack(rews), np.stack(dones), infos
-
-    def reset(self):
-        for remote in self.remotes:
-            remote.send(('reset', None))
-        return np.stack([remote.recv() for remote in self.remotes])
-
-    def reset_task(self):
-        for remote in self.remotes:
-            remote.send(('reset_task', None))
-        return np.stack([remote.recv() for remote in self.remotes])
-
-    def close(self):
-        if self.closed:
-            return
-        if self.waiting:
-            for remote in self.remotes:            
-                remote.recv()
-        for remote in self.remotes:
-            remote.send(('close', None))
-        for p in self.ps:
-            p.join()
-        self.closed = True
-
-
-
-
-# Random physical properties env
-def domainRandomize(env, origin_value=dict(), dyn_range=dict(),seed=None):
-    def get_rand(name):
-        origin = origin_value.get(name, getattr(env.env, name))
-        r = dyn_range.get(name, 1)
-        ratio = np.random.uniform(1-r, r-1)
-        if abs(ratio) < 0.0001:
-            ratio = 1
-        elif ratio < 0:
-            ratio = 1/(1-ratio)
-        else:
-            ratio = ratio+1
-        
-        value = origin * ratio
-        norm = 2*(ratio-1/(1-r))/(r+1-1/(1-r))-1 if not r==1 else 0
-        return value, norm # Normalized value (-1~1)
-
-    if seed is not None:
-        np.random.seed(seed)
-    env_name = env.env_name
-    if 'CartPole' in env_name:
-        env.env.masscart, norm_masscart = get_rand('masscart')
-        env.env.masspole, norm_masspole = get_rand('masspole')
-        env.env.total_mass = env.env.masspole + env.env.masscart
-        env.env.length, norm_length = get_rand('length')
-        env.env.polemass_length = env.env.masspole * env.env.length
-        env.env.force_mag, norm_forcemag = get_rand('force_mag')
-
-        return np.array([norm_masscart, norm_masspole, norm_length, norm_forcemag])
-    elif 'Pendulum' in env_name:
-        env.env.max_torque, norm_maxtorque = get_rand('max_torque')
-        env.env.m, norm_m = get_rand('m')
-        env.env.l, norm_l = get_rand('l')
-        return np.array([norm_maxtorque, norm_m, norm_l])
-    elif 'aviary' in env_name:
-        norm_param = env.random_urdf()
-        return norm_param
-    else:
-        raise NotImplementedError
-
-# multithreading 
-def workerDomainRand(remote, parent_remote, env_fn_wrapper, randomize, origin_value, dyn_range, idx):
-    parent_remote.close()
-    env = env_fn_wrapper.x
-    while True:
-        cmd, data = remote.recv()
-        if cmd == 'step':
-            ob, reward, done, info = env.step(data)
-            if done:
-                ob = env.reset()
-            remote.send((ob, reward, done, info))
-        elif cmd == 'reset':
-            ob = env.reset()
-            remote.send(ob)
-        elif cmd == 'reset_rand':
-            param = domainRandomize(env, origin_value=origin_value,
-                                    dyn_range=dyn_range,
-                                    seed=idx+np.random.randint(2147483647))
-            ob = env.reset()
-            remote.send((ob,param))
-        elif cmd == 'close':
-            remote.close()
-            break
-        elif cmd == 'get_spaces':
-            remote.send((env.observation_space, env.action_space))
-        else:
-            raise NotImplementedError
-
-class domainRandeEnv(parallelEnv):
-    '''
-    Domain randomize environment
-    '''
     def __init__(self, 
-                env_name='CartPole-v1',
-                tag='simple',
-                n=4, seed=0,
-                randomize=False, # True: domain randomize(=Randomize every reset)
-                dyn_range=dict() # physical properties range
-                ):
-        
-        self.env_name = env_name
-        self.original_phisical_params = {}
-        if not 'aviary' in env_name:
-            env_fns = [ gym.make(env_name) for _ in range(n) ]
-            if "CartPole" in env_name:
-                self.original_phisical_params.update({'masscart':env_fns[0].masscart,
-                                                        'masspole':env_fns[0].masspole,
-                                                        'length':env_fns[0].length,
-                                                        "force_mag":env_fns[0].force_mag})
-            elif "Pendulum" in env_name:
-                self.original_phisical_params.update({'max_torque':env_fns[0].max_torque,
-                                                        'm':env_fns[0].m,
-                                                        'l':env_fns[0].l})
+                initial_xyzs,
+                initial_rpys,
+                observable,
+                dyn_range,
+                rpy_noise,
+                vel_noise,
+                angvel_noise,
+                reward_coeff,
+                frame_stack=1,
+                episode_len_sec=2,
+                gui=False,
+                record=False,
+                goal=None,
+                **kwargs):
 
-            for i, env_fn in enumerate(env_fns):
-                setattr(env_fn, 'env_name', env_name)
-                domainRandomize(env=env_fn, dyn_range=dyn_range, seed=i+seed)
-                env_fn.seed(i+seed)
-        else:
-            env_fns = []
-            for idx in range(n):
-                env = gym.make(id=env_name, # arbitrary environment that has state normalization and clipping
-                    drone_model=DroneModel.CF2X,
-                    initial_xyzs=np.array([[0.0,0.0,10000.0]]),
-                    initial_rpys=np.array([[0.0,0.0,0.0]]),
-                    physics=Physics.PYB_GND_DRAG_DW,
-                    freq=200,
-                    aggregate_phy_steps=1,
-                    gui=False,
-                    record=False, 
-                    obs=ObservationType.KIN,
-                    act=ActionType.RPM)
-                env = domainRandomAviary(env, tag+str(time.time_ns()), idx, seed,
-                    observable=['pos', 'rotation', 'vel', 'angular_vel', 'rpm'],
-                    frame_stack=1,
-                    task='stabilize2',
-                    reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
-                    episode_len_sec=2,
-                    max_rpm=24000,
-                    initial_xyzs=[[0.0,0.0,10000.0]], # Far from the ground
-                    freq=200,
-                    rpy_noise=np.pi/4,
-                    vel_noise=2.0,
-                    angvel_noise=np.pi/2,
-                    mass_range=dyn_range.get('mass_range', 0.0),
-                    cm_range=dyn_range.get('cm_range', 0.0),
-                    kf_range=dyn_range.get('kf_range', 0.0),
-                    km_range=dyn_range.get('km_range', 0.0),
-                    i_range=dyn_range.get('i_range', 0.0),
-                    battery_range=dyn_range.get('battery_range', 0.0))
-                setattr(env, 'env_name', env_name)
-                env_fns.append(env)
-        
-        """
-        envs: list of gym environments to run in subprocesses
-        adopted from openai baseline
-        """
-        self.randomize = randomize
+        self.observable = observable
+        self.rpy_noise = rpy_noise
+        self.vel_noise = vel_noise
+        self.angvel_noise = angvel_noise
+        self.angvel_bias = np.zeros(3)
 
-        self.waiting = False
-        self.closed = False
-        self.nenvs = len(env_fns)
-        self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(self.nenvs)])
-        self.ps = [Process(target=workerDomainRand, args=(work_remote, remote, CloudpickleWrapper(env_fn),randomize,self.original_phisical_params,dyn_range,idx))
-            for (work_remote, remote, env_fn, idx) in zip(self.work_remotes, self.remotes, env_fns, range(len(env_fns)))]
-        for p in self.ps:
-            p.daemon = True # if the main process crashes, we should not cause things to hang
-            p.start()
-        for remote in self.work_remotes:
-            remote.close()
+        self.mass_range = dyn_range.get('mass_range', 0.0)
+        self.cm_range = dyn_range.get('cm_range', 0.0)
+        self.i_range = dyn_range.get('i_range', 0.0)
+        self.kf_range = dyn_range.get('kf_range', 0.0)
+        self.km_range = dyn_range.get('km_range', 0.0)
+        self.battery_range = dyn_range.get('battery_range', 0.0)
 
-        self.remotes[0].send(('get_spaces', None))
-        observation_space, action_space = self.remotes[0].recv()
-        VecEnv.__init__(self, len(env_fns), observation_space, action_space)
+        self.frame_stack = frame_stack
+        self.frame_buffer = []
+        self.reward_coeff = reward_coeff
+        self.new_URDF = "cf2x.urdf"
+        self.maketime = datetime.now().strftime("%m%d%Y_%H%M%S")
 
-        self.env_step = 0
-        
-    def reset(self):
-        self.env_step = 0
-        for remote in self.remotes:
-            if self.randomize:
-                remote.send(('reset_rand', None))
-            else:
-                remote.send(('reset', None))
-                
-        if self.randomize:
-            results = np.stack([remote.recv() for remote in self.remotes])
-            obs, param = zip(*results)
-            return np.stack(obs), np.stack(param)
-        else:
-            return np.stack([remote.recv() for remote in self.remotes]), None
+        self.goal_pos = initial_xyzs if goal is None else goal
 
-    def step(self, action):
-        """
-        Reward normalization
-        """
-        self.env_step += 1
-        if "CartPole" in self.env_name:
-            obs, reward, is_done, info = super().step(action)
-            reward = reward - np.clip(np.power(obs[:,0]/2.4,2),0,1)
-            return obs, reward, is_done, info
-        elif "Pendulum" in self.env_name:
-            obs, reward, is_done, info = super().step(action)
-            reward = (reward + 8.1) / 8.1
-            return obs, reward, is_done, info
-        elif 'aviary' in self.env_name:
-            action = action.reshape((self.nenvs,-1))
-            obs, reward, is_done, info = super().step(action)
-            return obs, reward, is_done, info
-        else:
-            raise NotImplementedError
-
-class VecDynRandEnv(VecEnvWrapper):
-    def __init__(self, venv: VecEnv, env_name: str, dyn_range=dict()):
-        super().__init__(venv=venv, observation_space=venv.observation_space)
-        self.env_name = env_name
-        self.dyn_range = dyn_range
-        self.origin_params = None
-        if not self.env_name=='takeoff-aviary-v0':
-            self.origin_params = {
-                # Only for pendulum
-                'max_torque': self.venv.venv.envs[0].max_torque,
-                'm': self.venv.venv.envs[0].m,
-                'l': self.venv.venv.envs[0].l
-            }
-    def get_rand(self, param):
-        origin = self.origin_params[param]
-        r = self.dyn_range.get(param, 1)
-        ratio = np.random.uniform(1-r, r-1)
-        if abs(ratio) < 0.0001:
-            ratio = 1
-        elif ratio < 0:
-            ratio = 1/(1-ratio)
-        else:
-            ratio = ratio+1
-        
-        value = origin * ratio
-        norm = 2*(ratio-1/(1-r))/(r+1-1/(1-r))-1 if not r==1 else 0
-        return value, norm # Normalized value (-1~1)
-
-    def reset(self) -> np.ndarray:
-        params = []
-        for env in self.venv.venv.envs:
-            if self.env_name=='takeoff-aviary-v0':
-                params.append(env.random_urdf())
-            else:
-                env.max_torque, norm_maxtorque = self.get_rand('max_torque')
-                env.m, norm_m = self.get_rand('m')
-                env.l, norm_l = self.get_rand('l')
-                params.append([norm_maxtorque, norm_m, norm_l])
-
-        params = np.stack(params, axis=0)
-        obs = self.venv.reset()
-        return obs, params
-
-    def step_async(self, actions: np.ndarray) -> None:
-        self.venv.step_async(actions)
-
-    def step_wait(self) -> VecEnvStepReturn:
-        obs, reward, done, info = self.venv.step_wait()
-        return obs, reward, done, info
-
-
-class dummyEnv:
-    def __init__(self, observation_dim, action_dim):
-        class dummy:
-            def __init__(self, observation_dim, action_dim):
-                self.observation_space = Box(-np.inf, np.inf,(observation_dim,))
-                self.action_space = Box(-np.inf, np.inf,(action_dim,))
-        self.env = dummy(observation_dim, action_dim)
-        self.env_name = "dummy"
-
-class dynRandeEnv:
-    def __init__(self, 
-                env_name='takeoff-aviary-v0',
-                tag='randomize',
-                task='stabilize',
-                obs_norm=False,
-                nenvs=4, seed=0,
-                episode_len=2,
-                load_path=None,
-                dyn_range=dict(), # physical properties range
-                record=False):
-        self.env_name = env_name
-        self.tag = tag
-        self.task = task
-        self.seed = seed
-        self.dyn_range = dyn_range
-        self.nenvs = nenvs
-        self.dyn_range = dyn_range
-        self.record = record
-        self.episode_len = episode_len
-
-        self.obs_norm = obs_norm
-        self.last_action = -np.ones((4,))[None,:]
-
-        envs = []
-        for idx in range(nenvs):
-            if self.env_name=='takeoff-aviary-v0':
-                env = self.drone_env(idx)
-            else:
-                env = gym.make(env_name)
-                setattr(env, 'env_name', self.env_name)
-            envs.append(env)
-        self.env = DummyVecEnv([lambda: env for env in envs])
-        if load_path is not None:
-            self.env = VecNormalize.load(load_path+'env.pkl', self.env)
-        else:
-            self.env = VecNormalize(self.env, norm_obs=self.obs_norm, norm_reward=False)
-        self.env = VecDynRandEnv(self.env, self.env_name, self.dyn_range)
-        self.env.seed(self.seed)
-
-    def drone_env(self, idx):  
-        if self.task == 'stabilize':
-            initial_xyzs = [[0.0,0.0,10000.0]]
-            rpy_noise=np.pi
-            vel_noise=1.0
-            angvel_noise=2*np.pi
-            goal = None
-        elif self.task == 'stabilize-record':
-            initial_xyzs = [[0.0,0.0,1.5]]
-            rpy_noise=np.pi
-            vel_noise=1.0
-            angvel_noise=2*np.pi
-            goal = None
-        elif self.task == 'takeoff':
-            initial_xyzs = [[0.0,0.0,0.025]]
-            rpy_noise=0
-            vel_noise=0
-            angvel_noise=0
-            goal = np.array([[0.0,0.0,0.8]])
-        else:
-            raise NotImplementedError("please choose task among [stabilize, stabilize-record, takeoff]")
-        env = gym.make(id=self.env_name, # arbitrary environment that has state normalization and clipping
+        super(dynRandeEnv, self).__init__(
             drone_model=DroneModel.CF2X,
-            initial_xyzs=np.array(initial_xyzs),
-            initial_rpys=np.array([[0.0,0.0,0.0]]),
+            initial_xyzs=initial_xyzs,
+            initial_rpys=initial_rpys,
             physics=Physics.PYB_DRAG,
             freq=200,
             aggregate_phy_steps=1,
-            gui=False,
-            record=self.record, 
+            gui=gui,
+            record=record, 
             obs=ObservationType.KIN,
-            act=ActionType.RPM)
-        env = domainRandomAviary(env, self.tag+str(time.time_ns()), idx, self.seed+idx,
-            observable=['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel'],
-            frame_stack=1,
-            task='stabilize2',
-            # reward_coeff={'pos':0.2, 'vel':0.0, 'ang_vel':0.02, 'd_action':0.01},
-            # reward_coeff={'pos':0.2, 'vel':0.016, 'ang_vel':0.005, 'd_action':0.0, 'rotation': 0.05},
-            reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.05, 'rotation': 0.0},
-            episode_len_sec=self.episode_len,
-            max_rpm=24000,
-            initial_xyzs=np.array(initial_xyzs), # Far from the ground
-            initial_rpys=np.array([[0.0,0.0,0.0]]),
-            freq=200,
-            rpy_noise=rpy_noise,
-            vel_noise=vel_noise,
-            angvel_noise=angvel_noise,
-            mass_range=self.dyn_range.get('mass_range', 0.0),
-            cm_range=self.dyn_range.get('cm_range', 0.0),
-            kf_range=self.dyn_range.get('kf_range', 0.0),
-            km_range=self.dyn_range.get('km_range', 0.0),
-            i_range=self.dyn_range.get('i_range', 0.0),
-            battery_range=self.dyn_range.get('battery_range', 0.0),
-            goal=goal)
-        setattr(env, 'env_name', self.env_name)
+            act=ActionType.RPM
+        )
+        self.orig_params = {"M":self.M,
+                            "L":self.L,
+                            "KF":self.KF,
+                            "KM":self.KM,
+                            "BATTERY":1.0}
 
-        return env
+        self.EPISODE_LEN_SEC = episode_len_sec
+        self.MAX_RPM = 24000
+
+        self.action_space = gym.spaces.Box(low=-1*np.ones(4),
+                            high=np.ones(4),
+                            dtype=np.float32
+                            )
+        self.observation_space = self.observable_obs_space()
+
+        self.last_action = -np.ones((4,))[None,:]
+
+    def observable_obs_space(self):
+        rng = np.inf
+        low_dict = {
+            'pos': [-rng] * 3,
+            'rel_pos': [-rng] * 3,
+            'quaternion': [-rng] * 4,
+            'rotation': [-rng] * 9,
+            'vel': [-rng] * 3,
+            'rel_vel': [-rng] * 3,
+            'angular_vel': [-rng] * 3,
+            'rel_angular_vel': [-rng] * 3,
+            'rpm': [-rng] * 4
+        }
+        high_dict = {
+            'pos': [rng] * 3,
+            'rel_pos': [rng] * 3,
+            'quaternion': [rng] * 4,
+            'rotation': [rng] * 9,
+            'vel': [rng] * 3,
+            'rel_vel': [rng] * 3,
+            'angular_vel': [rng] * 3,
+            'rel_angular_vel': [rng] * 3,
+            'rpm': [rng] * 4
+        }
+        low, high = [],[]
+        for obs in self.observable:
+            if obs in low_dict:
+                low += low_dict[obs]
+                high += high_dict[obs]
+            else:
+                raise "Observable type is wrong. ({})".format(obs)
+        
+        low = low * self.frame_stack # duplicate 
+        high = high * self.frame_stack # duplicate 
+
+        return gym.spaces.Box(low=np.array(low),
+                    high=np.array(high),
+                    dtype=np.float32
+                )
+
+    def _startVideoRecording(self):
+        """Starts the recording of a video output.
+
+        The format of the video output is .mp4, if GUI is True, or .png, otherwise.
+        The video is saved under folder `files/videos`.
+
+        """
+        if self.RECORD and self.GUI:
+            self.VIDEO_ID = p.startStateLogging(loggingType=p.STATE_LOGGING_VIDEO_MP4,
+                                                fileName=os.path.dirname(os.path.abspath(__file__))+"/../videos/video-"+datetime.now().strftime("%m.%d.%Y_%H.%M.%S")+".mp4",
+                                                physicsClientId=self.CLIENT
+                                                )
+        if self.RECORD and not self.GUI:
+            self.FRAME_NUM = 0
+            self.IMG_PATH = os.path.dirname(os.path.abspath(__file__))+"/../videos/video-"+datetime.now().strftime("%m.%d.%Y_%H.%M.%S")+"/"
+            os.makedirs(os.path.dirname(self.IMG_PATH), exist_ok=True)
+
+    def _housekeeping(self):
+        self.last_action = -np.ones((4,))[None,:]
+
+        self.angvel_bias = np.zeros(3)
+        self.RESET_TIME = time.time()
+        self.step_counter = 0
+        self.first_render_call = True
+        self.X_AX = -1*np.ones(self.NUM_DRONES)
+        self.Y_AX = -1*np.ones(self.NUM_DRONES)
+        self.Z_AX = -1*np.ones(self.NUM_DRONES)
+        self.GUI_INPUT_TEXT = -1*np.ones(self.NUM_DRONES)
+        self.USE_GUI_RPM=False
+        self.last_input_switch = 0
+        self.last_action = -1*np.ones((self.NUM_DRONES, 4))
+        self.last_clipped_action = np.zeros((self.NUM_DRONES, 4))
+        self.gui_input = np.zeros(4)
+        #### Initialize the drones kinemaatic information ##########
+        self.pos = np.zeros((self.NUM_DRONES, 3))
+        self.quat = np.zeros((self.NUM_DRONES, 4))
+        self.rpy = np.zeros((self.NUM_DRONES, 3))
+        self.vel = np.zeros((self.NUM_DRONES, 3))
+        self.ang_v = np.zeros((self.NUM_DRONES, 3))
+        if self.PHYSICS == Physics.DYN:
+            self.rpy_rates = np.zeros((self.NUM_DRONES, 3))
+        #### Set PyBullet's parameters #############################
+        p.setGravity(0, 0, -self.G, physicsClientId=self.CLIENT)
+        p.setRealTimeSimulation(0, physicsClientId=self.CLIENT)
+        p.setTimeStep(self.TIMESTEP, physicsClientId=self.CLIENT)
+        p.setAdditionalSearchPath(pybullet_data.getDataPath(), physicsClientId=self.CLIENT)
+        #### Load ground plane, drone and obstacles models #########
+        self.PLANE_ID = p.loadURDF("plane.urdf", physicsClientId=self.CLIENT)
+
+        # Put gaussian noise to initialize RPY
+        init_rpys = []
+        for i in range(self.NUM_DRONES):
+            init_rpy = self.INIT_RPYS[i,:] + self.rpy_noise*np.random.uniform(-1.0,1.0,self.INIT_RPYS[i,:].shape)
+            # init_rpy[i,-1] = init_rpy[i,-1] + np.random.uniform(-np.pi, np.pi) # random yaw
+            init_rpys.append(init_rpy)
+        self.DRONE_IDS = np.array([p.loadURDF(os.path.dirname(os.path.abspath(__file__))+"/assets/"+self.new_URDF,
+                                              self.INIT_XYZS[i,:],
+                                              p.getQuaternionFromEuler(init_rpys[i]),
+                                              flags = p.URDF_USE_INERTIA_FROM_FILE,
+                                              physicsClientId=self.CLIENT
+                                              ) for i in range(self.NUM_DRONES)])
+
+        # random velocity initialize
+        for i in range (self.NUM_DRONES):
+            vel = self.vel_noise * np.random.uniform(-1.0,1.0,size=3)
+            p.resetBaseVelocity(self.DRONE_IDS[i],\
+                                linearVelocity = vel.tolist(),\
+                                angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
+                                physicsClientId=self.CLIENT)
+            self.goal_pos[i,:] = self.INIT_XYZS[i,:] + np.random.uniform(-1.0,1.0,size=3)
+
+
+        for i in range(self.NUM_DRONES):
+            #### Show the frame of reference of the drone, note that ###
+            #### It severly slows down the GUI #########################
+            if self.GUI and self.USER_DEBUG:
+                self._showDroneLocalAxes(i)
+            #### Disable collisions between drones' and the ground plane
+            #### E.g., to start a drone at [0,0,0] #####################
+            # p.setCollisionFilterPair(bodyUniqueIdA=self.PLANE_ID, bodyUniqueIdB=self.DRONE_IDS[i], linkIndexA=-1, linkIndexB=-1, enableCollision=0, physicsClientId=self.CLIENT)
+        if self.OBSTACLES:
+            self._addObstacles()
+
+    def random_urdf(self):
+        self.new_URDF = self.maketime + "/cf2x.urdf"
+        norm_mass, norm_xcm, norm_ycm, norm_ixx, norm_iyy, norm_battery = 0,0,0,0,0,0
+        norm_KF, norm_KM = [0,0,0,0], [0,0,0,0]
+
+        mass = np.random.uniform(1-self.mass_range, 1+self.mass_range) * self.orig_params['M']
+        x_cm, y_cm = np.random.uniform(-self.cm_range, self.cm_range, size=(2,)) * self.orig_params['L']
+        i_xx, i_yy = np.random.uniform(1-self.i_range, 1+self.i_range, size=(2,))
+        if self.mass_range != 0:
+            norm_mass = 2*(mass/self.orig_params['M']-(1-self.mass_range))/(2*self.mass_range)-1
+        if self.cm_range != 0:
+            norm_xcm = 2*(x_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
+            norm_ycm = 2*(y_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
+        if self.i_range != 0:
+            norm_ixx = 2*(i_xx-(1-self.i_range))/(2*self.i_range)-1 if self.i_range!=0 else 0
+            norm_iyy = 2*(i_yy-(1-self.i_range))/(2*self.i_range)-1 if self.i_range!=0 else 0
+
+        generate_urdf(self.new_URDF, mass, x_cm, y_cm, i_xx, i_yy, 0.0)
+        self.M, \
+        self.L, \
+        self.THRUST2WEIGHT_RATIO, \
+        self.J, \
+        self.J_INV, \
+        self.KF, \
+        self.KM, \
+        self.COLLISION_H,\
+        self.COLLISION_R, \
+        self.COLLISION_Z_OFFSET, \
+        self.MAX_SPEED_KMH, \
+        self.GND_EFF_COEFF, \
+        self.PROP_RADIUS, \
+        self.DRAG_COEFF, \
+        self.DW_COEFF_1, \
+        self.DW_COEFF_2, \
+        self.DW_COEFF_3 = self._parseURDFParameters()
+
+        self.battery = self.orig_params['BATTERY'] * np.random.uniform(1.0-self.battery_range, 1.0)
+        if self.battery_range != 0:
+            norm_battery = 2*(self.battery-(1-self.battery_range))/(self.battery_range)-1
+        else:
+            norm_battery = 0
+        self.KF = self.orig_params['KF'] * np.random.uniform(1.0-self.kf_range, 1.0+self.kf_range, size=(4,))
+        self.KM = self.orig_params['KM'] * np.random.uniform(1.0-self.km_range, 1.0+self.km_range, size=(4,))
+        if self.kf_range != 0:
+            norm_KF = 2*(self.KF/self.orig_params['KF']-(1-self.kf_range))/(2*self.kf_range)-1
+        if self.km_range != 0:
+            norm_KM = 2*(self.KM/self.orig_params['KM']-(1-self.km_range))/(2*self.km_range)-1
+        self.KF = self.battery * self.KF
+        self.KM = self.battery * self.KM
+        #### Compute constants #####################################
+        self.GRAVITY = self.G*self.M
+        self.HOVER_RPM = np.sqrt(self.GRAVITY / np.sum(self.KF))
+        self.MAX_THRUST = (np.sum(self.KF)*self.MAX_RPM**2)
+        self.MAX_XY_TORQUE = (2*self.L*np.mean(self.KF)*self.MAX_RPM**2)/np.sqrt(2)
+        self.MAX_Z_TORQUE = (2*np.mean(self.KM)*self.MAX_RPM**2)
+        self.GND_EFF_H_CLIP = 0.25 * self.PROP_RADIUS * np.sqrt((15 * self.MAX_RPM**2 * np.mean(self.KF) * self.GND_EFF_COEFF) / self.MAX_THRUST)
+
+        self.mass = mass
+        self.com = [x_cm, y_cm]
+        self.kf = self.KF
+        self.km = self.KM
+
+        # return np.array([mass, x_cm, y_cm, self.battery, *self.env.KF, *self.env.KM])
+        # param_num = 12 
+        return np.array([norm_mass, norm_xcm, norm_ycm, norm_ixx, norm_iyy, norm_battery, *norm_KF, *norm_KM])
+
+    def _computeObs(self):
+        return self._help_computeObs(self._getDroneStateVector(0))
+
+    def _help_computeObs(self, obs_all):
+        obs_idx_dict = {
+            'pos': range(0,3),
+            'rel_pos': range(0,7),
+            'quaternion': range(3,7),
+            'rotation': range(3,7),
+            'vel': range(10,13),
+            'rel_vel': [10,11,12,3,4,5,6],
+            'angular_vel': range(13,16),
+            'rel_angular_vel': [13,14,15,3,4,5,6],
+            'rpm': range(16,20)
+        }
+        obs = []
+        for otype in self.observable:
+            if otype == 'rotation':
+                o = obs_all[obs_idx_dict[otype]]
+            else:
+                o = obs_all[obs_idx_dict[otype]]
+            obs.append(self._normalizeState(o, otype))
+
+        obs = np.hstack(obs).flatten()
+        obs_len = obs.shape[0]
+
+        if len(self.frame_buffer) == 0:
+            self.frame_buffer = [obs for _ in range(self.frame_stack)]
+        else:
+            self.frame_buffer.pop(0)
+            self.frame_buffer.append(obs)
+
+        return np.hstack(self.frame_buffer).reshape((obs_len * self.frame_stack,))
+
+    def _normalizeState(self,
+                                state,
+                                type
+                               ):
+        MAX_LIN_VEL = 3 
+        MAX_XYZ = MAX_LIN_VEL * 2# * self.env.EPISODE_LEN_SEC
+        MAX_RPY_RATE = 2 * np.pi # temporary
+
+        # Noise
+        POS_NOISE = 0.005
+        VEL_NOISE = 0.01
+        ROT_NOISE = 0.0
+        ANGVEL_NOISE = [0.000175, 0.0105, 1000.] # MPU-9250 gyroscope spec / ref https://github.com/amolchanov86/quad_sim2multireal/blob/master/quad_sim/sensor_noise.py#L58
+        # noise density, random walk, bias correlation_time
+
+        norm_state = state.copy()
+
+        if type=='pos':
+            norm_state = (norm_state - self.goal_pos[0,:3]) 
+            norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            norm_state = norm_state / MAX_XYZ
+
+        elif type=='rel_pos':
+            r = R.from_quat(norm_state[-4:])
+            rot = r.as_matrix()
+            pos = (norm_state[:3] - self.goal_pos[0,:3]).reshape((3,1)) 
+            norm_state = np.matmul(rot.transpose(),pos).reshape((3,))
+            norm_state += np.random.normal(0, POS_NOISE, size=norm_state.shape) # add noise
+            norm_state = norm_state / MAX_XYZ
+
+        elif type=='rotation':
+            # don't need normalization
+            r = R.from_quat(norm_state)
+            norm_state = r.as_matrix().reshape((9,))
+            
+        elif type=='vel':
+            # norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            norm_state = norm_state / MAX_LIN_VEL
+
+        elif type=='rel_vel':
+            r = R.from_quat(norm_state[-4:])
+            rot = r.as_matrix()
+            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) 
+            norm_state += np.random.normal(0, VEL_NOISE, size=norm_state.shape) # add noise
+            norm_state = norm_state / MAX_LIN_VEL
+
+        elif type=='angular_vel':
+            norm_state = state.copy()
+            norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
+            norm_state = norm_state / MAX_RPY_RATE
+            
+        elif type=='rel_angular_vel':
+            r = R.from_quat(norm_state[-4:])
+            rot = r.as_matrix()
+            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))
+            norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
+            norm_state = norm_state / MAX_RPY_RATE
+            # norm_state = np.deg2rad(np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))) / MAX_RPY_RATE
+
+        elif type=='rpm':
+            # range : -1 ~ 1
+            norm_state = state * 2 / self.MAX_RPM - 1
+        
+        elif type=='action':
+            # range : 0 ~ 1
+            norm_state = state / self.MAX_RPM
+
+        return norm_state
+
+    def _angvel_noise(self, angvel, ANGVEL_NOISE, update=True):
+        dt = 1 / self.SIM_FREQ
+        sigma_g_d = ANGVEL_NOISE[0] / (dt**0.5)
+        sigma_b_g_d = (-(sigma_g_d**2) * (ANGVEL_NOISE[2] / 2) * (np.exp(-2*dt/ANGVEL_NOISE[2]) - 1))**0.5
+        pi_g_d = np.exp(-dt / ANGVEL_NOISE[2])
+
+        if update:
+            self.angvel_bias = pi_g_d * self.angvel_bias + sigma_b_g_d * np.random.normal(0, 1, 3)
+        
+        return angvel + self.angvel_bias + ANGVEL_NOISE[1] * np.random.normal(0, 1, 3) # + self.gyro_turn_on_bias_sigma * normal(0, 1, 3)
+
+    def _preprocessAction(self,
+                          action
+                          ):
+        return np.array(self.MAX_RPM * (1+action) / 2)
+
+    def _computeReward(self):
+        state = self._getDroneStateVector(0)
+        coeff = {
+            'pos': 6 * self.reward_coeff['pos'], # 0~3
+            'vel': 3 * self.reward_coeff['vel'], # 10~13
+            'ang_vel': self.reward_coeff['ang_vel'], # 13~16
+            'd_action': self.reward_coeff['d_action'], # 16~20
+            'rotation': self.reward_coeff['rotation']
+        }
+        xyz = coeff['pos'] * np.linalg.norm(self._normalizeState(state[:3],'pos'), ord=2) # for single agent temporarily
+        vel = coeff['vel'] * np.linalg.norm(state[10:13],ord=2)
+        ang_vel = coeff['ang_vel'] * np.linalg.norm(state[13:16],ord=2)
+        
+        rot = coeff['rotation'] * self._normalizeState(state[3:7],'rotation')[-1]
+        f_s = xyz + vel + ang_vel - rot
+
+        d_action = coeff['d_action'] * np.linalg.norm(self._normalizeState(state[16:],'action'),ord=2)
+        f_a = d_action
+            
+        return -(f_s+f_a) # * (1/self.env.SIM_FREQ) # + done_reward
+    
+    def _computeDone(self):
+        if self.step_counter/self.SIM_FREQ >= self.EPISODE_LEN_SEC:
+            return True
+        else:
+            return False
+
+    def _computeInfo(self):
+        return {}
 
     def reset(self):
-        self.last_action = -np.ones((4,))[None,:]
-        return self.env.reset()
+        self.random_urdf()
+        return super().reset()
 
     def step(self, action):
         action = 4*(1/200)/0.15 * (action-self.last_action) + self.last_action
         self.last_action = action
-        return self.env.step(action)
-    
-    def normalize_obs(self, obs):
-        return self.env.normalize_obs(obs)
-
-    def unnormalize_obs(self, obs):
-        return self.env.unnormalize_obs(obs)
-
-    def close(self):
-        self.env.close()
-
-    def save(self, path):
-        self.env.save(path+'env.pkl')
-    
-    def load(self,path):
-        envs = []
-        for idx in range(self.nenvs):
-            if self.env_name=='takeoff-aviary-v0':
-                env = self.drone_env(idx)
-            else:
-                env = gym.make(self.env_name)
-                setattr(env, 'env_name', self.env_name)
-            envs.append(env)
-        self.env = DummyVecEnv([lambda: env for env in envs])
-        self.env = VecNormalize.load(path+'env.pkl', self.env)
-        self.env = VecDynRandEnv(self.env, self.env_name, self.dyn_range)
+        return super().step(action)
