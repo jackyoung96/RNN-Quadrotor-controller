@@ -32,17 +32,17 @@ from time import time
 
 dyn_range = {
     # drones
-    'mass_range': 0.3, # (1-n) ~ (1+n)
-    'cm_range': 0.3, # (1-n) ~ (1+n)
-    'kf_range': 0.3, # (1-n) ~ (1+n)
-    'km_range': 0.3, # (1-n) ~ (1+n)
-    'i_range': 0.3,
+    'mass_range': 0.05, # (1-n) ~ (1+n)
+    'cm_range': 0.05, # (1-n) ~ (1+n)
+    'kf_range': 0.05, # (1-n) ~ (1+n)
+    'km_range': 0.05, # (1-n) ~ (1+n)
+    'i_range': 0.05,
     'battery_range': 0.0 # (1-n) ~ (1)
 }
 hparam_set = {
     "goal_dim": [18],
     "param_num": [14],
-    "hidden_dim": [48],
+    "hidden_dim": [64],
 
 
     "q_lr": [1e-3],
@@ -408,7 +408,7 @@ if __name__=='__main__':
                                             'RNNHER','GRUHER','LSTMHER',
                                             'RNNsHER','GRUsHER','LSTMsHER']
                                 , default='None', help='Use memory network (LSTM)')
-    parser.add_argument('--policy_actf', type=str, default='tanh', help="policy activation function")
+    parser.add_argument('--policy_actf', type=str, default='relu', help="policy activation function")
     parser.add_argument('--obs_norm', action='store_true', help='use batchnorm for input normalization')
 
     # Arguments for training 

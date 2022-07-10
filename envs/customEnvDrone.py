@@ -563,6 +563,7 @@ class customAviary(gym.Wrapper):
     def step(self, action, **kwargs):
         # action = action * self.MAX_RPM
         action += np.clip(np.random.normal(0, 0.05, action.shape),-0.1,0.1) # Action noise 
+        action = np.clip(action, -1, 1)
         obs, rews, dones, infos = self.env.step(action, **kwargs)
         return obs, rews, dones, infos
 

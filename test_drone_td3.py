@@ -74,10 +74,12 @@ def main(hparam):
             'kf_range': 0.3, # (1-n) ~ (1+n)
             'km_range': 0.3, # (1-n) ~ (1+n)
             'i_range': 0.3,
-            'battery_range': 0.3 # (1-n) ~ (1)
+            'battery_range': 0 # (1-n) ~ (1)
         }
     elif 'normal' in hparam['task']:
-        dyn_range = {}
+        dyn_range = {
+            'battery_range': 0
+        }
     else:
         raise NotImplementedError
 
@@ -103,8 +105,8 @@ def main(hparam):
         max_steps = waypoints[-1][1]
     elif 'stabilize' in hparam['task']:
         waypoints = [
-            (np.array([[0,  0,  1.0]]),0),
-            (np.array([[0,  0,  1.0]]), 1000), # (pos, time)
+            (np.array([[0,  0,  100.0]]),0),
+            (np.array([[0,  0,  100.0]]), 1000), # (pos, time)
         ]
         theta = 0
         initial_rpys = np.random.uniform(-np.pi, np.pi, size=(1,3))
@@ -176,6 +178,7 @@ def main(hparam):
                     ]])
 
     with torch.no_grad():
+        agent.policy_net.eval()
         env.env.envs[0].goal = getgoal(waypoints, 0)
         state, param = env.reset()
 
