@@ -17,10 +17,12 @@ import os
 from torch.utils.tensorboard import SummaryWriter
 import wandb
 from datetime import datetime
+from copy import deepcopy
 
 from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 from stable_baselines3.common.vec_env.vec_normalize import VecNormalize
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.callbacks import EvalCallback
 
 from time import time
 
@@ -44,7 +46,7 @@ dyn_range = {
     'battery_range': 0.0 # (1-n) ~ (1)
 }
 hparam_set = {
-    "learning_rate": (np.random.uniform,[-4, -3]),
+    "learning_rate": (np.random.uniform,[-4, -2]),
     "learning_starts": (np.random.randint,[80000,80001]),
     "activation": (np.random.choice, [[torch.nn.Tanh, torch.nn.ReLU]]),
 
@@ -57,12 +59,13 @@ hparam_set = {
 
     "goal_dim": (np.random.randint,[18,19]),
     "param_num": (np.random.randint,[14,15]),
-    "hidden_dim": (np.random.randint,[64,65]),
+    "hidden_dim": (np.random.randint,[5,8]),
 
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
     "rnn_dropout": (np.random.uniform,[0, 0])
 }
+
 
 def train(args, hparam):
 
@@ -71,13 +74,15 @@ def train(args, hparam):
     #####################################
 
     max_episodes  = int(1e4)
-    hidden_dim = hparam['hidden_dim']
     max_steps = hparam['max_steps']
 
     hparam['learning_rate'] = 10**hparam['learning_rate']
+    hparam['hidden_dim'] = int(2**hparam['hidden_dim'])
+    hidden_dim = hparam['hidden_dim']
     observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
-    hparam['observable']=observable
-    # hparam['n_steps'] = 2**hparam['n_steps']
+    rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.05, 'rotation': 0.0}
+    hparam['observable'] = observable
+    hparam['rew_coeff'] = rew_coeff
 
     batch_size  = 128
     nenvs = 1
@@ -122,13 +127,13 @@ def train(args, hparam):
         rpy_noise=np.pi,
         vel_noise=2,
         angvel_noise=2*np.pi,
-        reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.05, 'rotation': 0.0},
+        reward_coeff=rew_coeff,
         frame_stack=1,
         episode_len_sec=max_steps/200,
         gui=False,
         record=False,
     )
-    env = Monitor(env)
+    env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
     env = DummyVecEnv([lambda: env])
     env = VecNormalize(env, norm_obs=hparam['obs_norm'], norm_reward=hparam['rew_norm'])
     
@@ -183,8 +188,8 @@ def train(args, hparam):
 
     trainer.learn(total_timesteps=total_timesteps,
         callback=WandbCallback(
-            model_save_path=f"models/{run.id}",
-            model_save_freq=2000*max_steps,
+            model_save_path=f"models/{run.id}/{run.step}",
+            model_save_freq=100*max_steps,
             gradient_save_freq=100*max_steps,
             verbose=0,
         ) if hparam['tb_log'] else None,

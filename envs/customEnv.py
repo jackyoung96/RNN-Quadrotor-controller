@@ -1,4 +1,5 @@
 from email.policy import default
+import queue
 import gym
 
 import numpy as np
@@ -95,6 +96,7 @@ class dynRandeEnv(TakeoffAviary):
         self.observation_space = self.observable_obs_space()
 
         self.last_action = -np.ones((4,))[None,:]
+        self.droneStates = []
 
     def observable_obs_space(self):
         rng = np.inf
@@ -441,4 +443,21 @@ class dynRandeEnv(TakeoffAviary):
     def step(self, action):
         action = 4*(1/200)/0.15 * (action-self.last_action) + self.last_action
         self.last_action = action
-        return super().step(action)
+        state, reward, done, _ = super().step(action)
+        self.droneStates.append(self._getDroneStateVector(0))
+        if len(self.droneStates) > 100:
+            self.droneStates.pop(0)
+        droneState = np.concatenate(self.droneStates).mean(axis=0)
+        info = {'x': droneState[0],
+                'y': droneState[1],
+                'z': droneState[2]-self.goal_pos[0,2],
+                'roll':droneState[7],
+                'pitch':droneState[8],
+                'yaw':droneState[9],
+                'vx':droneState[10],
+                'vy':droneState[11],
+                'vz':droneState[12],
+                'wx':droneState[13],
+                'wy':droneState[14],
+                'wz':droneState[15]}
+        return state, reward, done, info
