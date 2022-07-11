@@ -17,10 +17,12 @@ import os
 from torch.utils.tensorboard import SummaryWriter
 import wandb
 from datetime import datetime
+from copy import deepcopy
 
 from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 from stable_baselines3.common.vec_env.vec_normalize import VecNormalize
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.callbacks import EvalCallback
 
 from time import time
 
@@ -44,7 +46,7 @@ dyn_range = {
     'battery_range': 0.0 # (1-n) ~ (1)
 }
 hparam_set = {
-    "learning_rate": (np.random.uniform,[-4, -3]),
+    "learning_rate": (np.random.uniform,[-4, -2]),
     "learning_starts": (np.random.randint,[80000,80001]),
     "activation": (np.random.choice, [[torch.nn.ReLU]]),
 
@@ -64,6 +66,7 @@ hparam_set = {
     "rnn_dropout": (np.random.uniform,[0, 0])
 }
 
+
 def train(args, hparam):
 
     #####################################
@@ -80,7 +83,6 @@ def train(args, hparam):
     rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.05, 'rotation': 0.0}
     hparam['observable'] = observable
     hparam['rew_coeff'] = rew_coeff
-    # hparam['n_steps'] = 2**hparam['n_steps']
 
     batch_size  = 128
     nenvs = 1
@@ -131,7 +133,7 @@ def train(args, hparam):
         gui=False,
         record=False,
     )
-    env = Monitor(env)
+    env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
     env = DummyVecEnv([lambda: env])
     env = VecNormalize(env, norm_obs=hparam['obs_norm'], norm_reward=hparam['rew_norm'])
     
@@ -186,8 +188,8 @@ def train(args, hparam):
 
     trainer.learn(total_timesteps=total_timesteps,
         callback=WandbCallback(
-            model_save_path=f"models/{run.id}",
-            model_save_freq=2000*max_steps,
+            model_save_path=f"models/{run.id}/{run.step}",
+            model_save_freq=100*max_steps,
             gradient_save_freq=100*max_steps,
             verbose=0,
         ) if hparam['tb_log'] else None,
