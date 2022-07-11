@@ -60,7 +60,7 @@ hparam_set = {
     "goal_dim": (np.random.randint,[18,19]),
     "param_num": (np.random.randint,[14,15]),
     "hidden_dim": (np.random.randint,[5,7]),
-    "critic_dim": (np.random.randint,[6,9]),
+    "critic_dim": (np.random.randint,[7,9]),
 
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
@@ -152,13 +152,8 @@ def train(args, hparam):
         )
         total_timesteps = max_episodes*max_steps
     elif hparam['model']=='PPO':
-<<<<<<< HEAD
-        policy_kwargs = dict(activation_fn=torch.nn.Tanh,
-                     net_arch=[dict(pi=[hidden_dim]*4, vf=[128]*4)])
-=======
         policy_kwargs = dict(activation_fn=hparam['activation'],
                      net_arch=[dict(pi=[hidden_dim]*4, vf=[critic_dim]*4)])
->>>>>>> 9e22fa0ccbb2257edbf53293adb71c66c20383ea
         trainer = PPO('MlpPolicy', env, verbose=0, device=device,
                 n_steps=hparam['n_steps'],
                 batch_size=batch_size,
