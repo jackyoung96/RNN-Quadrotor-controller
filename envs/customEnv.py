@@ -447,7 +447,7 @@ class dynRandeEnv(TakeoffAviary):
         self.droneStates.append(self._getDroneStateVector(0))
         if len(self.droneStates) > 100:
             self.droneStates.pop(0)
-        droneState = np.concatenate(self.droneStates).mean(axis=0)
+        droneState = np.stack(self.droneStates).mean(axis=0)
         info = {'x': droneState[0],
                 'y': droneState[1],
                 'z': droneState[2]-self.goal_pos[0,2],

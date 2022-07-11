@@ -79,6 +79,7 @@ def train(args, hparam):
 
     hparam['learning_rate'] = 10**hparam['learning_rate']
     hparam['hidden_dim'] = int(2**hparam['hidden_dim'])
+    hparam['critic_dim'] = int(2**hparam['critic_dim'])
     hidden_dim = hparam['hidden_dim']
     critic_dim = hparam['critic_dim']
     observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
@@ -152,13 +153,8 @@ def train(args, hparam):
         )
         total_timesteps = max_episodes*max_steps
     elif hparam['model']=='PPO':
-<<<<<<< HEAD
-        policy_kwargs = dict(activation_fn=torch.nn.Tanh,
-                     net_arch=[dict(pi=[hidden_dim]*4, vf=[128]*4)])
-=======
         policy_kwargs = dict(activation_fn=hparam['activation'],
                      net_arch=[dict(pi=[hidden_dim]*4, vf=[critic_dim]*4)])
->>>>>>> 9e22fa0ccbb2257edbf53293adb71c66c20383ea
         trainer = PPO('MlpPolicy', env, verbose=0, device=device,
                 n_steps=hparam['n_steps'],
                 batch_size=batch_size,
