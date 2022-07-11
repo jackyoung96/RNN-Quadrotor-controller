@@ -4,3 +4,6 @@
 [submodule "crazyflie-firmware"]
 	path = crazyflie-firmware
 	url = https://github.com/jackyoung96/crazyflie-firmware
+[submodule "stable-baselines3-contrib"]
+	path = stable-baselines3-contrib
+	url = https://github.com/Stable-Baselines-Team/stable-baselines3-contrib/

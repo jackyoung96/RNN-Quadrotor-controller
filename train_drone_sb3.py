@@ -150,10 +150,15 @@ def train(args, hparam):
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.id}" if hparam['tb_log'] else None
         )
-        total_timesteps = max_episodes*max_steps / 2
+        total_timesteps = max_episodes*max_steps
     elif hparam['model']=='PPO':
+<<<<<<< HEAD
+        policy_kwargs = dict(activation_fn=torch.nn.Tanh,
+                     net_arch=[dict(pi=[hidden_dim]*4, vf=[128]*4)])
+=======
         policy_kwargs = dict(activation_fn=hparam['activation'],
                      net_arch=[dict(pi=[hidden_dim]*4, vf=[critic_dim]*4)])
+>>>>>>> 9e22fa0ccbb2257edbf53293adb71c66c20383ea
         trainer = PPO('MlpPolicy', env, verbose=0, device=device,
                 n_steps=hparam['n_steps'],
                 batch_size=batch_size,
@@ -173,7 +178,7 @@ def train(args, hparam):
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.id}" if hparam['tb_log'] else None
         )
-        total_timesteps = max_episodes*max_steps / 2
+        total_timesteps = max_episodes*max_steps
     elif hparam['model']=='RecurrentPPO':
         policy_kwargs = dict(activation_fn=hparam['activation'],
                      net_arch=[dict(pi=[hidden_dim]*4, vf=[critic_dim]*4)])
