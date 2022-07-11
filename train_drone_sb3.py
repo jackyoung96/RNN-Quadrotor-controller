@@ -46,7 +46,7 @@ dyn_range = {
     'battery_range': 0.0 # (1-n) ~ (1)
 }
 hparam_set = {
-    "learning_rate": (np.random.uniform,[-4, -2]),
+    "learning_rate": (np.random.uniform,[-4, -3]),
     "learning_starts": (np.random.randint,[80000,80001]),
     "activation": (np.random.choice, [[torch.nn.ReLU]]),
 
@@ -128,8 +128,8 @@ def train(args, hparam):
         observable=observable,
         dyn_range=dyn_range,
         rpy_noise=np.pi,
-        vel_noise=2,
-        angvel_noise=2*np.pi,
+        vel_noise=1,
+        angvel_noise=np.pi,
         reward_coeff=rew_coeff,
         frame_stack=1,
         episode_len_sec=max_steps/200,
