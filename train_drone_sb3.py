@@ -46,7 +46,7 @@ dyn_range = {
 hparam_set = {
     "learning_rate": (np.random.uniform,[-4, -3]),
     "learning_starts": (np.random.randint,[80000,80001]),
-    "activation": (np.random.choice, [[torch.nn.Tanh, torch.nn.ReLU]]),
+    "activation": (np.random.choice, [[torch.nn.ReLU]]),
 
     # PPO
     # "n_steps": (np.random.randint,[4,11]),
@@ -57,7 +57,7 @@ hparam_set = {
 
     "goal_dim": (np.random.randint,[18,19]),
     "param_num": (np.random.randint,[14,15]),
-    "hidden_dim": (np.random.randint,[64,65]),
+    "hidden_dim": (np.random.randint,[5,8]),
 
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
@@ -71,12 +71,15 @@ def train(args, hparam):
     #####################################
 
     max_episodes  = int(1e4)
-    hidden_dim = hparam['hidden_dim']
     max_steps = hparam['max_steps']
 
     hparam['learning_rate'] = 10**hparam['learning_rate']
+    hparam['hidden_dim'] = int(2**hparam['hidden_dim'])
+    hidden_dim = hparam['hidden_dim']
     observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
-    hparam['observable']=observable
+    rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.05, 'rotation': 0.0}
+    hparam['observable'] = observable
+    hparam['rew_coeff'] = rew_coeff
     # hparam['n_steps'] = 2**hparam['n_steps']
 
     batch_size  = 128
@@ -122,7 +125,7 @@ def train(args, hparam):
         rpy_noise=np.pi,
         vel_noise=2,
         angvel_noise=2*np.pi,
-        reward_coeff={'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.05, 'rotation': 0.0},
+        reward_coeff=rew_coeff,
         frame_stack=1,
         episode_len_sec=max_steps/200,
         gui=False,
@@ -143,7 +146,7 @@ def train(args, hparam):
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.id}" if hparam['tb_log'] else None
         )
-        total_timesteps = max_episodes*max_steps / 2
+        total_timesteps = max_episodes*max_steps
     elif hparam['model']=='PPO':
         policy_kwargs = dict(activation_fn=torch.nn.Tanh,
                      net_arch=[dict(pi=[hidden_dim]*4, vf=[128]*4)])
@@ -166,7 +169,7 @@ def train(args, hparam):
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.id}" if hparam['tb_log'] else None
         )
-        total_timesteps = max_episodes*max_steps / 2
+        total_timesteps = max_episodes*max_steps
     elif hparam['model']=='RecurrentPPO':
         policy_kwargs = dict(activation_fn=hparam['activation'],
                      net_arch=[dict(pi=[hidden_dim]*4, vf=[128]*4)])
