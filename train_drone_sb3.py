@@ -60,7 +60,7 @@ hparam_set = {
     "goal_dim": (np.random.randint,[18,19]),
     "param_num": (np.random.randint,[14,15]),
     "hidden_dim": (np.random.randint,[5,7]),
-    "critic_dim": (np.random.randint,[6,9]),
+    "critic_dim": (np.random.randint,[7,9]),
 
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
