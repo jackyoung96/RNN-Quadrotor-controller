@@ -430,8 +430,8 @@ class dynRandeEnv(TakeoffAviary):
     def _computeDone(self):
         if self.step_counter/self.SIM_FREQ >= self.EPISODE_LEN_SEC:
             return True
-        elif np.linalg.norm(self._getDroneStateVector(0)[:3]-self.goal_pos[0,:3], ord=2) > 6:
-            return True
+        # elif np.linalg.norm(self._getDroneStateVector(0)[:3]-self.goal_pos[0,:3], ord=2) > 6:
+        #     return True
         else:
             return False
 
