@@ -63,6 +63,7 @@ hparam_set = {
     "param_num": (np.random.randint,[14,15]),
     "hidden_dim": (np.random.randint,[5,7]),
     "critic_dim": (np.random.randint,[7,9]),
+    "net_layers": (np.random.randint,[2,5]),
 
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
