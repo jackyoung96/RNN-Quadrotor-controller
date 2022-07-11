@@ -59,7 +59,8 @@ hparam_set = {
 
     "goal_dim": (np.random.randint,[18,19]),
     "param_num": (np.random.randint,[14,15]),
-    "hidden_dim": (np.random.randint,[5,8]),
+    "hidden_dim": (np.random.randint,[5,7]),
+    "critic_dim": (np.random.randint,[6,9]),
 
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
@@ -79,6 +80,7 @@ def train(args, hparam):
     hparam['learning_rate'] = 10**hparam['learning_rate']
     hparam['hidden_dim'] = int(2**hparam['hidden_dim'])
     hidden_dim = hparam['hidden_dim']
+    critic_dim = hparam['critic_dim']
     observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
     rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.05, 'rotation': 0.0}
     hparam['observable'] = observable
@@ -139,7 +141,7 @@ def train(args, hparam):
     
     if hparam['model']=='SAC':
         policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=dict(pi=[hidden_dim]*4, qf=[128]*4))
+                     net_arch=dict(pi=[hidden_dim]*4, qf=[critic_dim]*4))
         trainer = SAC('MlpPolicy', env, verbose=0, device=device,
                 batch_size=batch_size,
                 learning_rate=hparam['learning_rate'],
@@ -151,7 +153,7 @@ def train(args, hparam):
         total_timesteps = max_episodes*max_steps / 2
     elif hparam['model']=='PPO':
         policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=[dict(pi=[hidden_dim]*4, vf=[128]*4)])
+                     net_arch=[dict(pi=[hidden_dim]*4, vf=[critic_dim]*4)])
         trainer = PPO('MlpPolicy', env, verbose=0, device=device,
                 n_steps=hparam['n_steps'],
                 batch_size=batch_size,
@@ -162,7 +164,7 @@ def train(args, hparam):
         total_timesteps = max_episodes*max_steps
     elif hparam['model']=='TD3':
         policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=dict(pi=[hidden_dim]*4, qf=[128]*4))
+                     net_arch=dict(pi=[hidden_dim]*4, qf=[critic_dim]*4))
         trainer = TD3('MlpPolicy', env, verbose=0, device=device,
                 batch_size=batch_size,
                 learning_rate=hparam['learning_rate'],
@@ -174,7 +176,7 @@ def train(args, hparam):
         total_timesteps = max_episodes*max_steps / 2
     elif hparam['model']=='RecurrentPPO':
         policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=[dict(pi=[hidden_dim]*4, vf=[128]*4)])
+                     net_arch=[dict(pi=[hidden_dim]*4, vf=[critic_dim]*4)])
         trainer = RecurrentPPO('MlpPolicy', env, verbose=0, device=device,
                 n_steps=hparam['n_steps'],
                 batch_size=batch_size,
