@@ -23,6 +23,8 @@ from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 from stable_baselines3.common.vec_env.vec_normalize import VecNormalize
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import EvalCallback
+from gym_pybullet_drones.envs.BaseAviary import DroneModel
+from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 
 from time import time
 
@@ -30,7 +32,7 @@ from time import time
 from wandb.integration.sb3 import WandbCallback
 import stable_baselines3 as SB3
 from stable_baselines3 import SAC, TD3, PPO
-from sb3_contrib import RecurrentPPO
+# from sb3_contrib import RecurrentPPO
 
 ############################
 ####### Global Vars ########
@@ -122,17 +124,17 @@ def train(args, hparam):
     ####################################
 
     env = dynRandeEnv(
-        initial_xyzs=np.array([[0,0,10000]]),
+        initial_xyzs=np.array([[0,0,1.5]]),
         initial_rpys=np.array([[0,0,0]]),
         observable=observable,
-        dyn_range=dyn_range,
-        rpy_noise=np.pi,
-        vel_noise=2,
-        angvel_noise=2*np.pi,
+        dyn_range=dyn_range if not args.test else {},
+        rpy_noise=0,
+        vel_noise=0,
+        angvel_noise=0,
         reward_coeff=rew_coeff,
         frame_stack=1,
         episode_len_sec=max_steps/200,
-        gui=False,
+        gui=args.render,
         record=False,
     )
     env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
@@ -188,15 +190,47 @@ def train(args, hparam):
     else:
         raise "Please use proper model"
 
-    trainer.learn(total_timesteps=total_timesteps,
-        callback=WandbCallback(
-            model_save_path=f"models/{run.id}/{run.step}",
-            model_save_freq=100*max_steps,
-            gradient_save_freq=100*max_steps,
-            verbose=0,
-        ) if hparam['tb_log'] else None,
-    )
-\
+
+    if not args.test:
+        trainer.learn(total_timesteps=total_timesteps,
+            callback=WandbCallback(
+                model_save_path=f"models/{run.id}/{run.step}",
+                model_save_freq=100*max_steps,
+                gradient_save_freq=100*max_steps,
+                verbose=0,
+            ) if hparam['tb_log'] else None,
+        )
+    else:
+        del trainer
+        if hparam['model']=='SAC':
+            trainer = SAC.load(args.path)
+        elif hparam['model']=='PPO':
+            trainer = PPO.load(args.path)
+        elif hparam['model']=='TD3':
+            trainer = TD3.load(args.path)
+        ctrl = DSLPIDControl(drone_model=DroneModel.CF2X)
+        obs = env.reset()
+        state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
+        reward_sum = 0
+        for i in range(max_steps):
+            action, _state = trainer.predict(obs, deterministic=True)
+            action, *_ = ctrl.computeControlFromState(control_timestep=1*i+1,
+                                                                       state=state,
+                                                                       target_pos=np.array([0,0,1.6]),
+                                                                       target_rpy=np.array([0,0,0])
+                                                                       )
+            action = 2*(action/24000)-1
+            obs, reward, done, info = env.step(action)
+            state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
+            env.render()
+            input()
+            if done:
+                obs = env.reset()
+            reward_sum+=reward
+
+        print(info)
+        print(reward_sum)
+
 
 if __name__=='__main__':
     # train(1000, 'CartPole-v1')
@@ -215,6 +249,7 @@ if __name__=='__main__':
     # Arguments for test
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
+    parser.add_argument('--render', action='store_true', help='whether record or not')
     parser.add_argument('--record', action='store_true', help='whether record or not')
     parser.add_argument('--task', default='stabilize',choices=['stabilize', 'stabilize-record', 'takeoff'],
                         help='For takeoff-aviary-v0 environment')
