@@ -156,7 +156,7 @@ def train(args, hparam):
     hidden_dim = hparam['hidden_dim']
     critic_dim = hparam['critic_dim']
     observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
-    rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel':0.0, 'd_action':0.00, 'rotation': 0.5}
+    rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.00, 'rotation': 0.0}
     hparam['observable'] = observable
     hparam['rew_coeff'] = rew_coeff
 
