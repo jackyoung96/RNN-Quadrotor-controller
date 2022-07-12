@@ -155,6 +155,7 @@ def train(args, hparam):
     hparam['critic_dim'] = int(2**hparam['critic_dim'])
     hidden_dim = hparam['hidden_dim']
     critic_dim = hparam['critic_dim']
+    net_layers = hparam['net_layers']
     observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
     rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.00, 'rotation': 0.0}
     hparam['observable'] = observable
@@ -215,7 +216,7 @@ def train(args, hparam):
     
     if hparam['model']=='SAC':
         policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=dict(pi=[hidden_dim]*4, qf=[critic_dim]*4))
+                     net_arch=dict(pi=[hidden_dim]*net_layers, qf=[critic_dim]*net_layers))
         trainer = SAC('MlpPolicy', env, verbose=0, device=device,
                 batch_size=batch_size,
                 learning_rate=hparam['learning_rate'],
@@ -227,7 +228,7 @@ def train(args, hparam):
         total_timesteps = max_episodes*max_steps / 2
     elif hparam['model']=='PPO':
         policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=[dict(pi=[hidden_dim]*4, vf=[critic_dim]*4)])
+                     net_arch=[dict(pi=[hidden_dim]*net_layers, vf=[critic_dim]*net_layers)])
         trainer = PPO('MlpPolicy', env, verbose=0, device=device,
                 n_steps=hparam['n_steps'],
                 batch_size=batch_size,
@@ -239,7 +240,7 @@ def train(args, hparam):
         total_timesteps = max_episodes*max_steps
     elif hparam['model']=='TD3':
         policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=dict(pi=[hidden_dim]*4, qf=[critic_dim]*4))
+                     net_arch=dict(pi=[hidden_dim]*net_layers, qf=[critic_dim]*net_layers))
         trainer = TD3('MlpPolicy', env, verbose=0, device=device,
                 batch_size=batch_size,
                 learning_rate=hparam['learning_rate'],
@@ -251,7 +252,7 @@ def train(args, hparam):
         total_timesteps = max_episodes*max_steps / 2
     elif hparam['model']=='RecurrentPPO':
         policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=[dict(pi=[hidden_dim]*4, vf=[critic_dim]*4)])
+                     net_arch=[dict(pi=[hidden_dim]*net_layers, vf=[critic_dim]*net_layers)])
         trainer = RecurrentPPO('MlpPolicy', env, verbose=0, device=device,
                 n_steps=hparam['n_steps'],
                 batch_size=batch_size,
@@ -267,7 +268,7 @@ def train(args, hparam):
         trainer.learn(total_timesteps=total_timesteps,
             callback=CustomWandbCallback(
                 model_save_path=f"models/{run.name}",
-                model_save_freq=10000*max_steps,
+                model_save_freq=100*max_steps,
                 gradient_save_freq=100*max_steps,
                 verbose=0,
             ) if hparam['tb_log'] else None,
@@ -288,7 +289,7 @@ def train(args, hparam):
             action, _state = trainer.predict(obs, deterministic=True)
             action, *_ = ctrl.computeControlFromState(control_timestep=1*i+1,
                                                                        state=state,
-                                                                       target_pos=np.array([0,0,1.6]),
+                                                                       target_pos=np.array([0,0,10000.0]),
                                                                        target_rpy=np.array([0,0,0])
                                                                        )
             action = 2*(action/24000)-1
