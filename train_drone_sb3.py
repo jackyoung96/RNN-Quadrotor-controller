@@ -233,7 +233,6 @@ def train(args, hparam):
                 n_steps=hparam['n_steps'],
                 batch_size=batch_size,
                 learning_rate=hparam['learning_rate'],
-                use_sde=True,
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
         )
