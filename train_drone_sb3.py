@@ -23,7 +23,7 @@ from copy import deepcopy
 from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 from stable_baselines3.common.vec_env.vec_normalize import VecNormalize
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import BaseCallback
 from gym_pybullet_drones.envs.BaseAviary import DroneModel
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 
