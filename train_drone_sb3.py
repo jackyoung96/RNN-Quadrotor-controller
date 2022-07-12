@@ -48,7 +48,7 @@ dyn_range = {
     'battery_range': 0.0 # (1-n) ~ (1)
 }
 hparam_set = {
-    "learning_rate": (np.random.uniform,[-4, -3]),
+    "learning_rate": (np.random.uniform,[-5, -3]),
     "learning_starts": (np.random.randint,[80000,80001]),
     "activation": (np.random.choice, [[torch.nn.ReLU]]),
 
@@ -62,8 +62,8 @@ hparam_set = {
     "goal_dim": (np.random.randint,[18,19]),
     "param_num": (np.random.randint,[14,15]),
     "hidden_dim": (np.random.randint,[5,7]),
-    "critic_dim": (np.random.randint,[7,9]),
-    "net_layers": (np.random.randint,[2,5]),
+    "critic_dim": (np.random.randint,[5,8]),
+    "net_layers": (np.random.randint,[2,4]),
 
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
@@ -103,7 +103,6 @@ class CustomWandbCallback(BaseCallback):
         # Create folder if needed
         if self.model_save_path is not None:
             os.makedirs(self.model_save_path, exist_ok=True)
-            self.path = os.path.join(self.model_save_path, "model")
         else:
             assert (
                 self.model_save_freq == 0
@@ -136,7 +135,7 @@ class CustomWandbCallback(BaseCallback):
             self.save_model()
 
     def save_model(self) -> None:
-        path = self.path+"_%07d.zip"%self.n_calls
+        path = os.path.join(self.model_save_path,"model%07d.zip"%self.n_calls)
         self.model.save(path)
         wandb.save(path, base_path=self.model_save_path)
 
@@ -156,7 +155,7 @@ def train(args, hparam):
     hidden_dim = hparam['hidden_dim']
     critic_dim = hparam['critic_dim']
     observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
-    rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.05, 'rotation': 0.0}
+    rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.00, 'rotation': 0.0}
     hparam['observable'] = observable
     hparam['rew_coeff'] = rew_coeff
 
@@ -222,7 +221,7 @@ def train(args, hparam):
                 learning_starts=hparam['learning_starts'],
                 train_freq=hparam['update_itr'],
                 policy_kwargs=policy_kwargs,
-                tensorboard_log=f"runs/{run.id}" if hparam['tb_log'] else None
+                tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
         )
         total_timesteps = max_episodes*max_steps
     elif hparam['model']=='PPO':
@@ -233,7 +232,7 @@ def train(args, hparam):
                 batch_size=batch_size,
                 learning_rate=hparam['learning_rate'],
                 policy_kwargs=policy_kwargs,
-                tensorboard_log=f"runs/{run.id}" if hparam['tb_log'] else None
+                tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
         )
         total_timesteps = max_episodes*max_steps
     elif hparam['model']=='TD3':
@@ -245,7 +244,7 @@ def train(args, hparam):
                 learning_starts=hparam['learning_starts'],
                 train_freq=(hparam['update_itr'], "episode"),
                 policy_kwargs=policy_kwargs,
-                tensorboard_log=f"runs/{run.id}" if hparam['tb_log'] else None
+                tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
         )
         total_timesteps = max_episodes*max_steps
     elif hparam['model']=='RecurrentPPO':
@@ -256,7 +255,7 @@ def train(args, hparam):
                 batch_size=batch_size,
                 learning_rate=hparam['learning_rate'],
                 policy_kwargs=policy_kwargs,
-                tensorboard_log=f"runs/{run.id}" if hparam['tb_log'] else None
+                tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
         )
         total_timesteps = max_episodes*max_steps
     else:
@@ -264,8 +263,8 @@ def train(args, hparam):
 
     trainer.learn(total_timesteps=total_timesteps,
         callback=CustomWandbCallback(
-            model_save_path=f"models/{run.id}",
-            model_save_freq=100*max_steps,
+            model_save_path=f"models/{run.name}",
+            model_save_freq=10000*max_steps,
             gradient_save_freq=100*max_steps,
             verbose=0,
         ) if hparam['tb_log'] else None,
