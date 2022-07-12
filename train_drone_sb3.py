@@ -224,7 +224,7 @@ def train(args, hparam):
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
         )
-        total_timesteps = max_episodes*max_steps
+        total_timesteps = max_episodes*max_steps / 2
     elif hparam['model']=='PPO':
         policy_kwargs = dict(activation_fn=hparam['activation'],
                      net_arch=[dict(pi=[hidden_dim]*4, vf=[critic_dim]*4)])
@@ -248,7 +248,7 @@ def train(args, hparam):
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
         )
-        total_timesteps = max_episodes*max_steps
+        total_timesteps = max_episodes*max_steps / 2
     elif hparam['model']=='RecurrentPPO':
         policy_kwargs = dict(activation_fn=hparam['activation'],
                      net_arch=[dict(pi=[hidden_dim]*4, vf=[critic_dim]*4)])
