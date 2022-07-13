@@ -30,6 +30,7 @@ from gym_pybullet_drones.envs.single_agent_rl.TakeoffAviary import TakeoffAviary
 
 class dynRandeEnv(TakeoffAviary):
     """Custom Environment that follows gym interface"""
+    metadata = {'render.modes': ['human','rgb_array']}
 
     def __init__(self, 
                 initial_xyzs,
@@ -45,6 +46,7 @@ class dynRandeEnv(TakeoffAviary):
                 gui=False,
                 record=False,
                 goal=None,
+                wandb_render=False,
                 **kwargs):
 
         self.observable = observable
@@ -97,6 +99,8 @@ class dynRandeEnv(TakeoffAviary):
 
         self.last_action = -np.ones((4,))[None,:]
         self.droneStates = []
+        self.param = np.zeros((14,0))
+        self.wandb_render = wandb_render
 
     def observable_obs_space(self):
         rng = np.inf
@@ -109,7 +113,8 @@ class dynRandeEnv(TakeoffAviary):
             'rel_vel': [-rng] * 3,
             'angular_vel': [-rng] * 3,
             'rel_angular_vel': [-rng] * 3,
-            'rpm': [-rng] * 4
+            'rpm': [-1] * 4,
+            'param': [-1] * 14
         }
         high_dict = {
             'pos': [rng] * 3,
@@ -120,7 +125,8 @@ class dynRandeEnv(TakeoffAviary):
             'rel_vel': [rng] * 3,
             'angular_vel': [rng] * 3,
             'rel_angular_vel': [rng] * 3,
-            'rpm': [rng] * 4
+            'rpm': [1] * 4,
+            'param': [1] * 14
         }
         low, high = [],[]
         for obs in self.observable:
@@ -300,12 +306,12 @@ class dynRandeEnv(TakeoffAviary):
             'rel_vel': [10,11,12,3,4,5,6],
             'angular_vel': range(13,16),
             'rel_angular_vel': [13,14,15,3,4,5,6],
-            'rpm': range(16,20)
+            'rpm': range(16,20),
         }
         obs = []
         for otype in self.observable:
-            if otype == 'rotation':
-                o = obs_all[obs_idx_dict[otype]]
+            if otype == 'param':
+                o = self.param.copy()
             else:
                 o = obs_all[obs_idx_dict[otype]]
             obs.append(self._normalizeState(o, otype))
@@ -388,6 +394,9 @@ class dynRandeEnv(TakeoffAviary):
             # range : 0 ~ 1
             norm_state = state / self.MAX_RPM
 
+        elif type=='param':
+            pass
+
         return norm_state
 
     def _angvel_noise(self, angvel, ANGVEL_NOISE, update=True):
@@ -410,12 +419,12 @@ class dynRandeEnv(TakeoffAviary):
         state = self._getDroneStateVector(0)
         coeff = {
             'pos': 6 * self.reward_coeff['pos'], # 0~3
-            'vel': 3 * self.reward_coeff['vel'], # 10~13
+            'vel': self.reward_coeff['vel'], # 10~13
             'ang_vel': self.reward_coeff['ang_vel'], # 13~16
             'd_action': self.reward_coeff['d_action'], # 16~20
             'rotation': self.reward_coeff['rotation']
         }
-        xyz = coeff['pos'] * np.linalg.norm(self._normalizeState(state[:3],'pos'), ord=2) # for single agent temporarily
+        xyz = coeff['pos'] * np.linalg.norm(state[:3]-self.goal_pos[0,:3], ord=2) # for single agent temporarily
         vel = coeff['vel'] * np.linalg.norm(state[10:13],ord=2)
         ang_vel = coeff['ang_vel'] * np.linalg.norm(state[13:16],ord=2)
         
@@ -439,7 +448,7 @@ class dynRandeEnv(TakeoffAviary):
         return {}
 
     def reset(self):
-        self.random_urdf()
+        self.param = self.random_urdf()
         return super().reset()
 
     def step(self, action):
@@ -463,3 +472,45 @@ class dynRandeEnv(TakeoffAviary):
                 'wy':droneState[14],
                 'wz':droneState[15]}
         return state, reward, done, info
+
+    def render(self,
+               mode='rgb_array',
+               close=False
+               ):
+        if not self.wandb_render:
+            return super().render('human', close)
+        else:
+            # rgb array return 
+            # X,Y,Z,Roll,Pitch,Yaw,Vx,Vy,Vz,Wx,Wy,Wz,a1,a2,a3,a4
+            state = self._getDroneStateVector(0)
+            xyz = np.clip(((state[:3] - self.goal_pos[0,:3]) / 10 + 1) * 50, 0,100)  # -10~10 m
+            rpy = np.clip((state[7:10] / np.pi + 1) * 50, 0, 100)   # -pi~pi rad
+            vs = np.clip((state[10:13] / 3 + 1) * 50, 0, 100) # -3~3 m/s
+            ws = np.clip((state[13:16] / 3 * np.pi + 1) * 50, 0, 100) # -3pi~3pi rad/s
+            aes = 2 * state[16:20] / self.MAX_RPM - 1 # -1~1
+
+            img = np.zeros((60,101,3), dtype=int)
+            img[:,49:52,:] = 255
+
+            img[0:3,max(xyz[0]-3),0:min(xyz[0]-4,100),0] = 255
+            img[3:6,max(xyz[1]-3),0:min(xyz[1]-4,100),1] = 255
+            img[6:9,max(xyz[2]-3),0:min(xyz[2]-4,100),2] = 255
+
+            img[12:15,max(rpy[0]-3),0:min(rpy[0]-4,100),0] = 255
+            img[15:18,max(rpy[1]-3),0:min(rpy[1]-4,100),1] = 255
+            img[18:21,max(rpy[2]-3),0:min(rpy[2]-4,100),2] = 255
+
+            img[24:27,max(vs[0]-3),0:min(vs[0]-4,100),0] = 255
+            img[27:30,max(vs[1]-3),0:min(vs[1]-4,100),1] = 255
+            img[30:33,max(vs[2]-3),0:min(vs[2]-4,100),2] = 255
+
+            img[36:39,max(ws[0]-3),0:min(ws[0]-4,100),0] = 255
+            img[39:42,max(ws[1]-3),0:min(ws[1]-4,100),1] = 255
+            img[42:45,max(ws[2]-3),0:min(ws[2]-4,100),2] = 255
+
+            img[48:51,max(aes[0]-3),0:min(aes[0]-4,100),0] = 255
+            img[51:54,max(aes[1]-3),0:min(aes[1]-4,100),1] = 255
+            img[54:57,max(aes[2]-3),0:min(aes[2]-4,100),2] = 255
+            img[57:60,max(aes[3]-3),0:min(aes[3]-4,100),:2] = 255
+
+            return img
