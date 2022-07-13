@@ -20,8 +20,7 @@ from wandb.sdk.lib import telemetry as wb_telemetry
 from datetime import datetime
 from copy import deepcopy
 
-from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
-from stable_baselines3.common.vec_env.vec_normalize import VecNormalize
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, VecVideoRecorder
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import BaseCallback
 from gym_pybullet_drones.envs.BaseAviary import DroneModel
@@ -49,7 +48,7 @@ dyn_range = {
     'battery_range': 0.0 # (1-n) ~ (1)
 }
 hparam_set = {
-    "learning_rate": (np.random.uniform,[-5, -3]),
+    "learning_rate": (np.random.uniform,[-5, -4]),
     "learning_starts": (np.random.randint,[80000,80001]),
     "activation": (np.random.choice, [[torch.nn.ReLU]]),
 
@@ -58,17 +57,19 @@ hparam_set = {
     "n_steps": (np.random.randint,[800,801]),
 
     # SAC, TD3
-    "update_itr": (np.random.randint,[1,11]),
+    "update_itr": (np.random.randint,[10,11]),
 
     "goal_dim": (np.random.randint,[18,19]),
     "param_num": (np.random.randint,[14,15]),
-    "hidden_dim": (np.random.randint,[5,7]),
-    "critic_dim": (np.random.randint,[5,8]),
-    "net_layers": (np.random.randint,[2,4]),
+    "hidden_dim": (np.random.randint,[5,6]),
+    "critic_dim": (np.random.randint,[7,8]),
+    "net_layers": (np.random.randint,[4,5]),
 
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
-    "rnn_dropout": (np.random.uniform,[0, 0])
+    "rnn_dropout": (np.random.uniform,[0, 0]),
+
+    "rew_angvel": (np.random.uniform, [0, 0.1])
 }
 
 
@@ -157,7 +158,9 @@ def train(args, hparam):
     critic_dim = hparam['critic_dim']
     net_layers = hparam['net_layers']
     observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
-    rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel':0.1, 'd_action':0.00, 'rotation': 0.0}
+    if hparam['param']:
+        observable += ['param']
+    rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel':hparam['rew_angvel'], 'd_action':0.00, 'rotation': 0.0}
     hparam['observable'] = observable
     hparam['rew_coeff'] = rew_coeff
 
@@ -213,6 +216,7 @@ def train(args, hparam):
     env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
     env = DummyVecEnv([lambda: env])
     env = VecNormalize(env, norm_obs=hparam['obs_norm'], norm_reward=hparam['rew_norm'])
+    env = VecVideoRecorder(env, "videos", record_video_trigger=lambda x: x % (125*max_steps) == 0, video_length=max_steps)
     
     if hparam['model']=='SAC':
         policy_kwargs = dict(activation_fn=hparam['activation'],
@@ -317,6 +321,7 @@ if __name__=='__main__':
     parser.add_argument('--rew_norm', action='store_true', help="Reward normalization")
     parser.add_argument('--obs_norm', action='store_true', help="Observation normalization")
     parser.add_argument('--tb_log', action='store_true', help="Tensorboard logging")
+    parser.add_argument('--param', action='store_true', help="Use param observation")
 
     # Arguments for test
     parser.add_argument('--test', action='store_true')
