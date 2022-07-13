@@ -418,7 +418,7 @@ class dynRandeEnv(TakeoffAviary):
     def _computeReward(self):
         state = self._getDroneStateVector(0)
         coeff = {
-            'pos': 6 * self.reward_coeff['pos'], # 0~3
+            'pos': self.reward_coeff['pos'], # 0~3
             'vel': self.reward_coeff['vel'], # 10~13
             'ang_vel': self.reward_coeff['ang_vel'], # 13~16
             'd_action': self.reward_coeff['d_action'], # 16~20
