@@ -218,7 +218,7 @@ def train(args, hparam):
     env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
     env = DummyVecEnv([lambda: env])
     env = VecNormalize(env, norm_obs=hparam['obs_norm'], norm_reward=hparam['rew_norm'])
-    env = VecVideoRecorder(env, f"{run.name}", record_video_trigger=lambda x: x % (125*max_steps) == 0, video_length=max_steps)
+    env = VecVideoRecorder(env, f"videos/{run.name}", record_video_trigger=lambda x: x % (125*max_steps) == 0, video_length=max_steps)
     
     if hparam['model']=='SAC':
         policy_kwargs = dict(activation_fn=hparam['activation'],
