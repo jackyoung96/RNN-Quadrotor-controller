@@ -49,7 +49,7 @@ dyn_range = {
     'battery_range': 0.0 # (1-n) ~ (1)
 }
 hparam_set = {
-    "learning_rate": (np.random.uniform,[-5, -3]),
+    "learning_rate": (np.random.uniform,[-4, -3]),
     "learning_starts": (np.random.randint,[80000,80001]),
     "activation": (np.random.choice, [[torch.nn.ReLU]]),
 
@@ -63,8 +63,8 @@ hparam_set = {
     "goal_dim": (np.random.randint,[18,19]),
     "param_num": (np.random.randint,[14,15]),
     "hidden_dim": (np.random.randint,[5,7]),
-    "critic_dim": (np.random.randint,[5,8]),
-    "net_layers": (np.random.randint,[2,4]),
+    "critic_dim": (np.random.randint,[6,8]),
+    "net_layers": (np.random.randint,[3,5]),
 
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
