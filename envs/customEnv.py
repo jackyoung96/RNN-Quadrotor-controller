@@ -483,34 +483,42 @@ class dynRandeEnv(TakeoffAviary):
             # rgb array return 
             # X,Y,Z,Roll,Pitch,Yaw,Vx,Vy,Vz,Wx,Wy,Wz,a1,a2,a3,a4
             state = self._getDroneStateVector(0)
-            xyz = np.clip(((state[:3] - self.goal_pos[0,:3]) / 10 + 1) * 50, 0,100)  # -10~10 m
-            rpy = np.clip((state[7:10] / np.pi + 1) * 50, 0, 100)   # -pi~pi rad
-            vs = np.clip((state[10:13] / 3 + 1) * 50, 0, 100) # -3~3 m/s
-            ws = np.clip((state[13:16] / 3 * np.pi + 1) * 50, 0, 100) # -3pi~3pi rad/s
-            aes = 2 * state[16:20] / self.MAX_RPM - 1 # -1~1
+            xyz = 100-np.clip(((state[:3] - self.goal_pos[0,:3]) / 10 + 1) * 50, 0,100)  # -10~10 m
+            rpy = 100-np.clip((state[7:10] / np.pi + 1) * 50, 0, 100)   # -pi~pi rad
+            vs = 100-np.clip((state[10:13] / 3 + 1) * 50, 0, 100) # -3~3 m/s
+            ws = 100-np.clip((state[13:16] / 3 * np.pi + 1) * 50, 0, 100) # -3pi~3pi rad/s
+            aes = 100-np.clip((state[16:20] / self.MAX_RPM) * 100, 0, 100) # -1~1
 
-            img = np.zeros((60,101,3), dtype=int)
-            img[:,49:52,:] = 255
+            img = np.zeros((101,60,3), dtype=np.uint8)
+            img[49:52,:,:] = 255
 
-            img[0:3,max(xyz[0]-3),0:min(xyz[0]-4,100),0] = 255
-            img[3:6,max(xyz[1]-3),0:min(xyz[1]-4,100),1] = 255
-            img[6:9,max(xyz[2]-3),0:min(xyz[2]-4,100),2] = 255
+            img[int(max(xyz[0]-3,0)):int(min(xyz[0]+4,100)),0:3,0] = 255
+            img[int(max(xyz[1]-3,0)):int(min(xyz[1]+4,100)),3:6,1] = 255
+            img[int(max(xyz[2]-3,0)):int(min(xyz[2]+4,100)),6:9,2] = 255
 
-            img[12:15,max(rpy[0]-3),0:min(rpy[0]-4,100),0] = 255
-            img[15:18,max(rpy[1]-3),0:min(rpy[1]-4,100),1] = 255
-            img[18:21,max(rpy[2]-3),0:min(rpy[2]-4,100),2] = 255
+            img[:,10,:] = 255
 
-            img[24:27,max(vs[0]-3),0:min(vs[0]-4,100),0] = 255
-            img[27:30,max(vs[1]-3),0:min(vs[1]-4,100),1] = 255
-            img[30:33,max(vs[2]-3),0:min(vs[2]-4,100),2] = 255
+            img[int(max(rpy[0]-3,0)):int(min(rpy[0]+4,100)),12:15,0] = 255
+            img[int(max(rpy[1]-3,0)):int(min(rpy[1]+4,100)),15:18,1] = 255
+            img[int(max(rpy[2]-3,0)):int(min(rpy[2]+4,100)),18:21,2] = 255
 
-            img[36:39,max(ws[0]-3),0:min(ws[0]-4,100),0] = 255
-            img[39:42,max(ws[1]-3),0:min(ws[1]-4,100),1] = 255
-            img[42:45,max(ws[2]-3),0:min(ws[2]-4,100),2] = 255
+            img[:,22,:] = 255
 
-            img[48:51,max(aes[0]-3),0:min(aes[0]-4,100),0] = 255
-            img[51:54,max(aes[1]-3),0:min(aes[1]-4,100),1] = 255
-            img[54:57,max(aes[2]-3),0:min(aes[2]-4,100),2] = 255
-            img[57:60,max(aes[3]-3),0:min(aes[3]-4,100),:2] = 255
+            img[int(max(vs[0]-3,0)):int(min(vs[0]+4,100)),24:27,0] = 255
+            img[int(max(vs[1]-3,0)):int(min(vs[1]+4,100)),27:30,1] = 255
+            img[int(max(vs[2]-3,0)):int(min(vs[2]+4,100)),30:33,2] = 255
+
+            img[:,34,:] = 255
+
+            img[int(max(ws[0]-3,0)):int(min(ws[0]+4,100)),36:39,0] = 255
+            img[int(max(ws[1]-3,0)):int(min(ws[1]+4,100)),39:42,1] = 255
+            img[int(max(ws[2]-3,0)):int(min(ws[2]+4,100)),42:45,2] = 255
+
+            img[:,46,:] = 255
+
+            img[int(max(aes[0]-3,0)):int(min(aes[0]+4,100)),48:51,0] = 255
+            img[int(max(aes[1]-3,0)):int(min(aes[1]+4,100)),51:54,1] = 255
+            img[int(max(aes[2]-3,0)):int(min(aes[2]+4,100)),54:57,2] = 255
+            img[int(max(aes[3]-3,0)):int(min(aes[3]+4,100)),57:60,:2] = 255
 
             return img
