@@ -183,7 +183,8 @@ def train(args, hparam):
         # wandb
         run = wandb.init(project="SB3-drone", config=hparam,
                         sync_tensorboard=True,
-                        save_code=True)
+                        save_code=True,
+                        monitor_gym=True,)
         wandb.run.name = "%s_%s"%(algorithm_name, now)
         wandb.run.save()
     
@@ -212,11 +213,12 @@ def train(args, hparam):
         episode_len_sec=max_steps/200,
         gui=args.render,
         record=False,
+        wandb_render=True,
     )
     env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
     env = DummyVecEnv([lambda: env])
     env = VecNormalize(env, norm_obs=hparam['obs_norm'], norm_reward=hparam['rew_norm'])
-    env = VecVideoRecorder(env, "videos", record_video_trigger=lambda x: x % (125*max_steps) == 0, video_length=max_steps)
+    env = VecVideoRecorder(env, f"{run.name}", record_video_trigger=lambda x: x % (125*max_steps) == 0, video_length=max_steps)
     
     if hparam['model']=='SAC':
         policy_kwargs = dict(activation_fn=hparam['activation'],
