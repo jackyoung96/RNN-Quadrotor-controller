@@ -45,6 +45,7 @@ dyn_range = {
     'kf_range': 0.3, # (1-n) ~ (1+n)
     'km_range': 0.3, # (1-n) ~ (1+n)
     'i_range': 0.3,
+    't_range': 0.3,
     'battery_range': 0.0 # (1-n) ~ (1)
 }
 # dyn_range = {
@@ -152,6 +153,7 @@ class CustomWandbCallback(BaseCallback):
 
 
 def train(args, hparam):
+    global dyn_range
 
     #####################################
     # hyper-parameters for RL training ##
@@ -291,21 +293,31 @@ def train(args, hparam):
     else:
         del trainer
         del env
-        max_steps=1400
+        max_steps=800
+        dyn_range = {
+            # drones
+            'mass_range': 0.1, # (1-n) ~ (1+n)
+            'cm_range': 0.1, # (1-n) ~ (1+n)
+            'kf_range': 0.1, # (1-n) ~ (1+n)
+            'km_range': 0.1, # (1-n) ~ (1+n)
+            'i_range': 0.1,
+            'battery_range': 0.0 # (1-n) ~ (1)
+        }
         env = dynRandeEnv(
             initial_xyzs=np.array([[0,0,10000.0]]),
             initial_rpys=np.array([[0,0,0]]),
             observable=observable,
             dyn_range=dyn_range,
-            rpy_noise=0,
-            vel_noise=1,
-            angvel_noise=0,
+            rpy_noise=0.2*np.pi,
+            vel_noise=0.2,
+            angvel_noise=0.4*np.pi,
             reward_coeff=rew_coeff,
             frame_stack=1,
             episode_len_sec=max_steps/100,
             gui=args.render,
             record=False,
             wandb_render=True,
+            goal=np.array([[0,0,10000.0]])
         )
         env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
         env = DummyVecEnv([lambda: env])

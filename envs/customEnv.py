@@ -61,6 +61,7 @@ class dynRandeEnv(TakeoffAviary):
         self.kf_range = dyn_range.get('kf_range', 0.0)
         self.km_range = dyn_range.get('km_range', 0.0)
         self.battery_range = dyn_range.get('battery_range', 0.0)
+        self.t_range = dyn_range.get('t_range', 0.0)
 
         self.frame_stack = frame_stack
         self.frame_buffer = []
@@ -68,6 +69,7 @@ class dynRandeEnv(TakeoffAviary):
         self.new_URDF = "cf2x.urdf"
         self.maketime = datetime.now().strftime("%m%d%Y_%H%M%S")
 
+        self.goal = goal
         self.goal_pos = initial_xyzs.copy() if goal is None else goal
 
         super(dynRandeEnv, self).__init__(
@@ -86,6 +88,7 @@ class dynRandeEnv(TakeoffAviary):
                             "L":self.L,
                             "KF":self.KF,
                             "KM":self.KM,
+                            "T": 0.15,
                             "BATTERY":1.0}
 
         self.EPISODE_LEN_SEC = episode_len_sec
@@ -114,7 +117,7 @@ class dynRandeEnv(TakeoffAviary):
             'angular_vel': [-rng] * 3,
             'rel_angular_vel': [-rng] * 3,
             'rpm': [-rng] * 4,
-            'param': [-rng] * 14
+            'param': [-rng] * 15
         }
         high_dict = {
             'pos': [rng] * 3,
@@ -126,7 +129,7 @@ class dynRandeEnv(TakeoffAviary):
             'angular_vel': [rng] * 3,
             'rel_angular_vel': [rng] * 3,
             'rpm': [rng] * 4,
-            'param': [rng] * 14
+            'param': [rng] * 15
         }
         low, high = [],[]
         for obs in self.observable:
@@ -213,7 +216,8 @@ class dynRandeEnv(TakeoffAviary):
                                 linearVelocity = vel.tolist(),\
                                 angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.CLIENT)
-            self.goal_pos[i,:] = self.INIT_XYZS[i,:] + np.random.uniform(-1.0,1.0,size=3)
+            self.goal_pos[i,:] = self.INIT_XYZS[i,:] + np.random.uniform(-1.0,1.0,size=3) if self.goal is None \
+                                else self.INIT_XYZS[i,:]
 
 
         for i in range(self.NUM_DRONES):
@@ -229,25 +233,26 @@ class dynRandeEnv(TakeoffAviary):
 
     def random_urdf(self):
         self.new_URDF = self.maketime + "/cf2x.urdf"
-        norm_mass, norm_xcm, norm_ycm, norm_ixx, norm_iyy, norm_battery = 0,0,0,0,0,0
+        norm_mass, norm_xcm, norm_ycm, norm_ixx, norm_iyy, norm_izz, norm_T = 0,0,0,0,0,0,0
         norm_KF, norm_KM = [0,0,0,0], [0,0,0,0]
 
         mass = np.random.uniform(1-self.mass_range, 1+self.mass_range) * self.orig_params['M']
         x_cm, y_cm = np.random.uniform(-self.cm_range, self.cm_range, size=(2,)) * self.orig_params['L']
         i_xx, i_yy, i_zz = np.random.uniform(1-self.i_range, 1+self.i_range, size=(3,))
+        T = np.random.uniform(1-self.t_range, 1+self.t_range)
         
-        norm_mass = 0
-        norm_xcm, norm_ycm = 0,0
-        norm_ixx, norm_iyy, norm_izz = 0,0,0
         if self.mass_range != 0:
             norm_mass = 2*(mass/self.orig_params['M']-(1-self.mass_range))/(2*self.mass_range)-1
         if self.cm_range != 0:
             norm_xcm = 2*(x_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
             norm_ycm = 2*(y_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
         if self.i_range != 0:
-            norm_ixx = 2*(i_xx-(1-self.i_range))/(2*self.i_range)-1 if self.i_range!=0 else 0
-            norm_iyy = 2*(i_yy-(1-self.i_range))/(2*self.i_range)-1 if self.i_range!=0 else 0
-            norm_izz = 2*(i_zz-(1-self.i_range))/(2*self.i_range)-1 if self.i_range!=0 else 0
+            norm_ixx = 2*(i_xx-(1-self.i_range))/(2*self.i_range)-1
+            norm_iyy = 2*(i_yy-(1-self.i_range))/(2*self.i_range)-1
+            norm_izz = 2*(i_zz-(1-self.i_range))/(2*self.i_range)-1
+        if self.t_range != 0:
+            norm_T = 2*(T-(1-self.t_range))/(2*self.t_range)-1
+        self.T = self.orig_params['T'] * T
 
         generate_urdf(self.new_URDF, mass, x_cm, y_cm, i_xx, i_yy, i_zz)
         self.M, \
@@ -295,8 +300,8 @@ class dynRandeEnv(TakeoffAviary):
         self.km = self.KM
 
         # return np.array([mass, x_cm, y_cm, self.battery, *self.env.KF, *self.env.KM])
-        # param_num = 12 
-        return np.array([norm_mass, norm_xcm, norm_ycm, norm_ixx, norm_iyy, norm_izz, *norm_KF, *norm_KM])
+        # param_num = 15
+        return np.array([norm_mass, norm_xcm, norm_ycm, norm_ixx, norm_iyy, norm_izz, norm_T, *norm_KF, *norm_KM])
 
     def _computeObs(self):
         return self._help_computeObs(self._getDroneStateVector(0))
@@ -457,7 +462,7 @@ class dynRandeEnv(TakeoffAviary):
         return super().reset()
 
     def step(self, action):
-        action = 4*(1/200)/0.15 * (action-self.last_action) + self.last_action
+        action = 4*(self.AGGR_PHY_STEPS/self.SIM_FREQ)/self.T * (action-self.last_action) + self.last_action
         self.last_action = action
         state, reward, done, _ = super().step(action)
         
