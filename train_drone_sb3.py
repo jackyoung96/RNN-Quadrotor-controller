@@ -47,8 +47,17 @@ dyn_range = {
     'i_range': 0.3,
     'battery_range': 0.0 # (1-n) ~ (1)
 }
+# dyn_range = {
+#     # drones
+#     'mass_range': 0.0, # (1-n) ~ (1+n)
+#     'cm_range': 0.0, # (1-n) ~ (1+n)
+#     'kf_range': 0.0, # (1-n) ~ (1+n)
+#     'km_range': 0.0, # (1-n) ~ (1+n)
+#     'i_range': 0.0,
+#     'battery_range': 0.0 # (1-n) ~ (1)
+# }
 hparam_set = {
-    "learning_rate": (np.random.uniform,[-4, -3]),
+    "learning_rate": (np.random.uniform,[-3.6, -3.5]),
     "learning_starts": (np.random.randint,[80000,80001]),
     "activation": (np.random.choice, [[torch.nn.ReLU]]),
 
@@ -69,7 +78,7 @@ hparam_set = {
     "her_length": (np.random.randint,[800,801]),
     "rnn_dropout": (np.random.uniform,[0, 0]),
 
-    "rew_angvel": (np.random.uniform, [0, 0.1])
+    "rew_angvel": (np.random.uniform, [0, 0.2])
 }
 
 
@@ -148,7 +157,7 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(1e4)
+    max_episodes  = int(3e4)
     max_steps = hparam['max_steps']
 
     hparam['learning_rate'] = 10**hparam['learning_rate']
@@ -210,7 +219,7 @@ def train(args, hparam):
         angvel_noise=np.pi,
         reward_coeff=rew_coeff,
         frame_stack=1,
-        episode_len_sec=max_steps/200,
+        episode_len_sec=max_steps/100,
         gui=args.render,
         record=False,
         wandb_render=True,
@@ -218,7 +227,8 @@ def train(args, hparam):
     env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
     env = DummyVecEnv([lambda: env])
     env = VecNormalize(env, norm_obs=hparam['obs_norm'], norm_reward=hparam['rew_norm'])
-    env = VecVideoRecorder(env, f"videos/{run.name}", record_video_trigger=lambda x: x % (125*max_steps) == 0, video_length=max_steps)
+    if args.tb_log:
+        env = VecVideoRecorder(env, f"videos/{run.name}", record_video_trigger=lambda x: x % (500*max_steps) == 0, video_length=max_steps)
     
     if hparam['model']=='SAC':
         policy_kwargs = dict(activation_fn=hparam['activation'],
@@ -273,13 +283,33 @@ def train(args, hparam):
         trainer.learn(total_timesteps=total_timesteps,
             callback=CustomWandbCallback(
                 model_save_path=f"models/{run.name}",
-                model_save_freq=100*max_steps,
-                gradient_save_freq=100*max_steps,
+                model_save_freq=500*max_steps,
+                gradient_save_freq=500*max_steps,
                 verbose=0,
             ) if hparam['tb_log'] else None,
         )
     else:
         del trainer
+        del env
+        max_steps=1400
+        env = dynRandeEnv(
+            initial_xyzs=np.array([[0,0,10000.0]]),
+            initial_rpys=np.array([[0,0,0]]),
+            observable=observable,
+            dyn_range=dyn_range,
+            rpy_noise=0,
+            vel_noise=1,
+            angvel_noise=0,
+            reward_coeff=rew_coeff,
+            frame_stack=1,
+            episode_len_sec=max_steps/100,
+            gui=args.render,
+            record=False,
+            wandb_render=True,
+        )
+        env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
+        env = DummyVecEnv([lambda: env])
+        env = VecNormalize(env, norm_obs=hparam['obs_norm'], norm_reward=hparam['rew_norm'])
         if hparam['model']=='SAC':
             trainer = SAC.load(args.path)
         elif hparam['model']=='PPO':
@@ -290,19 +320,29 @@ def train(args, hparam):
         obs = env.reset()
         state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
         reward_sum = 0
+        state_buffer = []
+        obs_buffer = []
+        action_buffer = []
         for i in range(max_steps):
             action, _state = trainer.predict(obs, deterministic=True)
-            action, *_ = ctrl.computeControlFromState(control_timestep=1*i+1,
-                                                                       state=state,
-                                                                       target_pos=np.array([0,0,10000.0]),
-                                                                       target_rpy=np.array([0,0,0])
-                                                                       )
-            action = 2*(action/24000)-1
-            obs, reward, done, info = env.step(action)
+            # action, *_ = ctrl.computeControlFromState(control_timestep=env.venv.envs[0].env.TIMESTEP,
+            #                                                            state=state,
+            #                                                            target_pos=env.venv.envs[0].env.goal_pos.squeeze(),
+            #                                                            target_rpy=np.array([0,0,0])
+            #                                                            )
+            # action = 2*(action/24000)-1
+
+            obs_buffer.append(obs)
+            state_buffer.append(state)
+            action_buffer.append(action)
+
+            obs, reward, done, info = env.step(action[None,:])
             state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
-            env.render()
-            input()
-            if done:
+            
+            if args.render:
+                env.render()
+                input()
+            if any(done):
                 obs = env.reset()
             reward_sum+=reward
 
