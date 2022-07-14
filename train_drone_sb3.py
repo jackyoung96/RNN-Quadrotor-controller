@@ -216,7 +216,7 @@ def train(args, hparam):
         initial_rpys=np.array([[0,0,0]]),
         observable=observable,
         dyn_range=dyn_range,
-        rpy_noise=np.pi,
+        rpy_noise=2*np.pi,
         vel_noise=1,
         angvel_noise=np.pi,
         reward_coeff=rew_coeff,
