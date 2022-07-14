@@ -48,7 +48,7 @@ dyn_range = {
     'battery_range': 0.0 # (1-n) ~ (1)
 }
 hparam_set = {
-    "learning_rate": (np.random.uniform,[-4, -3]),
+    "learning_rate": (np.random.uniform,[-3.6, -3.5]),
     "learning_starts": (np.random.randint,[80000,80001]),
     "activation": (np.random.choice, [[torch.nn.ReLU]]),
 
@@ -69,7 +69,7 @@ hparam_set = {
     "her_length": (np.random.randint,[800,801]),
     "rnn_dropout": (np.random.uniform,[0, 0]),
 
-    "rew_angvel": (np.random.uniform, [0, 0.1])
+    "rew_angvel": (np.random.uniform, [0, 0.2])
 }
 
 
@@ -148,7 +148,7 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(1e4)
+    max_episodes  = int(3e4)
     max_steps = hparam['max_steps']
 
     hparam['learning_rate'] = 10**hparam['learning_rate']
