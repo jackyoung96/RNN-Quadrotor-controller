@@ -70,7 +70,7 @@ hparam_set = {
 
     "goal_dim": (np.random.randint,[18,19]),
     "param_num": (np.random.randint,[14,15]),
-    "hidden_dim": (np.random.randint,[5,6]),
+    "hidden_dim": (np.random.randint,[6,7]),
     "critic_dim": (np.random.randint,[7,8]),
     "net_layers": (np.random.randint,[4,5]),
 
