@@ -113,8 +113,8 @@ class dynRandeEnv(TakeoffAviary):
             'rel_vel': [-rng] * 3,
             'angular_vel': [-rng] * 3,
             'rel_angular_vel': [-rng] * 3,
-            'rpm': [-1] * 4,
-            'param': [-1] * 14
+            'rpm': [-rng] * 4,
+            'param': [-rng] * 14
         }
         high_dict = {
             'pos': [rng] * 3,
@@ -125,8 +125,8 @@ class dynRandeEnv(TakeoffAviary):
             'rel_vel': [rng] * 3,
             'angular_vel': [rng] * 3,
             'rel_angular_vel': [rng] * 3,
-            'rpm': [1] * 4,
-            'param': [1] * 14
+            'rpm': [rng] * 4,
+            'param': [rng] * 14
         }
         low, high = [],[]
         for obs in self.observable:
