@@ -42,8 +42,8 @@ dyn_range = {
     # drones
     'mass_range': 0.3, # (1-n) ~ (1+n)
     'cm_range': 0.3, # (1-n) ~ (1+n)
-    'kf_range': 0.3, # (1-n) ~ (1+n)
-    'km_range': 0.3, # (1-n) ~ (1+n)
+    'kf_range': 0.1, # (1-n) ~ (1+n)
+    'km_range': 0.1, # (1-n) ~ (1+n)
     'i_range': 0.3,
     't_range': 0.3,
     'battery_range': 0.0 # (1-n) ~ (1)
@@ -172,6 +172,7 @@ def train(args, hparam):
     rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel': args.rew_angvel, 'ang_vel_xy': args.rew_angvel_xy, 'ang_vel_z': args.rew_angvel_z, 'd_action':0.0, 'rotation': 0.0}
     hparam['observable'] = observable
     hparam['rew_coeff'] = rew_coeff
+    hparam['dyn_range'] = dyn_range
 
     batch_size  = 128
     nenvs = 1
@@ -291,13 +292,13 @@ def train(args, hparam):
     else:
         del trainer
         del env
-        max_steps=800
+        max_steps=5000
         dyn_range = {
             # drones
             'mass_range': 0.3, # (1-n) ~ (1+n)
             'cm_range': 0.3, # (1-n) ~ (1+n)
-            'kf_range': 0.3, # (1-n) ~ (1+n)
-            'km_range': 0.3, # (1-n) ~ (1+n)
+            'kf_range': 0.1, # (1-n) ~ (1+n)
+            'km_range': 0.1, # (1-n) ~ (1+n)
             'i_range': 0.3,
             't_range': 0.3,
             'battery_range': 0.0 # (1-n) ~ (1)
@@ -347,7 +348,8 @@ def train(args, hparam):
         obs_buffer = []
         action_buffer = []
         for i in range(max_steps):
-            action, _state = trainer.predict(obs, deterministic=False)
+            # obs[:,-15:] = 0
+            action, _state = trainer.predict(obs, deterministic=True)
             # action, *_ = ctrl.computeControlFromState(control_timestep=env.venv.envs[0].env.TIMESTEP,
             #                                                            state=state,
             #                                                            target_pos=env.venv.envs[0].env.goal_pos.squeeze(),
