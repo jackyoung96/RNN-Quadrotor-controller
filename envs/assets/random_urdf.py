@@ -22,10 +22,15 @@ def generate_urdf(path, mass=0.027, x_cm=0, y_cm=0, i_xx=1, i_yy=1, i_zz=1):
     root.findall("link")[0].find('inertial').find('origin').set('rpy', '0 0 0')
     # root.findall("link")[0].find('inertial').find('origin').set('xyz', '%s %s %s'%(str(x_cm), str(y_cm), str(z_cm)))
     root.findall("link")[0].find('inertial').find('origin').set('xyz', '0 0 0')
-    root.findall("link")[0].find('inertial').find('mass').set('value', '%s'%str(mass))
-    root.findall("link")[0].find('inertial').find('inertia').set('ixx', str(ixx))
-    root.findall("link")[0].find('inertial').find('inertia').set('iyy', str(iyy))
-    root.findall("link")[0].find('inertial').find('inertia').set('izz', str(izz))
+    root.findall("link")[0].find('inertial').find('mass').set('value', '0')
+    root.findall("link")[0].find('inertial').find('inertia').set('ixx', '0')
+    root.findall("link")[0].find('inertial').find('inertia').set('iyy', '0')
+    root.findall("link")[0].find('inertial').find('inertia').set('izz', '0')
+
+    root.findall("link")[-1].find('inertial').find('mass').set('value', '%s'%str(mass))
+    root.findall("link")[-1].find('inertial').find('inertia').set('ixx', str(ixx))
+    root.findall("link")[-1].find('inertial').find('inertia').set('iyy', str(iyy))
+    root.findall("link")[-1].find('inertial').find('inertia').set('izz', str(izz))
     root.findall("link")[-1].find('inertial').find('origin').set('xyz', '%s %s %s'%(str(x_cm), str(y_cm), str(z_cm))) # center of mass -> Torque is applied based on CoM
 
     content = ET.tostring(root, encoding='unicode', method='xml')
