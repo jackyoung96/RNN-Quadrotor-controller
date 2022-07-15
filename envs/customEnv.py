@@ -93,6 +93,7 @@ class dynRandeEnv(TakeoffAviary):
 
         self.EPISODE_LEN_SEC = episode_len_sec
         self.MAX_RPM = 21700
+        # self.MAX_RPM = 24000
 
         self.action_space = gym.spaces.Box(low=-1*np.ones(4),
                             high=np.ones(4),

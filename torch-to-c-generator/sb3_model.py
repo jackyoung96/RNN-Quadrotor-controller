@@ -616,7 +616,7 @@ if __name__ == "__main__" :
 	# generate_lstm_helper(path, 22, 4, 0, output_path=output_path)
 
 	# None 
-	generate_ff_helper("source/sb3/sac_policy.pth",output_path="models")
+	generate_ff_helper("source/sb3/policy.pth",output_path="model")
 	# RNN2
 	# generate_rnn_helper(path, 22, 4, 0, output_path=output_path)
 	# # RNN-HER
