@@ -302,7 +302,7 @@ def train(args, hparam):
             't_range': 0.3,
             'battery_range': 0.0 # (1-n) ~ (1)
         }
-        dyn_range = {}
+        # dyn_range = {}
         if args.task == 'stabilize':
             initial_xyzs = np.array([[0,0,10000.0]])
             rpy_noise=np.pi,
@@ -347,6 +347,7 @@ def train(args, hparam):
         obs_buffer = []
         action_buffer = []
         for i in range(max_steps):
+            obs[:,-14:] = 0
             action, _state = trainer.predict(obs, deterministic=False)
             # action, *_ = ctrl.computeControlFromState(control_timestep=env.venv.envs[0].env.TIMESTEP,
             #                                                            state=state,
