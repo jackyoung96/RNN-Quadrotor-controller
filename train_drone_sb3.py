@@ -348,7 +348,7 @@ def train(args, hparam):
         action_buffer = []
         for i in range(max_steps):
             obs[:,-14:] = 0
-            action, _state = trainer.predict(obs, deterministic=False)
+            action, _state = trainer.predict(obs, deterministic=True)
             # action, *_ = ctrl.computeControlFromState(control_timestep=env.venv.envs[0].env.TIMESTEP,
             #                                                            state=state,
             #                                                            target_pos=env.venv.envs[0].env.goal_pos.squeeze(),

@@ -30,17 +30,22 @@ def bias2str(bias):
 	result = result[:-1]
 	return result + "}"
 
-def get_linear_loop(_in_dim, _out_dim, _in, _out, _layer):
+def get_linear_loop(_in_dim, _out_dim, _in, _out, _layer, actf=None):
 	loop = """
 		for (int i = 0; i < """+str(_out_dim)+"""; i++) {
 			"""+_out+"""[i] = 0;
 			for (int j = 0; j < """+str(_in_dim)+"""; j++) {
 				"""+_out+"""[i] += """+_in+"""[j] * """+_layer+"""_weight[i][j];
 			}
-			"""+_out+"""[i] += """+_layer+"""_bias[i];
-			"""+_out+"""[i] = relu("""+_out+"""[i]);
+			"""+_out+"""[i] += """+_layer+"""_bias[i];"""
+	if actf is not None:
+		loop += \
+			_out+"""[i] = """+actf+"""("""+_out+"""[i]);
+	"""
+	loop += """
 		}
 	"""
+
 	return loop
 
 def get_rnn_loop(_in_dim, _out_dim, _in, _out):
@@ -537,13 +542,15 @@ def generate_ff_helper(source_path, output_path=None):
 	# linear_loop
 	in_keys = ["linear_input"]+["output_"+key.replace('.','_') for key in model_latent_key]
 	out_keys = ["output_"+key.replace('.','_') for key in model_latent_key] + ["output_action"]
-	layer_keys = [key.replace('.','_') for key in model_latent_key] + [key.replace('.','_') for key in model_mu_key]
-	for in_key, out_key, layer_key in zip(in_keys, out_keys, layer_keys):
-		code += get_linear_loop(_in_dim = model[key+".weight"].shape[1],
-									_out_dim = model[key+".weight"].shape[0],
+	layer_keys = model_latent_key + model_mu_key
+	actfs = ['relu' for _ in range(len(model_latent_key))] + ['tanh' for _ in range(len(model_mu_key))]
+	for in_key, out_key, layer_key, actf in zip(in_keys, out_keys, layer_keys, actfs):
+		code += get_linear_loop(_in_dim = model[layer_key+".weight"].shape[1],
+									_out_dim = model[layer_key+".weight"].shape[0],
 									_in = in_key,
 									_out = out_key,
-									_layer = layer_key) +"\n"
+									_layer = layer_key.replace('.','_'),
+									actf=actf) +"\n"
 
 	## assign network outputs to control
 	assignment = """
@@ -609,7 +616,7 @@ if __name__ == "__main__" :
 	# generate_lstm_helper(path, 22, 4, 0, output_path=output_path)
 
 	# None 
-	generate_ff_helper("source/sb3/sac_policy.pth",output_path="models/sb3")
+	generate_ff_helper("source/sb3/sac_policy.pth",output_path="models")
 	# RNN2
 	# generate_rnn_helper(path, 22, 4, 0, output_path=output_path)
 	# # RNN-HER
