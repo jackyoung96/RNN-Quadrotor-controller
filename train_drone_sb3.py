@@ -231,6 +231,27 @@ def train(args, hparam):
     if args.tb_log:
         env = VecVideoRecorder(env, f"videos/{run.name}", record_video_trigger=lambda x: x % (500*max_steps) == 0, video_length=max_steps)
     
+    eval_env = dynRandeEnv(
+        initial_xyzs=np.array([[0,0,10000.0]]),
+        initial_rpys=np.array([[0,0,0]]),
+        observable=observable,
+        dyn_range=dyn_range,
+        rpy_noise=2*np.pi,
+        vel_noise=1,
+        angvel_noise=np.pi,
+        reward_coeff=rew_coeff,
+        frame_stack=1,
+        episode_len_sec=max_steps/100,
+        gui=False,
+        record=False,
+        wandb_render=True,
+    )
+    eval_env = Monitor(eval_env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
+    eval_env = DummyVecEnv([lambda: eval_env])
+    eval_env = VecNormalize(eval_env, norm_obs=hparam['obs_norm'], norm_reward=hparam['rew_norm'])
+    if args.tb_log:
+        eval_env = VecVideoRecorder(eval_env, f"videos/{run.name}_eval", record_video_trigger=lambda x: x % (500*max_steps) == 0, video_length=max_steps)
+    
     if hparam['model']=='SAC':
         policy_kwargs = dict(activation_fn=hparam['activation'],
                      net_arch=dict(pi=[hidden_dim]*net_layers, qf=[critic_dim]*net_layers))
@@ -282,6 +303,9 @@ def train(args, hparam):
 
     if not args.test:
         trainer.learn(total_timesteps=total_timesteps,
+            eval_env=eval_env,
+            eval_freq=500*max_steps,
+            n_eval_episodes=25,
             callback=CustomWandbCallback(
                 model_save_path=f"models/{run.name}",
                 model_save_freq=500*max_steps,

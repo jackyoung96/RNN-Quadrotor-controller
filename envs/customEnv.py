@@ -494,6 +494,19 @@ class dynRandeEnv(TakeoffAviary):
                 'wx':droneState[13],
                 'wy':droneState[14],
                 'wz':droneState[15]}
+        droneState = np.stack(self.droneStates).var(axis=0)
+        info.update({'x_var': droneState[0],
+                'y_var': droneState[1],
+                'z_var': droneState[2]-self.goal_pos[0,2],
+                'roll_var':droneState[7],
+                'pitch_var':droneState[8],
+                'yaw_var':droneState[9],
+                'vx_var':droneState[10],
+                'vy_var':droneState[11],
+                'vz_var':droneState[12],
+                'wx_var':droneState[13],
+                'wy_var':droneState[14],
+                'wz_var':droneState[15]})
         return state, reward, done, info
 
     def render(self,
