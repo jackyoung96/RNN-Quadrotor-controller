@@ -217,7 +217,7 @@ class dynRandeEnv(TakeoffAviary):
                                 angularVelocity = (self.angvel_noise * np.random.uniform(-1.0,1.0,size=3)).tolist(),\
                                 physicsClientId=self.CLIENT)
             self.goal_pos[i,:] = self.INIT_XYZS[i,:] + np.random.uniform(-1.0,1.0,size=3) if self.goal is None \
-                                else self.INIT_XYZS[i,:]
+                                else self.goal
 
 
         for i in range(self.NUM_DRONES):
@@ -395,6 +395,13 @@ class dynRandeEnv(TakeoffAviary):
             norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
             norm_state = norm_state / MAX_RPY_RATE
             # norm_state = np.deg2rad(np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))) / MAX_RPY_RATE
+        
+        elif type=='rel_angular_vel_nonoise':
+            r = R.from_quat(norm_state[-4:])
+            rot = r.as_matrix()
+            norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))
+            norm_state = norm_state / MAX_RPY_RATE
+            # norm_state = np.deg2rad(np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))) / MAX_RPY_RATE
 
         elif type=='rpm':
             # range : -1 ~ 1
@@ -431,15 +438,20 @@ class dynRandeEnv(TakeoffAviary):
             'pos': self.reward_coeff['pos'], # 0~3
             'vel': self.reward_coeff['vel'], # 10~13
             'ang_vel': self.reward_coeff['ang_vel'], # 13~16
+            'ang_vel_xy': self.reward_coeff['ang_vel_xy'],
+            'ang_vel_z': self.reward_coeff['ang_vel_z'],
             'd_action': self.reward_coeff['d_action'], # 16~20
             'rotation': self.reward_coeff['rotation']
         }
         xyz = coeff['pos'] * np.linalg.norm(state[:3]-self.goal_pos[0,:3], ord=2) # for single agent temporarily
         vel = coeff['vel'] * np.linalg.norm(state[10:13],ord=2)
         ang_vel = coeff['ang_vel'] * np.linalg.norm(state[13:16],ord=2)
+        rel_angvel = self._normalizeState(state[3:7],'rel_angular_vel_nonoise') * 2 * np.pi
+        ang_vel_xy = coeff['ang_vel_z'] * np.linalg.norm(rel_angvel[:2])
+        ang_vel_z = coeff['ang_vel_z'] * rel_angvel[-1]
         
         rot = coeff['rotation'] * self._normalizeState(state[3:7],'rotation')[-1]
-        f_s = xyz + vel + ang_vel - rot
+        f_s = xyz + vel + ang_vel + ang_vel_xy + ang_vel_z - rot
 
         d_action = coeff['d_action'] * np.linalg.norm(self._normalizeState(state[16:],'action'),ord=2)
         f_a = d_action

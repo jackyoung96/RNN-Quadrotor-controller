@@ -78,8 +78,6 @@ hparam_set = {
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
     "rnn_dropout": (np.random.uniform,[0, 0]),
-
-    "rew_angvel": (np.random.uniform, [0, 0.2])
 }
 
 
@@ -159,7 +157,7 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(3e4)
+    max_episodes  = int(25000)
     max_steps = hparam['max_steps']
 
     hparam['learning_rate'] = 10**hparam['learning_rate']
@@ -171,7 +169,7 @@ def train(args, hparam):
     observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
     if hparam['param']:
         observable += ['param']
-    rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel':hparam['rew_angvel'], 'd_action':0.00, 'rotation': 0.0}
+    rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel': args.rew_angvel, 'ang_vel_xy': args.rew_angvel_xy, 'ang_vel_z': args.rew_angvel_z, 'd_action':0.0, 'rotation': 0.0}
     hparam['observable'] = observable
     hparam['rew_coeff'] = rew_coeff
 
@@ -296,39 +294,52 @@ def train(args, hparam):
         max_steps=800
         dyn_range = {
             # drones
-            'mass_range': 0.1, # (1-n) ~ (1+n)
-            'cm_range': 0.1, # (1-n) ~ (1+n)
-            'kf_range': 0.1, # (1-n) ~ (1+n)
-            'km_range': 0.1, # (1-n) ~ (1+n)
-            'i_range': 0.1,
+            'mass_range': 0.3, # (1-n) ~ (1+n)
+            'cm_range': 0.3, # (1-n) ~ (1+n)
+            'kf_range': 0.3, # (1-n) ~ (1+n)
+            'km_range': 0.3, # (1-n) ~ (1+n)
+            'i_range': 0.3,
+            't_range': 0.3,
             'battery_range': 0.0 # (1-n) ~ (1)
         }
+        dyn_range = {}
+        if args.task == 'stabilize':
+            initial_xyzs = np.array([[0,0,10000.0]])
+            rpy_noise=np.pi,
+            vel_noise=1,
+            angvel_noise=2*np.pi,
+            goal = None
+        elif args.task == 'takeoff':
+            initial_xyzs = np.array([[0,0,0.025]])
+            rpy_noise = 0
+            vel_noise = 0
+            angvel_noise = 0
+            goal = np.array([[0,0,1.5]])
         env = dynRandeEnv(
-            initial_xyzs=np.array([[0,0,10000.0]]),
+            initial_xyzs=initial_xyzs,
             initial_rpys=np.array([[0,0,0]]),
             observable=observable,
             dyn_range=dyn_range,
-            rpy_noise=0.2*np.pi,
-            vel_noise=0.2,
-            angvel_noise=0.4*np.pi,
+            rpy_noise=rpy_noise,
+            vel_noise=vel_noise,
+            angvel_noise=angvel_noise,
             reward_coeff=rew_coeff,
             frame_stack=1,
             episode_len_sec=max_steps/100,
             gui=args.render,
             record=False,
-            wandb_render=True,
-            goal=np.array([[0,0,10000.0]])
+            goal=goal,
         )
         env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
         env = DummyVecEnv([lambda: env])
         env = VecNormalize(env, norm_obs=hparam['obs_norm'], norm_reward=hparam['rew_norm'])
         if hparam['model']=='SAC':
-            trainer = SAC.load(args.path)
+            trainer = SAC.load(args.path, env=env, device=device)
         elif hparam['model']=='PPO':
-            trainer = PPO.load(args.path)
+            trainer = PPO.load(args.path, env=env, device=device)
         elif hparam['model']=='TD3':
-            trainer = TD3.load(args.path)
-        ctrl = DSLPIDControl(drone_model=DroneModel.CF2X)
+            trainer = TD3.load(args.path, env=env, device=device)
+        # ctrl = DSLPIDControl(drone_model=DroneModel.CF2X)
         obs = env.reset()
         state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
         reward_sum = 0
@@ -336,7 +347,7 @@ def train(args, hparam):
         obs_buffer = []
         action_buffer = []
         for i in range(max_steps):
-            action, _state = trainer.predict(obs, deterministic=True)
+            action, _state = trainer.predict(obs, deterministic=False)
             # action, *_ = ctrl.computeControlFromState(control_timestep=env.venv.envs[0].env.TIMESTEP,
             #                                                            state=state,
             #                                                            target_pos=env.venv.envs[0].env.goal_pos.squeeze(),
@@ -348,7 +359,7 @@ def train(args, hparam):
             state_buffer.append(state)
             action_buffer.append(action)
 
-            obs, reward, done, info = env.step(action[None,:])
+            obs, reward, done, info = env.step(action)
             state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
             
             if args.render:
@@ -357,7 +368,13 @@ def train(args, hparam):
             if any(done):
                 obs = env.reset()
             reward_sum+=reward
-
+        
+        goal_state = np.zeros_like(state)
+        goal_state[:3] = env.venv.envs[0].env.goal_pos[0]
+        state_buffer.append(goal_state)
+        np.savetxt('paperworks/test_state.txt',np.stack(state_buffer),delimiter=',')
+        np.savetxt('paperworks/test_obs.txt',np.concatenate(obs_buffer),delimiter=',')
+        np.savetxt('paperworks/test_action.txt',np.concatenate(action_buffer),delimiter=',')
         print(info)
         print(reward_sum)
 
@@ -372,10 +389,15 @@ if __name__=='__main__':
                                 , required=True, help='SB3 Models')
 
     # Arguments for training 
-    parser.add_argument('--rew_norm', action='store_true', help="Reward normalization")
-    parser.add_argument('--obs_norm', action='store_true', help="Observation normalization")
     parser.add_argument('--tb_log', action='store_true', help="Tensorboard logging")
     parser.add_argument('--param', action='store_true', help="Use param observation")
+    parser.add_argument('--rew_angvel_xy', type=float, default=0.0, help="Reward for angvel xy")
+    parser.add_argument('--rew_angvel_z', type=float, default=0.0, help="Reward for angvel z")
+    parser.add_argument('--rew_angvel', type=float, default=0.0, help="Reward for angvel xyz")
+
+    parser.add_argument('--rew_norm', action='store_true', help="Reward normalization")
+    parser.add_argument('--obs_norm', action='store_true', help="Observation normalization")
+    
 
     # Arguments for test
     parser.add_argument('--test', action='store_true')
