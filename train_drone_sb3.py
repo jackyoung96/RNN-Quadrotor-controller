@@ -301,7 +301,7 @@ def train(args, hparam):
     else:
         raise "Please use proper model"
 
-    if not args.test:
+    if args.test == 0:
         trainer.learn(total_timesteps=total_timesteps,
             eval_env=eval_env,
             eval_freq=500*max_steps,
@@ -316,7 +316,7 @@ def train(args, hparam):
     else:
         del trainer
         del env
-        max_steps=1400
+        max_steps=800
         dyn_range = {
             # drones
             'mass_range': 0.3, # (1-n) ~ (1+n)
@@ -327,7 +327,6 @@ def train(args, hparam):
             't_range': 0.3,
             'battery_range': 0.0 # (1-n) ~ (1)
         }
-        dyn_range = {}
         if args.task == 'stabilize':
             initial_xyzs = np.array([[0,0,10000.0]])
             rpy_noise=np.pi,
@@ -365,45 +364,62 @@ def train(args, hparam):
         elif hparam['model']=='TD3':
             trainer = TD3.load(args.path, env=env, device=device)
         # ctrl = DSLPIDControl(drone_model=DroneModel.CF2X)
-        obs = env.reset()
-        state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
-        reward_sum = 0
-        state_buffer = []
-        obs_buffer = []
-        action_buffer = []
-        for i in range(max_steps):
-            # obs[:,-15:] = 0
-            action, _state = trainer.predict(obs, deterministic=True)
-            # action, *_ = ctrl.computeControlFromState(control_timestep=env.venv.envs[0].env.TIMESTEP,
-            #                                                            state=state,
-            #                                                            target_pos=env.venv.envs[0].env.goal_pos.squeeze(),
-            #                                                            target_rpy=np.array([0,0,0])
-            #                                                            )
-            # action = 2*(action/24000)-1
 
-            obs_buffer.append(obs)
-            state_buffer.append(state)
-            action_buffer.append(action)
+        total_info = []
 
-            obs, reward, done, info = env.step(action)
+        for itr in range(args.test):
+
+            obs = env.reset()
             state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
+            reward_sum = 0
+            state_buffer,obs_buffer, action_buffer = [],[],[]
             
-            if args.render:
-                env.render()
-                input()
-            if any(done):
-                obs = env.reset()
-            reward_sum+=reward
-        
-        goal_state = np.zeros_like(state)
-        goal_state[:3] = env.venv.envs[0].env.goal_pos[0]
-        state_buffer.append(goal_state)
-        np.savetxt('paperworks/test_state.txt',np.stack(state_buffer),delimiter=',')
-        np.savetxt('paperworks/test_obs.txt',np.concatenate(obs_buffer),delimiter=',')
-        np.savetxt('paperworks/test_action.txt',np.concatenate(action_buffer),delimiter=',')
-        print(info)
-        print(reward_sum)
+            for i in range(max_steps):
+                # obs[:,-15:] = 0
+                action, _state = trainer.predict(obs, deterministic=True)
+                # action, *_ = ctrl.computeControlFromState(control_timestep=env.venv.envs[0].env.TIMESTEP,
+                #                                                            state=state,
+                #                                                            target_pos=env.venv.envs[0].env.goal_pos.squeeze(),
+                #                                                            target_rpy=np.array([0,0,0])
+                #                                                            )
+                # action = 2*(action/24000)-1
 
+                obs_buffer.append(obs)
+                state_buffer.append(state)
+                action_buffer.append(action)
+
+                obs, reward, done, info = env.step(action)
+                state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
+                
+                if args.render:
+                    env.render()
+                    input()
+                if any(done):
+                    obs = env.reset()
+                reward_sum+=reward
+            
+            goal_state = np.zeros_like(state)
+            goal_state[:3] = env.venv.envs[0].env.goal_pos[0]
+            state_buffer.append(goal_state)
+            np.savetxt('paperworks/test_state_%02d.txt'%itr,np.stack(state_buffer),delimiter=',')
+            # np.savetxt('paperworks/test_obs_%02d.txt'%itr,np.concatenate(obs_buffer),delimiter=',')
+            np.savetxt('paperworks/test_action_%02d.txt'%itr,np.concatenate(action_buffer),delimiter=',')
+            print("iteration : ",itr)
+            info = info[0]
+            info.update({'reward': reward_sum[0]})
+            print(info)
+
+            total_info.append(info)
+        
+        final_info = {}
+        for info in total_info:
+            for key,value in info.items():
+                final_info[key] = final_info.get(key,0) + value
+        for key,value in final_info.items():
+            final_info[key] = value / args.test
+
+        print("Average results")
+        print(final_info)
 
 if __name__=='__main__':
     # train(1000, 'CartPole-v1')
@@ -426,7 +442,7 @@ if __name__=='__main__':
     
 
     # Arguments for test
-    parser.add_argument('--test', action='store_true')
+    parser.add_argument('--test', type=int, default=0, help='how many times for testing. 0 means training')
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
     parser.add_argument('--render', action='store_true', help='whether record or not')
     parser.add_argument('--record', action='store_true', help='whether record or not')

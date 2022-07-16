@@ -240,6 +240,8 @@ class dynRandeEnv(TakeoffAviary):
         mass = np.random.uniform(1-self.mass_range, 1+self.mass_range) * self.orig_params['M']
         x_cm, y_cm = np.random.uniform(-self.cm_range, self.cm_range, size=(2,)) * self.orig_params['L']
         i_xx, i_yy, i_zz = np.random.uniform(1-self.i_range, 1+self.i_range, size=(3,))
+        i_xx, i_yy = 1.4e-5 * i_xx, 1.4e-5 * i_yy
+        i_zz = min(2.17e-5 * i_zz,i_xx+i_yy) # Inertia property
         T = np.random.uniform(1-self.t_range, 1+self.t_range)
         
         if self.mass_range != 0:
@@ -248,12 +250,12 @@ class dynRandeEnv(TakeoffAviary):
             norm_xcm = 2*(x_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
             norm_ycm = 2*(y_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
         if self.i_range != 0:
-            norm_ixx = 2*(i_xx-(1-self.i_range))/(2*self.i_range)-1
-            norm_iyy = 2*(i_yy-(1-self.i_range))/(2*self.i_range)-1
-            norm_izz = 2*(i_zz-(1-self.i_range))/(2*self.i_range)-1
+            norm_ixx = 2*((i_xx/1.4e-5)-(1-self.i_range))/(2*self.i_range)-1
+            norm_iyy = 2*((i_yy/1.4e-5)-(1-self.i_range))/(2*self.i_range)-1
+            norm_izz = 2*((i_zz/2.17e-5)-(1-self.i_range))/(2*self.i_range)-1
         if self.t_range != 0:
             norm_T = 2*(T-(1-self.t_range))/(2*self.t_range)-1
-        self.T = self.orig_params['T'] * T
+        
 
         generate_urdf(self.new_URDF, mass, x_cm, y_cm, i_xx, i_yy, i_zz)
         self.M, \
@@ -279,6 +281,8 @@ class dynRandeEnv(TakeoffAviary):
             norm_battery = 2*(self.battery-(1-self.battery_range))/(self.battery_range)-1
         else:
             norm_battery = 0
+        self.M = mass
+        self.T = self.orig_params['T'] * T
         self.KF = self.orig_params['KF'] * np.random.uniform(1.0-self.kf_range, 1.0+self.kf_range, size=(4,))
         self.KM = self.orig_params['KM'] * np.random.uniform(1.0-self.km_range, 1.0+self.km_range, size=(4,))
         if self.kf_range != 0:
@@ -448,7 +452,7 @@ class dynRandeEnv(TakeoffAviary):
         ang_vel = coeff['ang_vel'] * np.linalg.norm(state[13:16],ord=2)
         rel_angvel = self._normalizeState(state[[13,14,15,3,4,5,6]],'rel_angular_vel_nonoise') * 2 * np.pi
         ang_vel_xy = coeff['ang_vel_z'] * np.linalg.norm(rel_angvel[:2])
-        ang_vel_z = coeff['ang_vel_z'] * rel_angvel[-1]
+        ang_vel_z = coeff['ang_vel_z'] * np.linalg.norm(rel_angvel[-1])
         
         rot = coeff['rotation'] * self._normalizeState(state[3:7],'rotation')[-1]
         f_s = xyz + vel + ang_vel + ang_vel_xy + ang_vel_z - rot
@@ -506,7 +510,8 @@ class dynRandeEnv(TakeoffAviary):
                 'vz_var':droneState[12],
                 'wx_var':droneState[13],
                 'wy_var':droneState[14],
-                'wz_var':droneState[15]})
+                'wz_var':droneState[15],
+                'param': self.param})
         return state, reward, done, info
 
     def render(self,
