@@ -101,7 +101,7 @@ class dynRandeEnv(TakeoffAviary):
                             )
         self.observation_space = self.observable_obs_space()
 
-        self.last_action = -np.ones((4,))[None,:]
+        self.last_action_custom = -np.ones((4,))[None,:]
         self.droneStates = []
         self.param = np.zeros((14,))
         self.wandb_render = wandb_render
@@ -166,7 +166,7 @@ class dynRandeEnv(TakeoffAviary):
             os.makedirs(os.path.dirname(self.IMG_PATH), exist_ok=True)
 
     def _housekeeping(self):
-        self.last_action = -np.ones((4,))[None,:]
+        self.last_action_custom = -np.ones((4,))[None,:]
 
         self.angvel_bias = np.zeros(3)
         self.RESET_TIME = time.time()
@@ -474,8 +474,8 @@ class dynRandeEnv(TakeoffAviary):
         return super().reset()
 
     def step(self, action):
-        action = 4*(self.AGGR_PHY_STEPS/self.SIM_FREQ)/self.T * (action-self.last_action) + self.last_action
-        self.last_action = action
+        action = 4*(self.AGGR_PHY_STEPS/self.SIM_FREQ)/self.T * (action-self.last_action_custom) + self.last_action_custom
+        self.last_action_custom = action
         state, reward, done, _ = super().step(action)
         
         self.droneStates.append(self._getDroneStateVector(0))
