@@ -321,8 +321,8 @@ def train(args, hparam):
             # drones
             'mass_range': 0.3, # (1-n) ~ (1+n)
             'cm_range': 0.3, # (1-n) ~ (1+n)
-            'kf_range': 0.3, # (1-n) ~ (1+n)
-            'km_range': 0.3, # (1-n) ~ (1+n)
+            'kf_range': 0.1, # (1-n) ~ (1+n)
+            'km_range': 0.1, # (1-n) ~ (1+n)
             'i_range': 0.3,
             't_range': 0.3,
             'battery_range': 0.0 # (1-n) ~ (1)

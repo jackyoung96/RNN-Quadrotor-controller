@@ -401,7 +401,6 @@ class dynRandeEnv(TakeoffAviary):
             r = R.from_quat(norm_state[-4:])
             rot = r.as_matrix()
             norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))
-            norm_state = norm_state / MAX_RPY_RATE
             # norm_state = np.deg2rad(np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))) / MAX_RPY_RATE
 
         elif type=='rpm':
@@ -447,7 +446,7 @@ class dynRandeEnv(TakeoffAviary):
         xyz = coeff['pos'] * np.linalg.norm(state[:3]-self.goal_pos[0,:3], ord=2) # for single agent temporarily
         vel = coeff['vel'] * np.linalg.norm(state[10:13],ord=2)
         ang_vel = coeff['ang_vel'] * np.linalg.norm(state[13:16],ord=2)
-        rel_angvel = self._normalizeState(state[3:7],'rel_angular_vel_nonoise') * 2 * np.pi
+        rel_angvel = self._normalizeState(state[[13,14,15,3,4,5,6]],'rel_angular_vel_nonoise') * 2 * np.pi
         ang_vel_xy = coeff['ang_vel_z'] * np.linalg.norm(rel_angvel[:2])
         ang_vel_z = coeff['ang_vel_z'] * rel_angvel[-1]
         
@@ -498,7 +497,7 @@ class dynRandeEnv(TakeoffAviary):
         droneState = np.stack(self.droneStates).var(axis=0)
         info.update({'x_var': droneState[0],
                 'y_var': droneState[1],
-                'z_var': droneState[2]-self.goal_pos[0,2],
+                'z_var': droneState[2],
                 'roll_var':droneState[7],
                 'pitch_var':droneState[8],
                 'yaw_var':droneState[9],
