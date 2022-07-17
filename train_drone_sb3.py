@@ -51,7 +51,7 @@ dyn_range = {
 
 hparam_set = {
     "learning_rate": (np.random.uniform,[-3.53, -3.52]),
-    "learning_starts": (np.random.randint,[800000,800001]),
+    "learning_starts": (np.random.randint,[80000,80001]),
     "activation": (np.random.choice, [[torch.nn.Tanh]]),
 
     # PPO
@@ -305,10 +305,10 @@ def train(args, hparam):
         for name, param in trainer.policy.actor.named_parameters():
             if 'mu' in name:
                 param.data.copy_(param * 0.1)
-    else:
-        for name, param in trainer.policy.named_parameters():
-            if 'action_net' in name:
-                param.data.copy_(param * 0.1)
+    # else:
+    #     for name, param in trainer.policy.named_parameters():
+    #         if 'action_net' in name:
+    #             param.data.copy_(param * 0.1)
 
     if args.test == 0:
         trainer.learn(total_timesteps=total_timesteps,
