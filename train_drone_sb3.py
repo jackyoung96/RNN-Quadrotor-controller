@@ -254,7 +254,8 @@ def train(args, hparam):
                 buffer_size=max_episodes*max_steps,
                 learning_rate=hparam['learning_rate'],
                 learning_starts=hparam['learning_starts'],
-                gradient_steps=hparam['update_itr'],
+                train_freq=hparam['update_itr'],
+                # gradient_steps=hparam['update_itr'],
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
         )
@@ -265,7 +266,7 @@ def train(args, hparam):
         trainer = PPO('MlpPolicy', env, verbose=0, device=device,
                 n_steps=hparam['n_steps'],
                 batch_size=batch_size,
-                n_epoch=hparam['update_itr'],
+                n_epochs=hparam['update_itr'],
                 learning_rate=hparam['learning_rate'],
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
@@ -279,7 +280,8 @@ def train(args, hparam):
                 buffer_size=max_episodes*max_steps,
                 learning_rate=hparam['learning_rate'],
                 learning_starts=hparam['learning_starts'],
-                gradient_steps=hparam['update_itr'],
+                train_freq=hparam['update_itr'],
+                # gradient_steps=hparam['update_itr'],
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
         )
@@ -299,9 +301,14 @@ def train(args, hparam):
         raise "Please use proper model"
 
     # Initialize policy head 
-    for name, param in trainer.policy.actor.named_parameters():
-        if 'mu' in name:
-            param.data.copy_(param * 0.1)
+    if 'PPO' not in hparam['model']:
+        for name, param in trainer.policy.actor.named_parameters():
+            if 'mu' in name:
+                param.data.copy_(param * 0.1)
+    else:
+        for name, param in trainer.policy.named_parameters():
+            if 'action_net' in name:
+                param.data.copy_(param * 0.1)
 
     if args.test == 0:
         trainer.learn(total_timesteps=total_timesteps,
