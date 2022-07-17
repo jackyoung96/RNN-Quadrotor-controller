@@ -174,7 +174,7 @@ def train(args, hparam):
     hparam['rew_coeff'] = rew_coeff
     hparam['dyn_range'] = dyn_range
 
-    batch_size  = 128
+    batch_size  = 512
     nenvs = 1
     
     #########################################
@@ -257,6 +257,7 @@ def train(args, hparam):
                      net_arch=dict(pi=[hidden_dim]*net_layers, qf=[critic_dim]*net_layers))
         trainer = SAC('MlpPolicy', env, verbose=0, device=device,
                 batch_size=batch_size,
+                buffer_size=max_episodes*max_steps,
                 learning_rate=hparam['learning_rate'],
                 learning_starts=hparam['learning_starts'],
                 train_freq=hparam['update_itr'],
@@ -269,6 +270,7 @@ def train(args, hparam):
                      net_arch=[dict(pi=[hidden_dim]*net_layers, vf=[critic_dim]*net_layers)])
         trainer = PPO('MlpPolicy', env, verbose=0, device=device,
                 n_steps=hparam['n_steps'],
+                buffer_size=max_episodes*max_steps,
                 batch_size=batch_size,
                 learning_rate=hparam['learning_rate'],
                 policy_kwargs=policy_kwargs,
@@ -280,6 +282,7 @@ def train(args, hparam):
                      net_arch=dict(pi=[hidden_dim]*net_layers, qf=[critic_dim]*net_layers))
         trainer = TD3('MlpPolicy', env, verbose=0, device=device,
                 batch_size=batch_size,
+                buffer_size=max_episodes*max_steps,
                 learning_rate=hparam['learning_rate'],
                 learning_starts=hparam['learning_starts'],
                 train_freq=(hparam['update_itr'], "episode"),
