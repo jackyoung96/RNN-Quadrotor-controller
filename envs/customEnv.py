@@ -416,7 +416,7 @@ class dynRandeEnv(TakeoffAviary):
             norm_state = state / self.MAX_RPM
 
         elif type=='param':
-            norm_state += np.random.normal(0,0.05,norm_state.shape)
+            norm_state = norm_state + np.random.normal(0,0.05,norm_state.shape)
             pass
 
         return norm_state

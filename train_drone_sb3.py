@@ -48,32 +48,25 @@ dyn_range = {
     't_range': 0.3,
     'battery_range': 0.0 # (1-n) ~ (1)
 }
-# dyn_range = {
-#     # drones
-#     'mass_range': 0.0, # (1-n) ~ (1+n)
-#     'cm_range': 0.0, # (1-n) ~ (1+n)
-#     'kf_range': 0.0, # (1-n) ~ (1+n)
-#     'km_range': 0.0, # (1-n) ~ (1+n)
-#     'i_range': 0.0,
-#     'battery_range': 0.0 # (1-n) ~ (1)
-# }
+
 hparam_set = {
-    "learning_rate": (np.random.uniform,[-3.6, -3.5]),
-    "learning_starts": (np.random.randint,[80000,80001]),
-    "activation": (np.random.choice, [[torch.nn.ReLU]]),
+    "learning_rate": (np.random.uniform,[-3.53, -3.52]),
+    "learning_starts": (np.random.randint,[800000,800001]),
+    "activation": (np.random.choice, [[torch.nn.Tanh]]),
 
     # PPO
     # "n_steps": (np.random.randint,[4,11]),
     "n_steps": (np.random.randint,[800,801]),
 
     # SAC, TD3
-    "update_itr": (np.random.randint,[10,11]),
+    "update_itr": (np.random.randint,[5,6]),
 
     "goal_dim": (np.random.randint,[18,19]),
     "param_num": (np.random.randint,[14,15]),
     "hidden_dim": (np.random.randint,[6,7]),
     "critic_dim": (np.random.randint,[7,8]),
-    "net_layers": (np.random.randint,[4,5]),
+    "policy_net_layers": (np.random.randint,[2,3]),
+    "critic_net_layers": (np.random.randint,[4,5]),
 
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
@@ -163,9 +156,10 @@ def train(args, hparam):
     hparam['learning_rate'] = 10**hparam['learning_rate']
     hparam['hidden_dim'] = int(2**hparam['hidden_dim'])
     hparam['critic_dim'] = int(2**hparam['critic_dim'])
-    hidden_dim = hparam['hidden_dim']
+    policy_dim = hparam['hidden_dim']
     critic_dim = hparam['critic_dim']
-    net_layers = hparam['net_layers']
+    policy_net_layers = hparam['policy_net_layers']
+    critic_net_layers = hparam['critic_net_layers']
     observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
     if hparam['param']:
         observable += ['param']
@@ -174,7 +168,7 @@ def train(args, hparam):
     hparam['rew_coeff'] = rew_coeff
     hparam['dyn_range'] = dyn_range
 
-    batch_size  = 512
+    batch_size  = 128
     nenvs = 1
     
     #########################################
@@ -254,24 +248,24 @@ def train(args, hparam):
     
     if hparam['model']=='SAC':
         policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=dict(pi=[hidden_dim]*net_layers, qf=[critic_dim]*net_layers))
+                     net_arch=dict(pi=[policy_dim]*policy_net_layers, qf=[critic_dim]*critic_net_layers))
         trainer = SAC('MlpPolicy', env, verbose=0, device=device,
                 batch_size=batch_size,
                 buffer_size=max_episodes*max_steps,
                 learning_rate=hparam['learning_rate'],
                 learning_starts=hparam['learning_starts'],
-                train_freq=hparam['update_itr'],
+                gradient_steps=hparam['update_itr'],
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
         )
-        total_timesteps = max_episodes*max_steps / 2
+        total_timesteps = max_episodes*max_steps / 3
     elif hparam['model']=='PPO':
         policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=[dict(pi=[hidden_dim]*net_layers, vf=[critic_dim]*net_layers)])
+                     net_arch=[dict(pi=[policy_dim]*policy_net_layers, vf=[critic_dim]*critic_net_layers)])
         trainer = PPO('MlpPolicy', env, verbose=0, device=device,
                 n_steps=hparam['n_steps'],
-                buffer_size=max_episodes*max_steps,
                 batch_size=batch_size,
+                n_epoch=hparam['update_itr'],
                 learning_rate=hparam['learning_rate'],
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
@@ -279,20 +273,20 @@ def train(args, hparam):
         total_timesteps = max_episodes*max_steps
     elif hparam['model']=='TD3':
         policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=dict(pi=[hidden_dim]*net_layers, qf=[critic_dim]*net_layers))
+                     net_arch=dict(pi=[policy_dim]*policy_net_layers, qf=[critic_dim]*critic_net_layers))
         trainer = TD3('MlpPolicy', env, verbose=0, device=device,
                 batch_size=batch_size,
                 buffer_size=max_episodes*max_steps,
                 learning_rate=hparam['learning_rate'],
                 learning_starts=hparam['learning_starts'],
-                train_freq=(hparam['update_itr'], "episode"),
+                gradient_steps=hparam['update_itr'],
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
         )
-        total_timesteps = max_episodes*max_steps / 2
+        total_timesteps = max_episodes*max_steps / 3
     elif hparam['model']=='RecurrentPPO':
         policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=[dict(pi=[hidden_dim]*net_layers, vf=[critic_dim]*net_layers)])
+                     net_arch=[dict(pi=[policy_dim]*policy_net_layers, vf=[critic_dim]*critic_net_layers)])
         trainer = RecurrentPPO('MlpPolicy', env, verbose=0, device=device,
                 n_steps=hparam['n_steps'],
                 batch_size=batch_size,
@@ -304,11 +298,16 @@ def train(args, hparam):
     else:
         raise "Please use proper model"
 
+    # Initialize policy head 
+    for name, param in trainer.policy.actor.named_parameters():
+        if 'mu' in name:
+            param.data.copy_(param * 0.1)
+
     if args.test == 0:
         trainer.learn(total_timesteps=total_timesteps,
             eval_env=eval_env,
             eval_freq=500*max_steps,
-            n_eval_episodes=25,
+            n_eval_episodes=50,
             callback=CustomWandbCallback(
                 model_save_path=f"models/{run.name}",
                 model_save_freq=500*max_steps,
@@ -330,6 +329,7 @@ def train(args, hparam):
             't_range': 0.3,
             'battery_range': 0.0 # (1-n) ~ (1)
         }
+        dyn_range = {}
         if args.task == 'stabilize':
             initial_xyzs = np.array([[0,0,10000.0]])
             rpy_noise=np.pi,
