@@ -18,8 +18,6 @@ def generate_urdf(path, mass=0.027, x_cm=0, y_cm=0, i_xx=1.4e-5, i_yy=1.4e-5, i_
     z_cm = 0
     root.findall("link")[0].find('inertial').find('origin').set('rpy', '0 0 0')
     root.findall("link")[0].find('inertial').find('origin').set('xyz', '%s %s %s'%(str(x_cm), str(y_cm), str(z_cm)))
-
-    root.findall("link")[0].find('inertial').find('origin').set('xyz', '0 0 0')
     root.findall("link")[0].find('inertial').find('mass').set('value', '%s'%str(mass))
     root.findall("link")[0].find('inertial').find('inertia').set('ixx', str(i_xx))
     root.findall("link")[0].find('inertial').find('inertia').set('iyy', str(i_yy))

@@ -51,7 +51,7 @@ dyn_range = {
 
 hparam_set = {
     "learning_rate": (np.random.uniform,[-3.53, -3.52]),
-    "learning_starts": (np.random.randint,[800000,800001]),
+    "learning_starts": (np.random.randint,[80000,80001]),
     "activation": (np.random.choice, [[torch.nn.ReLU]]),
 
     # PPO
@@ -160,15 +160,16 @@ def train(args, hparam):
     critic_dim = hparam['critic_dim']
     policy_net_layers = hparam['policy_net_layers']
     critic_net_layers = hparam['critic_net_layers']
-    if args.relative:
-        observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
-    else:
-        observable = ['pos', 'rotation', 'vel', 'angular_vel']
+    observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
     if hparam['param']:
         observable += ['param']
     rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel': args.rew_angvel, 'ang_vel_xy': args.rew_angvel_xy, 'ang_vel_z': args.rew_angvel_z, 'd_action':0.0, 'rotation': 0.0}
     hparam['observable'] = observable
     hparam['rew_coeff'] = rew_coeff
+
+    if args.no_random:
+        dyn_range = {}
+
     hparam['dyn_range'] = dyn_range
 
     batch_size  = 128
@@ -461,7 +462,7 @@ if __name__=='__main__':
     parser.add_argument('--rew_angvel_z', type=float, default=0.0, help="Reward for angvel z")
     parser.add_argument('--rew_angvel', type=float, default=0.0, help="Reward for angvel xyz")
     parser.add_argument('--pretrain', type=str, default=None, help='Use pretrained model or not')
-    parser.add_argument('--relative', action='store_true')
+    parser.add_argument('--no_random', action='store_true')
 
     parser.add_argument('--rew_norm', action='store_true', help="Reward normalization")
     parser.add_argument('--obs_norm', action='store_true', help="Observation normalization")
