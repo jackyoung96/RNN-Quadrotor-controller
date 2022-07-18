@@ -41,7 +41,7 @@ from stable_baselines3 import SAC, TD3, PPO
 dyn_range = {
     # drones
     'mass_range': 0.3, # (1-n) ~ (1+n)
-    'cm_range': 0.3, # (1-n) ~ (1+n)
+    'cm_range': 0.05, # (1-n) ~ (1+n)
     'kf_range': 0.3, # (1-n) ~ (1+n)
     'km_range': 0.3, # (1-n) ~ (1+n)
     'i_range': 0.3,
@@ -51,21 +51,21 @@ dyn_range = {
 
 hparam_set = {
     "learning_rate": (np.random.uniform,[-3.53, -3.52]),
-    "learning_starts": (np.random.randint,[80000,80001]),
-    "activation": (np.random.choice, [[torch.nn.Tanh]]),
+    "learning_starts": (np.random.randint,[800000,800001]),
+    "activation": (np.random.choice, [[torch.nn.ReLU]]),
 
     # PPO
     # "n_steps": (np.random.randint,[4,11]),
     "n_steps": (np.random.randint,[800,801]),
 
     # SAC, TD3
-    "update_itr": (np.random.randint,[5,6]),
+    "update_itr": (np.random.randint,[10,11]),
 
     "goal_dim": (np.random.randint,[18,19]),
-    "param_num": (np.random.randint,[14,15]),
+    "param_num": (np.random.randint,[15,16]),
     "hidden_dim": (np.random.randint,[6,7]),
     "critic_dim": (np.random.randint,[7,8]),
-    "policy_net_layers": (np.random.randint,[2,3]),
+    "policy_net_layers": (np.random.randint,[3,4]),
     "critic_net_layers": (np.random.randint,[4,5]),
 
     "max_steps": (np.random.randint,[800,801]),
@@ -160,7 +160,10 @@ def train(args, hparam):
     critic_dim = hparam['critic_dim']
     policy_net_layers = hparam['policy_net_layers']
     critic_net_layers = hparam['critic_net_layers']
-    observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
+    if args.relative:
+        observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
+    else:
+        observable = ['pos', 'rotation', 'vel', 'angular_vel']
     if hparam['param']:
         observable += ['param']
     rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel': args.rew_angvel, 'ang_vel_xy': args.rew_angvel_xy, 'ang_vel_z': args.rew_angvel_z, 'd_action':0.0, 'rotation': 0.0}
@@ -185,7 +188,7 @@ def train(args, hparam):
     if args.tb_log:
 
         # wandb
-        run = wandb.init(project="SB3-drone", config=hparam,
+        run = wandb.init(project="SB3-drone-final", config=hparam,
                         sync_tensorboard=True,
                         save_code=True,
                         monitor_gym=True,)
@@ -246,59 +249,70 @@ def train(args, hparam):
     if args.tb_log:
         eval_env = VecVideoRecorder(eval_env, f"videos/{run.name}_eval", record_video_trigger=lambda x: x % (500*max_steps) == 0, video_length=max_steps)
     
-    if hparam['model']=='SAC':
-        policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=dict(pi=[policy_dim]*policy_net_layers, qf=[critic_dim]*critic_net_layers))
-        trainer = SAC('MlpPolicy', env, verbose=0, device=device,
-                batch_size=batch_size,
-                buffer_size=max_episodes*max_steps,
-                learning_rate=hparam['learning_rate'],
-                learning_starts=hparam['learning_starts'],
-                train_freq=hparam['update_itr'],
-                # gradient_steps=hparam['update_itr'],
-                policy_kwargs=policy_kwargs,
-                tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
-        )
-        total_timesteps = max_episodes*max_steps / 3
-    elif hparam['model']=='PPO':
-        policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=[dict(pi=[policy_dim]*policy_net_layers, vf=[critic_dim]*critic_net_layers)])
-        trainer = PPO('MlpPolicy', env, verbose=0, device=device,
-                n_steps=hparam['n_steps'],
-                batch_size=batch_size,
-                n_epochs=hparam['update_itr'],
-                learning_rate=hparam['learning_rate'],
-                policy_kwargs=policy_kwargs,
-                tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
-        )
-        total_timesteps = max_episodes*max_steps
-    elif hparam['model']=='TD3':
-        policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=dict(pi=[policy_dim]*policy_net_layers, qf=[critic_dim]*critic_net_layers))
-        trainer = TD3('MlpPolicy', env, verbose=0, device=device,
-                batch_size=batch_size,
-                buffer_size=max_episodes*max_steps,
-                learning_rate=hparam['learning_rate'],
-                learning_starts=hparam['learning_starts'],
-                train_freq=hparam['update_itr'],
-                # gradient_steps=hparam['update_itr'],
-                policy_kwargs=policy_kwargs,
-                tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
-        )
-        total_timesteps = max_episodes*max_steps / 3
-    elif hparam['model']=='RecurrentPPO':
-        policy_kwargs = dict(activation_fn=hparam['activation'],
-                     net_arch=[dict(pi=[policy_dim]*policy_net_layers, vf=[critic_dim]*critic_net_layers)])
-        trainer = RecurrentPPO('MlpPolicy', env, verbose=0, device=device,
-                n_steps=hparam['n_steps'],
-                batch_size=batch_size,
-                learning_rate=hparam['learning_rate'],
-                policy_kwargs=policy_kwargs,
-                tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
-        )
-        total_timesteps = max_episodes*max_steps
+    if args.pretrain is not None:
+        if hparam['model']=='SAC':
+            trainer = SAC.load(args.pretrain, env=env, device=device)
+            total_timesteps = max_episodes*max_steps / 2
+        elif hparam['model']=='PPO':
+            trainer = PPO.load(args.pretrain, env=env, device=device)
+            total_timesteps = max_episodes*max_steps
+        elif hparam['model']=='TD3':
+            trainer = TD3.load(args.pretrain, env=env, device=device)
+            total_timesteps = max_episodes*max_steps / 2
     else:
-        raise "Please use proper model"
+        if hparam['model']=='SAC':
+            policy_kwargs = dict(activation_fn=hparam['activation'],
+                        net_arch=dict(pi=[policy_dim]*policy_net_layers, qf=[critic_dim]*critic_net_layers))
+            trainer = SAC('MlpPolicy', env, verbose=0, device=device,
+                    batch_size=batch_size,
+                    buffer_size=max_episodes*max_steps,
+                    learning_rate=hparam['learning_rate'],
+                    learning_starts=hparam['learning_starts'],
+                    train_freq=hparam['update_itr'],
+                    # gradient_steps=hparam['update_itr'],
+                    policy_kwargs=policy_kwargs,
+                    tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
+            )
+            total_timesteps = max_episodes*max_steps / 2
+        elif hparam['model']=='PPO':
+            policy_kwargs = dict(activation_fn=hparam['activation'],
+                        net_arch=[dict(pi=[policy_dim]*policy_net_layers, vf=[critic_dim]*critic_net_layers)])
+            trainer = PPO('MlpPolicy', env, verbose=0, device=device,
+                    n_steps=hparam['n_steps'],
+                    batch_size=batch_size,
+                    n_epochs=hparam['update_itr'],
+                    learning_rate=hparam['learning_rate'],
+                    policy_kwargs=policy_kwargs,
+                    tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
+            )
+            total_timesteps = max_episodes*max_steps
+        elif hparam['model']=='TD3':
+            policy_kwargs = dict(activation_fn=hparam['activation'],
+                        net_arch=dict(pi=[policy_dim]*policy_net_layers, qf=[critic_dim]*critic_net_layers))
+            trainer = TD3('MlpPolicy', env, verbose=0, device=device,
+                    batch_size=batch_size,
+                    buffer_size=max_episodes*max_steps,
+                    learning_rate=hparam['learning_rate'],
+                    learning_starts=hparam['learning_starts'],
+                    train_freq=hparam['update_itr'],
+                    # gradient_steps=hparam['update_itr'],
+                    policy_kwargs=policy_kwargs,
+                    tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
+            )
+            total_timesteps = max_episodes*max_steps / 2
+        elif hparam['model']=='RecurrentPPO':
+            policy_kwargs = dict(activation_fn=hparam['activation'],
+                        net_arch=[dict(pi=[policy_dim]*policy_net_layers, vf=[critic_dim]*critic_net_layers)])
+            trainer = RecurrentPPO('MlpPolicy', env, verbose=0, device=device,
+                    n_steps=hparam['n_steps'],
+                    batch_size=batch_size,
+                    learning_rate=hparam['learning_rate'],
+                    policy_kwargs=policy_kwargs,
+                    tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
+            )
+            total_timesteps = max_episodes*max_steps
+        else:
+            raise "Please use proper model"
 
     # Initialize policy head 
     if 'PPO' not in hparam['model']:
@@ -336,7 +350,7 @@ def train(args, hparam):
             't_range': 0.3,
             'battery_range': 0.0 # (1-n) ~ (1)
         }
-        dyn_range = {}
+        # dyn_range = {}
         if args.task == 'stabilize':
             initial_xyzs = np.array([[0,0,10000.0]])
             rpy_noise=np.pi,
@@ -446,6 +460,8 @@ if __name__=='__main__':
     parser.add_argument('--rew_angvel_xy', type=float, default=0.0, help="Reward for angvel xy")
     parser.add_argument('--rew_angvel_z', type=float, default=0.0, help="Reward for angvel z")
     parser.add_argument('--rew_angvel', type=float, default=0.0, help="Reward for angvel xyz")
+    parser.add_argument('--pretrain', type=str, default=None, help='Use pretrained model or not')
+    parser.add_argument('--relative', action='store_true')
 
     parser.add_argument('--rew_norm', action='store_true', help="Reward normalization")
     parser.add_argument('--obs_norm', action='store_true', help="Observation normalization")

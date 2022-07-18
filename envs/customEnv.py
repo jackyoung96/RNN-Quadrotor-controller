@@ -85,7 +85,7 @@ class dynRandeEnv(TakeoffAviary):
             act=ActionType.RPM
         )
         self.orig_params = {"M":self.M,
-                            "L":self.L,
+                            "L":self.L / np.sqrt(2),
                             "KF":self.KF,
                             "KM":self.KM,
                             "T": 0.15,
@@ -464,7 +464,7 @@ class dynRandeEnv(TakeoffAviary):
         return -(f_s+f_a) # * (1/self.env.SIM_FREQ) # + done_reward
     
     def _computeDone(self):
-        if (self.step_counter)/self.SIM_FREQ >= self.EPISODE_LEN_SEC:
+        if (self.step_counter+self.AGGR_PHY_STEPS)/(self.SIM_FREQ) >= self.EPISODE_LEN_SEC:
             return True
         # elif np.linalg.norm(self._getDroneStateVector(0)[:3]-self.goal_pos[0,:3], ord=2) > 6:
         #     return True
