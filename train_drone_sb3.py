@@ -68,7 +68,7 @@ hparam_set = {
     "policy_net_layers": (np.random.randint,[3,4]),
     "critic_net_layers": (np.random.randint,[4,5]),
 
-    "max_steps": (np.random.randint,[800,801]),
+    "max_steps": (np.random.randint,[400,401]),
     "her_length": (np.random.randint,[800,801]),
     "rnn_dropout": (np.random.uniform,[0, 0]),
 }
@@ -222,6 +222,7 @@ def train(args, hparam):
         gui=args.render,
         record=False,
         wandb_render=True,
+        is_noise=not args.is_random,
     )
     env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
     env = DummyVecEnv([lambda: env])
@@ -243,7 +244,7 @@ def train(args, hparam):
         gui=False,
         record=False,
         wandb_render=True,
-        is_noise=args.no_random,
+        is_noise=not args.no_random,
     )
     eval_env = Monitor(eval_env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
     eval_env = DummyVecEnv([lambda: eval_env])
