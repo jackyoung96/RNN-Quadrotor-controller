@@ -243,6 +243,7 @@ def train(args, hparam):
         gui=False,
         record=False,
         wandb_render=True,
+        is_noise=args.no_random,
     )
     eval_env = Monitor(eval_env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
     eval_env = DummyVecEnv([lambda: eval_env])
@@ -351,7 +352,7 @@ def train(args, hparam):
             't_range': 0.3,
             'battery_range': 0.0 # (1-n) ~ (1)
         }
-        # dyn_range = {}
+        dyn_range = {}
         if args.task == 'stabilize':
             initial_xyzs = np.array([[0,0,10000.0]])
             rpy_noise=np.pi,
@@ -439,7 +440,8 @@ def train(args, hparam):
         final_info = {}
         for info in total_info:
             for key,value in info.items():
-                final_info[key] = final_info.get(key,0) + value
+                if key != 'episode':
+                    final_info[key] = final_info.get(key,0) + value
         for key,value in final_info.items():
             final_info[key] = value / args.test
 

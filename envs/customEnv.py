@@ -47,6 +47,7 @@ class dynRandeEnv(TakeoffAviary):
                 record=False,
                 goal=None,
                 wandb_render=False,
+                is_noise=False,
                 **kwargs):
 
         self.observable = observable
@@ -105,6 +106,7 @@ class dynRandeEnv(TakeoffAviary):
         self.droneStates = []
         self.param = np.zeros((14,))
         self.wandb_render = wandb_render
+        self.is_noise = is_noise
 
     def observable_obs_space(self):
         rng = np.inf
@@ -361,7 +363,8 @@ class dynRandeEnv(TakeoffAviary):
 
         if type=='pos':
             norm_state = (norm_state - self.goal_pos[0,:3]) 
-            norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            if self.is_noise:
+                norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
             norm_state = norm_state / MAX_XYZ
 
         elif type=='rel_pos':
@@ -369,7 +372,8 @@ class dynRandeEnv(TakeoffAviary):
             rot = r.as_matrix()
             pos = (norm_state[:3] - self.goal_pos[0,:3]).reshape((3,1)) 
             norm_state = np.matmul(rot.transpose(),pos).reshape((3,))
-            norm_state += np.random.normal(0, POS_NOISE, size=norm_state.shape) # add noise
+            if self.is_noise:
+                norm_state += np.random.normal(0, POS_NOISE, size=norm_state.shape) # add noise
             norm_state = norm_state / MAX_XYZ
 
         elif type=='rotation':
@@ -378,26 +382,30 @@ class dynRandeEnv(TakeoffAviary):
             norm_state = r.as_matrix().reshape((9,))
             
         elif type=='vel':
-            # norm_state += np.random.normal(0, 0.005, size=norm_state.shape) # add noise
+            if self.is_noise:
+                norm_state += np.random.normal(0, VEL_NOISE, size=norm_state.shape) # add noise
             norm_state = norm_state / MAX_LIN_VEL
 
         elif type=='rel_vel':
             r = R.from_quat(norm_state[-4:])
             rot = r.as_matrix()
             norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,)) 
-            norm_state += np.random.normal(0, VEL_NOISE, size=norm_state.shape) # add noise
+            if self.is_noise:
+                norm_state += np.random.normal(0, VEL_NOISE, size=norm_state.shape) # add noise
             norm_state = norm_state / MAX_LIN_VEL
 
         elif type=='angular_vel':
             norm_state = state.copy()
-            norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
+            if self.is_noise:
+                norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
             norm_state = norm_state / MAX_RPY_RATE
             
         elif type=='rel_angular_vel':
             r = R.from_quat(norm_state[-4:])
             rot = r.as_matrix()
             norm_state = np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))
-            norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
+            if self.is_noise:
+                norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
             norm_state = norm_state / MAX_RPY_RATE
             # norm_state = np.deg2rad(np.matmul(rot.transpose(),norm_state[:3, None]).reshape((3,))) / MAX_RPY_RATE
         
@@ -416,13 +424,14 @@ class dynRandeEnv(TakeoffAviary):
             norm_state = state / self.MAX_RPM
 
         elif type=='param':
-            norm_state = norm_state + np.random.normal(0,0.05,norm_state.shape)
+            if self.is_noise:
+                norm_state = norm_state + np.random.normal(0,0.05,norm_state.shape)
             pass
 
         return norm_state
 
     def _angvel_noise(self, angvel, ANGVEL_NOISE, update=True):
-        dt = 1 / self.SIM_FREQ
+        dt = 1 / (self.SIM_FREQ/self.AGGR_PHY_STEPS)
         sigma_g_d = ANGVEL_NOISE[0] / (dt**0.5)
         sigma_b_g_d = (-(sigma_g_d**2) * (ANGVEL_NOISE[2] / 2) * (np.exp(-2*dt/ANGVEL_NOISE[2]) - 1))**0.5
         pi_g_d = np.exp(-dt / ANGVEL_NOISE[2])
@@ -479,7 +488,8 @@ class dynRandeEnv(TakeoffAviary):
         return super().reset()
 
     def step(self, action):
-        action = 4*(self.AGGR_PHY_STEPS/self.SIM_FREQ)/self.T * (action-self.last_action_custom) + self.last_action_custom
+        if self.is_noise:
+            action = 4*(self.AGGR_PHY_STEPS/self.SIM_FREQ)/self.T * (action-self.last_action_custom) + self.last_action_custom
         self.last_action_custom = action
         state, reward, done, _ = super().step(action)
         
