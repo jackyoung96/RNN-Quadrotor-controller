@@ -460,8 +460,8 @@ class dynRandeEnv(TakeoffAviary):
         xyz = coeff['pos'] * np.linalg.norm(state[:3]-self.goal_pos[0,:3], ord=2) # for single agent temporarily
         vel = coeff['vel'] * np.linalg.norm(state[10:13],ord=2)
         ang_vel = coeff['ang_vel'] * np.linalg.norm(state[13:16],ord=2)
-        rel_angvel = self._normalizeState(state[[13,14,15,3,4,5,6]],'rel_angular_vel_nonoise') * 2 * np.pi
-        ang_vel_xy = coeff['ang_vel_z'] * np.linalg.norm(rel_angvel[:2])
+        rel_angvel = self._normalizeState(state[[13,14,15,3,4,5,6]],'rel_angular_vel_nonoise')
+        ang_vel_xy = coeff['ang_vel_xy'] * np.linalg.norm(rel_angvel[:2])
         ang_vel_z = coeff['ang_vel_z'] * np.linalg.norm(rel_angvel[-1])
         
         rot = coeff['rotation'] * self._normalizeState(state[3:7],'rotation')[-1]
