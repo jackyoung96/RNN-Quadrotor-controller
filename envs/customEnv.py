@@ -14,6 +14,7 @@ from gym_pybullet_drones.envs.BaseAviary import DroneModel, Physics
 from gym_pybullet_drones.envs.single_agent_rl.BaseSingleAgentAviary import ActionType, ObservationType, BaseSingleAgentAviary
 import gym_pybullet_drones
 import time
+from copy import deepcopy
 
 import pybullet as p
 import pybullet_data
@@ -71,7 +72,7 @@ class dynRandeEnv(TakeoffAviary):
         self.maketime = datetime.now().strftime("%m%d%Y_%H%M%S")
 
         self.goal = goal
-        self.goal_pos = initial_xyzs.copy() if goal is None else goal
+        self.goal_pos = deepcopy(initial_xyzs) if goal is None else goal
 
         super(dynRandeEnv, self).__init__(
             drone_model=DroneModel.CF2X,
@@ -328,7 +329,7 @@ class dynRandeEnv(TakeoffAviary):
         obs = []
         for otype in self.observable:
             if otype == 'param':
-                o = self.param.copy()
+                o = deepcopy(self.param)
             else:
                 o = obs_all[obs_idx_dict[otype]]
             obs.append(self._normalizeState(o, otype))
@@ -359,7 +360,7 @@ class dynRandeEnv(TakeoffAviary):
         ANGVEL_NOISE = [0.000175, 0.0105, 1000.] # MPU-9250 gyroscope spec / ref https://github.com/amolchanov86/quad_sim2multireal/blob/master/quad_sim/sensor_noise.py#L58
         # noise density, random walk, bias correlation_time
 
-        norm_state = state.copy()
+        norm_state = deepcopy(state)
 
         if type=='pos':
             norm_state = (norm_state - self.goal_pos[0,:3]) 
@@ -395,7 +396,6 @@ class dynRandeEnv(TakeoffAviary):
             norm_state = norm_state / MAX_LIN_VEL
 
         elif type=='angular_vel':
-            norm_state = state.copy()
             if self.is_noise:
                 norm_state = self._angvel_noise(norm_state, ANGVEL_NOISE)
             norm_state = norm_state / MAX_RPY_RATE
@@ -470,7 +470,7 @@ class dynRandeEnv(TakeoffAviary):
         d_action = coeff['d_action'] * np.linalg.norm(self._normalizeState(state[16:],'action'),ord=2)
         f_a = d_action
             
-        return -(f_s+f_a) # * (1/self.env.SIM_FREQ) # + done_reward
+        return -(f_s+f_a) * (1/(self.SIM_FREQ/self.AGGR_PHY_STEPS)) # + done_reward
     
     def _computeDone(self):
         if (self.step_counter+self.AGGR_PHY_STEPS)/(self.SIM_FREQ) >= self.EPISODE_LEN_SEC:
@@ -489,8 +489,11 @@ class dynRandeEnv(TakeoffAviary):
 
     def step(self, action):
         if self.is_noise:
+            # motor lag
             action = 4*(self.AGGR_PHY_STEPS/self.SIM_FREQ)/self.T * (action-self.last_action_custom) + self.last_action_custom
         self.last_action_custom = action
+        if self.is_noise:
+            action += np.random.normal(0, 0.005, action.shape)
         state, reward, done, _ = super().step(action)
         
         self.droneStates.append(self._getDroneStateVector(0))
