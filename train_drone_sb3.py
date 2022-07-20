@@ -253,13 +253,13 @@ def train(args, hparam):
     if args.pretrain is not None:
         if hparam['model']=='SAC':
             trainer = SAC.load(args.pretrain, env=env, device=device)
-            total_timesteps = max_episodes*max_steps / 2
+            total_timesteps = max_episodes*max_steps
         elif hparam['model']=='PPO':
             trainer = PPO.load(args.pretrain, env=env, device=device)
             total_timesteps = max_episodes*max_steps
         elif hparam['model']=='TD3':
             trainer = TD3.load(args.pretrain, env=env, device=device)
-            total_timesteps = max_episodes*max_steps / 2
+            total_timesteps = max_episodes*max_steps
     else:
         if hparam['model']=='SAC':
             policy_kwargs = dict(activation_fn=hparam['activation'],
@@ -274,7 +274,7 @@ def train(args, hparam):
                     policy_kwargs=policy_kwargs,
                     tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
             )
-            total_timesteps = max_episodes*max_steps / 2
+            total_timesteps = max_episodes*max_steps
         elif hparam['model']=='PPO':
             policy_kwargs = dict(activation_fn=hparam['activation'],
                         net_arch=[dict(pi=[policy_dim]*policy_net_layers, vf=[critic_dim]*critic_net_layers)])
@@ -300,7 +300,7 @@ def train(args, hparam):
                     policy_kwargs=policy_kwargs,
                     tensorboard_log=f"runs/{run.name}" if hparam['tb_log'] else None
             )
-            total_timesteps = max_episodes*max_steps / 2
+            total_timesteps = max_episodes*max_steps
         elif hparam['model']=='RecurrentPPO':
             policy_kwargs = dict(activation_fn=hparam['activation'],
                         net_arch=[dict(pi=[policy_dim]*policy_net_layers, vf=[critic_dim]*critic_net_layers)])
