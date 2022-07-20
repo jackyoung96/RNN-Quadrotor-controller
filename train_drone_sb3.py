@@ -68,7 +68,7 @@ hparam_set = {
     "policy_net_layers": (np.random.randint,[3,4]),
     "critic_net_layers": (np.random.randint,[4,5]),
 
-    "max_steps": (np.random.randint,[400,401]),
+    "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
     "rnn_dropout": (np.random.uniform,[0, 0]),
 }
@@ -222,7 +222,7 @@ def train(args, hparam):
         gui=args.render,
         record=False,
         wandb_render=True,
-        is_noise=not args.is_random,
+        is_noise=not args.no_random,
     )
     env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
     env = DummyVecEnv([lambda: env])
@@ -342,7 +342,6 @@ def train(args, hparam):
     else:
         del trainer
         del env
-        max_steps=800
         dyn_range = {
             # drones
             'mass_range': 0.3, # (1-n) ~ (1+n)
@@ -380,6 +379,7 @@ def train(args, hparam):
             gui=args.render,
             record=False,
             goal=goal,
+            is_noise=not args.no_random
         )
         env = Monitor(env, info_keywords=['x','y','z','roll','pitch','yaw','vx','vy','vz','wx','wy','wz'])
         env = DummyVecEnv([lambda: env])
@@ -429,7 +429,7 @@ def train(args, hparam):
             goal_state[:3] = env.venv.envs[0].env.goal_pos[0]
             state_buffer.append(goal_state)
             np.savetxt('paperworks/test_state_%02d.txt'%itr,np.stack(state_buffer),delimiter=',')
-            # np.savetxt('paperworks/test_obs_%02d.txt'%itr,np.concatenate(obs_buffer),delimiter=',')
+            np.savetxt('paperworks/test_obs_%02d.txt'%itr,np.concatenate(obs_buffer),delimiter=',')
             np.savetxt('paperworks/test_action_%02d.txt'%itr,np.concatenate(action_buffer),delimiter=',')
             print("iteration : ",itr)
             info = info[0]
