@@ -268,7 +268,7 @@ def train(args, hparam):
                         net_arch=dict(pi=[policy_dim]*policy_net_layers, qf=[critic_dim]*critic_net_layers))
             trainer = SAC('MlpPolicy', env, verbose=0, device=device,
                     batch_size=batch_size,
-                    buffer_size=max_episodes*max_steps,
+                    # buffer_size=max_episodes*max_steps,
                     learning_rate=hparam['learning_rate'],
                     learning_starts=hparam['learning_starts'],
                     train_freq=hparam['update_itr'],
@@ -294,7 +294,7 @@ def train(args, hparam):
                         net_arch=dict(pi=[policy_dim]*policy_net_layers, qf=[critic_dim]*critic_net_layers))
             trainer = TD3('MlpPolicy', env, verbose=0, device=device,
                     batch_size=batch_size,
-                    buffer_size=max_episodes*max_steps,
+                    # buffer_size=max_episodes*max_steps,
                     learning_rate=hparam['learning_rate'],
                     learning_starts=hparam['learning_starts'],
                     train_freq=hparam['update_itr'],
@@ -400,6 +400,8 @@ def train(args, hparam):
             state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
             reward_sum = 0
             state_buffer,obs_buffer, action_buffer = [],[],[]
+            goal_state = np.zeros_like(state)
+            goal_state[:3] = env.venv.envs[0].env.goal_pos[0]
             
             for i in range(max_steps):
                 # obs[:,-15:] = 0
@@ -415,7 +417,6 @@ def train(args, hparam):
                 state_buffer.append(state)
                 action_buffer.append(action)
 
-                action = -np.ones_like(action)
                 obs, reward, done, info = env.step(action)
                 state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
                 
@@ -426,8 +427,6 @@ def train(args, hparam):
                     obs = env.reset()
                 reward_sum+=reward
             
-            goal_state = np.zeros_like(state)
-            goal_state[:3] = env.venv.envs[0].env.goal_pos[0]
             state_buffer.append(goal_state)
             np.savetxt('paperworks/test_state_%02d.txt'%itr,np.stack(state_buffer),delimiter=',')
             np.savetxt('paperworks/test_obs_%02d.txt'%itr,np.concatenate(obs_buffer),delimiter=',')
