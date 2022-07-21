@@ -471,7 +471,7 @@ if __name__=='__main__':
     parser.add_argument('--pretrain', type=str, default=None, help='Use pretrained model or not')
     parser.add_argument('--no_random', action='store_true')
 
-    parser.add_argument('--dyn', choices=['mass', 'cm', 'kf', 'km', 'i', 't'], default=None)
+    parser.add_argument('--dyn', choices=['mass', 'cm', 'kf', 'km', 'i', 't', 'no'], default=None)
 
     parser.add_argument('--rew_norm', action='store_true', help="Reward normalization")
     parser.add_argument('--obs_norm', action='store_true', help="Observation normalization")
