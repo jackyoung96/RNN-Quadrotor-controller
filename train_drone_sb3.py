@@ -41,7 +41,7 @@ from stable_baselines3 import SAC, TD3, PPO
 dyn_range = {
     # drones
     'mass_range': 0.3, # (1-n) ~ (1+n)
-    'cm_range': 0.05, # (1-n) ~ (1+n)
+    'cm_range': 0.3, # (1-n) ~ (1+n)
     'kf_range': 0.3, # (1-n) ~ (1+n)
     'km_range': 0.3, # (1-n) ~ (1+n)
     'i_range': 0.3,
@@ -169,6 +169,9 @@ def train(args, hparam):
 
     if args.no_random:
         dyn_range = {}
+    if args.dyn is not None:
+        dyn_range = {'%s_range'%args.dyn: 0.3}
+    
 
     hparam['dyn_range'] = dyn_range
 
@@ -342,6 +345,7 @@ def train(args, hparam):
     else:
         del trainer
         del env
+        max_steps = 1400
         dyn_range = {
             # drones
             'mass_range': 0.3, # (1-n) ~ (1+n)
@@ -415,7 +419,6 @@ def train(args, hparam):
                 state_buffer.append(state)
                 action_buffer.append(action)
 
-                action = -np.ones_like(action)
                 obs, reward, done, info = env.step(action)
                 state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
                 
@@ -467,6 +470,8 @@ if __name__=='__main__':
     parser.add_argument('--rew_angvel', type=float, default=0.0, help="Reward for angvel xyz")
     parser.add_argument('--pretrain', type=str, default=None, help='Use pretrained model or not')
     parser.add_argument('--no_random', action='store_true')
+
+    parser.add_argument('--dyn', choices=['mass', 'cm', 'kf', 'km', 'i', 't'], default=None)
 
     parser.add_argument('--rew_norm', action='store_true', help="Reward normalization")
     parser.add_argument('--obs_norm', action='store_true', help="Observation normalization")
