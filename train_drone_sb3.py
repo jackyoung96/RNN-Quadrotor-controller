@@ -64,9 +64,9 @@ hparam_set = {
     "goal_dim": (np.random.randint,[18,19]),
     "param_num": (np.random.randint,[15,16]),
     "hidden_dim": (np.random.randint,[6,7]),
-    "critic_dim": (np.random.randint,[6,7]),
-    "policy_net_layers": (np.random.randint,[2,3]),
-    "critic_net_layers": (np.random.randint,[2,3]),
+    "critic_dim": (np.random.randint,[7,8]),
+    "policy_net_layers": (np.random.randint,[3,4]),
+    "critic_net_layers": (np.random.randint,[4,5]),
 
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
@@ -415,6 +415,7 @@ def train(args, hparam):
                 state_buffer.append(state)
                 action_buffer.append(action)
 
+                action = -np.ones_like(action)
                 obs, reward, done, info = env.step(action)
                 state = env.venv.envs[0].env._getDroneStateVector(0).squeeze()
                 
