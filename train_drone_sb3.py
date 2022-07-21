@@ -52,7 +52,7 @@ dyn_range = {
 hparam_set = {
     "learning_rate": (np.random.uniform,[-3.53, -3.52]),
     "learning_starts": (np.random.randint,[80000,80001]),
-    "activation": (np.random.choice, [[torch.nn.ReLU]]),
+    "activation": (np.random.choice, [[torch.nn.Tanh]]),
 
     # PPO
     # "n_steps": (np.random.randint,[4,11]),
@@ -64,9 +64,9 @@ hparam_set = {
     "goal_dim": (np.random.randint,[18,19]),
     "param_num": (np.random.randint,[15,16]),
     "hidden_dim": (np.random.randint,[6,7]),
-    "critic_dim": (np.random.randint,[7,8]),
-    "policy_net_layers": (np.random.randint,[3,4]),
-    "critic_net_layers": (np.random.randint,[4,5]),
+    "critic_dim": (np.random.randint,[6,7]),
+    "policy_net_layers": (np.random.randint,[2,3]),
+    "critic_net_layers": (np.random.randint,[2,3]),
 
     "max_steps": (np.random.randint,[800,801]),
     "her_length": (np.random.randint,[800,801]),
