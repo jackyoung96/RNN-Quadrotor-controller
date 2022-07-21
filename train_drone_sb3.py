@@ -52,7 +52,7 @@ dyn_range = {
 hparam_set = {
     "learning_rate": (np.random.uniform,[-3.53, -3.52]),
     "learning_starts": (np.random.randint,[80000,80001]),
-    "activation": (np.random.choice, [[torch.nn.Tanh]]),
+    "activation": (np.random.choice, [[torch.nn.ReLU]]),
 
     # PPO
     # "n_steps": (np.random.randint,[4,11]),
