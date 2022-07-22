@@ -604,7 +604,7 @@ class domainRandomAviary(customAviary):
         self.env.DRAG_COEFF, \
         self.env.DW_COEFF_1, \
         self.env.DW_COEFF_2, \
-        self.env.DW_COEFF_3 = self.env.env._parseURDFParameters()
+        self.env.DW_COEFF_3 = self.env._parseURDFParameters()
 
         self.battery = self.orig_params['BATTERY'] * np.random.uniform(1.0-self.battery_range, 1.0)
         if self.battery_range != 0:

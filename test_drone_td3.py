@@ -83,15 +83,19 @@ def main(hparam):
 
     if 'waypoint' in hparam['task']:
         waypoints = [
-            (np.array([[0,  0,  0.025]]),0),
+            (np.array([[0,  0,  0.015]]),0),
             (np.array([[0,  0,  0.525]]),400), # (pos, time)
             (np.array([[0.5,0,  0.525]]),800),
             # (np.array([[0.5,0.5,1.025]]),1200),
             # (np.array([[0,  0.5,1.025]]),1600),
             # (np.array([[0,  0,  1.025]]),2000)
+        ],
+        waypoints = [
+            (np.array([[0,  0,  0.025]]),0),
+            (np.array([[0,  0,  0.515]]),400),
         ]
         theta = np.random.uniform(0,2*np.pi)
-        theta = np.deg2rad(30)
+        theta = 0
         initial_rpys = np.array([[0.0,0.0,theta]])
         rpy_noise = 0
         vel_noise = 0
@@ -161,7 +165,6 @@ def main(hparam):
     eval_position = 0 
     eval_angle = 0
 
-    theta = np.random.uniform(0,2*np.pi)
     goal = np.array([[0,0,0, # pos
                     np.cos(theta),-np.sin(theta),0,
                     np.sin(theta),np.cos(theta),0,
@@ -194,9 +197,8 @@ def main(hparam):
             goal_pos = getgoal(waypoints, i_step)
             if goal_pos is not None and np.any(env.env.envs[0].goal_pos-goal_pos):
                 env.env.envs[0].goal_pos = goal_pos
-                # hidden_out = hidden_out_zero
+            hidden_out = hidden_out_zero
                 # last_action = -np.ones_like(last_action)
-            goal = np.array([[0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0]])
             if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                 hidden_in = hidden_out
                 if not hasattr(agent.q_net1, '_goal_dim'):
@@ -262,6 +264,11 @@ def main(hparam):
         if np.sum(np.where(np.array(e_as) < 10, 1, 0)[-100:]) == 100\
             and 'stabilize' in hparam['task']: 
             eval_success = 1
+
+
+
+
+
 
     drone_state_buffer.to_csv('paperworks/%s.csv'%(hparam['rnn']+hparam['task']), header=False)
     print("EVALUATION SUCCESS RATE:", eval_success)
