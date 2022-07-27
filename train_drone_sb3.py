@@ -40,11 +40,11 @@ from stable_baselines3 import SAC, TD3, PPO
 
 dyn_range = {
     # drones
-    'mass_range': 0.3, # (1-n) ~ (1+n)
-    'cm_range': 0.3, # (1-n) ~ (1+n)
-    'kf_range': 0.3, # (1-n) ~ (1+n)
-    'km_range': 0.3, # (1-n) ~ (1+n)
-    'i_range': 0.3,
+    'mass_range': 0.1, # (1-n) ~ (1+n)
+    'cm_range': 0.05, # (1-n) ~ (1+n)
+    'kf_range': 0.1, # (1-n) ~ (1+n)
+    'km_range': 0.1, # (1-n) ~ (1+n)
+    'i_range': 0.1,
     't_range': 0.3,
     'battery_range': 0.0 # (1-n) ~ (1)
 }
@@ -345,7 +345,7 @@ def train(args, hparam):
     else:
         del trainer
         del env
-        max_steps = 1400
+        max_steps = 800
         dyn_range = {
             # drones
             'mass_range': 0.3, # (1-n) ~ (1+n)
