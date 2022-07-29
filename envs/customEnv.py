@@ -494,7 +494,10 @@ class dynRandeEnv(TakeoffAviary):
         self.last_action_custom = action
         if self.is_noise:
             action += np.random.normal(0, 0.005, action.shape)
-        state, reward, done, _ = super().step(action)
+        if self.step_counter >= 1598:
+            state, reward, done, _ = super().step(action)
+        else:
+            state, reward, done, _ = super().step(action)
         
         self.droneStates.append(self._getDroneStateVector(0))
         if len(self.droneStates) > 100:
