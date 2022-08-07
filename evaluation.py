@@ -1,7 +1,6 @@
 import torch
 import gym
-import matplotlib
-from envs.customEnv import domainRandomize
+from envs.customEnv import dynRandeEnv
 from gym_pybullet_drones.envs.BaseAviary import DroneModel, Physics, BaseAviary
 from gym_pybullet_drones.envs.single_agent_rl.BaseSingleAgentAviary import ActionType, ObservationType, BaseSingleAgentAviary
 from envs.customEnvDrone import domainRandomAviary
@@ -444,7 +443,7 @@ def pendulum_test(eval_env, agent, max_steps, test_itr=10, record=False, log=Fal
             eval_angle / test_itr, \
             imgs
 
-def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False):
+def drone_test(eval_env, agent, max_steps, test_itr=10):
     
         # hyper-parameters for RL training
     DETERMINISTIC=True  # DDPG: deterministic policy gradient      
@@ -452,26 +451,14 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
     device = agent.device
     eval_success = 0
     eval_reward = 0
-    eval_position = 0 
-    eval_angle = 0
-    eval_vel = 0
-    eval_angvel = 0
-
-    goal = np.array([[0,0,0, # pos
-                    1,0,0,
-                    0,1,0,
-                    0,0,1, # rotation matrix
-                    0,0,0, # vel
-                    0,0,0, # ang vel
-                    0,0,0,0]]) # dummy action
-    goal = eval_env.normalize_obs(goal)
+    infos = []
 
     with torch.no_grad():
         for i_eval in range(test_itr):
 
             state, param = eval_env.reset()
             total_rew = 0
-            last_action = eval_env.env.action_space.sample()[None,:]
+            last_action = eval_env.action_space.sample()[None,:]
             last_action = -np.ones_like(last_action)
             if hasattr(agent, 'rnn_type'):
                 if 'LSTM' == agent.rnn_type:
@@ -481,66 +468,31 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
                     hidden_out = torch.zeros([1, 1, agent.hidden_dim], dtype=torch.float).to(device)
 
             step, success = 0,0
-            e_ps, e_as = [],[]
-            e_vs, e_ws = [],[]
-            state_buffer, action_buffer, reward_buffer = [],[],[]
-            time_buffer = []
+            reward_buffer = []
 
             for i_step in range(max_steps):
                 start = time.time()
                 if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                     hidden_in = hidden_out
                     if not hasattr(agent.q_net1, '_goal_dim'):
+                        raise NotImplementedError
                         action, hidden_out = \
                             agent.policy_net.get_action(state, 
                                                             last_action, 
-                                                            hidden_in, 
-                                                            deterministic=DETERMINISTIC, 
-                                                            explore_noise_scale=0.0)
+                                                            hidden_in)
                     else:
+                        raise NotImplementedError
                         action, hidden_out = \
                             agent.policy_net.get_action(state, 
                                                             last_action, 
                                                             hidden_in, 
-                                                            goal=goal,
-                                                            deterministic=DETERMINISTIC, 
-                                                            explore_noise_scale=0.0)
+                                                            goal=goal)
                 else:
                     action = agent.policy_net.get_action(state, 
-                                                        last_action,
-                                                        deterministic=DETERMINISTIC, 
-                                                        explore_noise_scale=0.0)
+                                                        last_action)
 
-                time_buffer.append(time.time()-start)
+                next_state, reward, done, info = eval_env.step(action)
 
-                next_state, reward, done, _ = eval_env.step(action) 
-                
-                # Metric (position, angle error)
-                unnormed_state = eval_env.unnormalize_obs(next_state)
-                e_p = np.linalg.norm(6*unnormed_state[0,:3]) # position (m)
-                e_a = np.arccos(np.clip(unnormed_state[0,11], -1.0, 1.0)) # angle (rad)
-                e_v = np.linalg.norm(3*unnormed_state[0,12:15])
-                e_w = np.linalg.norm(2*180*unnormed_state[0,15:18])
-                e_ps.append(e_p)
-                e_as.append(e_a)
-                e_vs.append(e_v)
-                e_ws.append(e_w)
-                pos_achieve = e_p < 0.1
-                ang_achieve = e_a < np.deg2rad(10)
-
-                # reward = 0.0 if pos_achieve and ang_achieve else -1.0
-
-                # Success test
-                if pos_achieve and ang_achieve:
-                    step = step+1 
-                else:
-                    step = 0
-                if step > 100: # 0.5 second
-                    success = 1
-                    break
-                
-                state_buffer.append(state)
-                action_buffer.append(action)
                 reward_buffer.append(reward)
                 if not isinstance(action, np.ndarray):
                     action = np.array([action])
@@ -549,27 +501,11 @@ def drone_test(eval_env, agent, max_steps, test_itr=10, record=False, log=False)
 
             eval_success += success
             eval_reward += total_rew
-            eval_position += np.mean(e_ps[-100:])
-            eval_angle += np.mean(e_as[-100:])
-            eval_vel += np.mean(e_vs[-100:])
-            eval_angvel += np.mean(e_ws[-100:])
+            infos.append(info)
 
-            if log:
-                print("%d iteration \n\
-                        reward %.3f\n\
-                        success %d\n\
-                        position error[m] %.3f\n\
-                        angle error[deg] %.3f"%(i_eval,total_rew,success, np.mean(e_ps[-100:]), np.rad2deg(np.mean(e_as[-100:]))))
-                print("EXECUTION TIME:", np.mean(time_buffer))
 
-    if log:
-        print("total average reward %.3f success rate %.2f"%(eval_reward / test_itr,eval_success / test_itr))
-        print("position error[m] %.3f angle error[deg] %.3f"%(eval_position / test_itr, np.rad2deg(eval_angle / test_itr)))
-    
     return eval_reward / test_itr, \
             eval_success / test_itr, \
-            eval_position / test_itr, \
-            eval_angle / test_itr, \
-            eval_vel / test_itr, \
-            eval_angvel / test_itr
+            infos
+
 

@@ -1,0 +1,391 @@
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.distributions import Normal
+import math
+from .initialize import *
+
+class PolicyNetworkBase(nn.Module):
+    """ Base network class for policy function """
+    def __init__(self, state_space, action_space, device):
+        super(PolicyNetworkBase, self).__init__()
+        self._state_space = state_space
+        self._state_shape = state_space.shape
+        if len(self._state_shape) == 1:
+            self._state_dim = self._state_shape[0]
+        else:  # high-dim state 
+            pass  
+        self._action_space = action_space
+        self._action_shape = action_space.shape
+        if len(self._action_shape) < 1:  # Discrete space
+            self._action_dim = action_space.n
+        else:
+            self._action_dim = self._action_shape[0]
+        
+
+        self.device = device
+
+    def forward(self):
+        pass
+    
+    def evaluate(self):
+        pass 
+    
+    def get_action(self):
+        pass
+
+    def sample_action(self,):
+        a=torch.FloatTensor(self._action_dim).uniform_(self._action_space.low, self._action_space.high)
+        return a.numpy()
+        
+class PolicyNetwork(PolicyNetworkBase):
+    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+        super().__init__(state_space, action_space, device)
+
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+
+        self.linear1 = nn.Linear(self._state_dim, hidden_size)
+        self.linear2 = nn.Linear(hidden_size, hidden_size)
+        self.linear3 = nn.Linear(hidden_size, hidden_size)
+
+        self.mean_linear = nn.Linear(hidden_size, self._action_dim)
+        self.mean_linear.weight.data.uniform_(-init_w, init_w)
+        self.mean_linear.bias.data.uniform_(-init_w, init_w)
+        
+        self.log_std_linear = nn.Linear(hidden_size, self._action_dim)
+        self.log_std_linear.weight.data.uniform_(-init_w, init_w)
+        self.log_std_linear.bias.data.uniform_(-init_w, init_w)
+
+        self.actf = actf
+        self.out_actf = out_actf
+        self.action_scale = action_scale
+        
+    def forward(self, state):
+        x = self.actf(self.linear1(state))
+        x = self.actf(self.linear2(x))
+        x = self.actf(self.linear3(x))
+        mean = self.mean_linear(x)
+        if not self.out_actf is None:
+            mean = self.out_actf(mean)
+        std = F.softplus(self.log_std_linear(x))
+        std = torch.clamp(std, self.log_std_min, self.log_std_max)
+
+        return self.action_scale * mean, self.action_scale * std
+    
+    def evaluate(self, state):
+        '''
+        generate action with state as input wrt the policy network, for calculating gradients
+        '''
+        num_batch = 1 if len(state.shape) < 2 else state.shape[0]
+        mean, std = self.forward(state)
+        
+        ''' add noise '''
+        normal = Normal(0, 1)
+        z = normal.sample((num_batch,1))
+        action_0 = mean + std * z.to(self.device)
+        action = action_0
+        
+        log_prob = Normal(mean, std).log_prob(action_0)
+        log_prob = log_prob.sum(dim=1, keepdim=True)
+
+        action = torch.clamp(action, -1.0, 1.0)
+
+        return action, log_prob, z, mean, std
+        
+    
+    def get_action(self, state):
+        '''
+        generate action for interaction with env
+        '''
+        num_batch = 1 if len(state.shape) < 2 else state.shape[0]
+        state = torch.FloatTensor(state).to(self.device)
+        mean, std = self.forward(state)
+        normal = Normal(0,1)
+        z = normal.sample((num_batch,1)).to(self.device)
+
+        action = (mean + std*z).detach().cpu().numpy()
+
+        return action
+
+class PolicyNetworkRNN(PolicyNetworkBase):
+    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2), rnn_dropout=0.5):
+        super().__init__(state_space, action_space, device)
+        
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+        
+        self.linear1 = nn.Linear(self._state_dim, hidden_size)
+        # self.linear2 = nn.Linear(hidden_size, hidden_size)
+        self.linear_rnn = nn.Linear(self._state_dim+self._action_dim, hidden_size)
+        self.rnn = nn.RNN(hidden_size, hidden_size, batch_first=True)
+        self.rnn_dropout = nn.Dropout(p=rnn_dropout)
+        self.linear3 = nn.Linear(2*hidden_size, hidden_size)
+        self.linear4 = nn.Linear(hidden_size, hidden_size)
+
+        self.mean_linear = nn.Linear(hidden_size, self._action_dim)
+        self.mean_linear.weight.data.uniform_(-init_w, init_w)
+        self.mean_linear.bias.data.uniform_(-init_w, init_w)
+        
+        self.log_std_linear = nn.Linear(hidden_size, self._action_dim)
+        self.log_std_linear.weight.data.uniform_(-init_w, init_w)
+        self.log_std_linear.bias.data.uniform_(-init_w, init_w)
+
+        self.actf = actf
+        self.out_actf = out_actf
+        self.action_scale = action_scale
+        
+    def forward(self, state, last_action, hidden_in):
+        assert state.shape[0]==last_action.shape[0], "Batch dimension is not matched, {}, {}".format(state.shape, last_action.shape)
+        if len(state.shape)==len(last_action.shape)+1:
+            last_action = last_action.unsqueeze(-1)
+        
+        if len(state.shape)==2:
+            B,L=state.shape[0],1
+        elif len(state.shape)==3:
+            B,L = state.shape[:2]
+        else:
+            assert True, "Something wrong"
+
+        fc_x = self.actf(self.linear1(state))  
+        # fc_x = F.relu(self.linear2(fc_x)) 
+        sa_cat = torch.cat([state,last_action], dim=-1)
+        rnn_x = self.actf(self.linear_rnn(sa_cat)).view(B,L,-1)
+        rnn_out, rnn_hidden = self.rnn(rnn_x, hidden_in)
+        rnn_x = self.rnn_dropout(rnn_out.contiguous().view(*fc_x.shape)) # Dropout for make RNN weaker
+        merged_x = torch.cat([fc_x, rnn_x],dim=-1)
+        x = self.actf(self.linear3(merged_x))
+        x = self.actf(self.linear4(x))
+        mean = self.mean_linear(x)
+        if not self.out_actf is None:
+            mean = self.out_actf(mean)
+        std = F.softplus(self.log_std_linear(x))
+        std = torch.clamp(std, self.log_std_min, self.log_std_max)
+
+        if not L==1:
+            mean = mean.view(B,L,-1)
+            std = std.view(B,L,-1)
+
+        return self.action_scale * mean, self.action_scale * std, rnn_hidden, rnn_out
+    
+    def evaluate(self, state, last_action, hidden_in, \
+                deterministic, eval_noise_scale):
+        '''
+        generate action with state as input wrt the policy network, for calculating gradients
+        '''
+        num_batch = 1 if len(state.shape) < 2 else state.shape[0]
+        mean, std, hidden_out, hidden_all = self.forward(state, last_action, hidden_in)
+        
+        ''' add noise '''
+        normal = Normal(0, 1)
+        z = normal.sample(std.shape)
+        action_0 = mean + std * z.to(self.device)
+        action = mean if deterministic else action_0
+        
+        log_prob = Normal(mean, std).log_prob(action_0)
+        log_prob = log_prob.sum(dim=1, keepdim=True)
+
+        eval_noise_clip = 2*eval_noise_scale
+        noise = normal.sample(action.shape) * eval_noise_scale
+        noise = torch.clamp(
+        noise,
+        -eval_noise_clip,
+        eval_noise_clip)
+        action = torch.clamp(action + noise.to(self.device), -1.0, 1.0)
+
+        return action, hidden_out, hidden_all, log_prob, z, mean, std
+        
+    
+    def get_action(self, state, last_action, hidden_in,\
+                    deterministic, explore_noise_scale):
+        '''
+        generate action for interaction with env
+        '''
+        num_batch = 1 if len(state.shape) < 2 else state.shape[0]
+        state = torch.FloatTensor(state).to(self.device)
+        last_action = torch.FloatTensor(last_action).to(self.device)
+        mean, std, hidden_out, hidden_all = self.forward(state, last_action, hidden_in)
+
+        # print("debug",state[0],hidden_in[0], mean[0], std[0])
+
+        normal = Normal(0,1)
+        z = normal.sample(std.shape).to(self.device)
+
+        action = mean.detach().cpu().numpy() if deterministic\
+                else (mean + std*z).detach().cpu().numpy()
+
+        # print("debug get action", mean.squeeze(), action)
+
+        ''' add noise '''
+        noise = normal.sample(action.shape) * explore_noise_scale
+        action = np.clip(action + noise.numpy(), -1.0, 1.0)
+
+        # last_action = last_action.detach().cpu().numpy()
+        # action = 4*(1/200)/0.15 * (action-last_action) + last_action
+
+        return action, hidden_out
+
+class PolicyNetworkLSTM(PolicyNetworkRNN):
+    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+        super().__init__(state_space, action_space, hidden_size, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
+        self.rnn = nn.LSTM(hidden_size, hidden_size, batch_first=True)
+
+class PolicyNetworkGRU(PolicyNetworkRNN):
+    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+        super().__init__(state_space, action_space, hidden_size, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
+        self.rnn = nn.GRU(hidden_size, hidden_size, batch_first=True)
+
+
+
+class PolicyNetworkGoalRNN(PolicyNetworkBase):
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.tanh ,out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2), rnn_dropout=0.5):
+        super().__init__(state_space, action_space, device)
+        self._goal_dim = goal_dim
+        
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+
+        self.batchnorm = batchnorm
+        if self.batchnorm:
+            self.bm_s = nn.BatchNorm1d(self._state_dim)
+            self.bm_g = nn.BatchNorm1d(self._goal_dim)
+        
+        self.linear1 = nn.Linear(self._state_dim+self._goal_dim, hidden_size)
+        # self.linear2 = nn.Linear(hidden_size, hidden_size)
+        self.linear_rnn = nn.Linear(self._state_dim+self._action_dim, hidden_size)
+        self.rnn = nn.RNN(hidden_size, hidden_size, batch_first=True)
+        self.rnn_dropout = nn.Dropout(p=rnn_dropout)
+        self.linear3 = nn.Linear(2*hidden_size, hidden_size)
+        self.linear4 = nn.Linear(hidden_size, hidden_size)
+
+        self.mean_linear = nn.Linear(hidden_size, self._action_dim)
+        self.mean_linear.weight.data.uniform_(-init_w, init_w)
+        self.mean_linear.bias.data.uniform_(-init_w, init_w)
+        
+        self.log_std_linear = nn.Linear(hidden_size, self._action_dim)
+        self.log_std_linear.weight.data.uniform_(-init_w, init_w)
+        self.log_std_linear.bias.data.uniform_(-init_w, init_w)
+
+        self.actf = actf
+        self.out_actf = out_actf
+        self.action_scale = action_scale
+        
+    def forward(self, state, last_action, hidden_in, goal):
+        assert state.shape[0]==last_action.shape[0], "Batch dimension is not matched, {}, {}".format(state.shape, last_action.shape)
+        if len(state.shape)==len(last_action.shape)+1:
+            last_action = last_action.unsqueeze(-1)
+        
+        if len(state.shape)==2:
+            B,L=state.shape[0],1
+        elif len(state.shape)==3:
+            B,L = state.shape[:2]
+        else:
+            assert True, "Something wrong"
+
+        if len(goal.shape)==2:
+            goal = goal[:,:self._goal_dim]
+        elif len(goal.shape)==3:
+            goal = goal[:,:,:self._goal_dim]
+        
+        if self.batchnorm:
+            s_shape, g_shape = state.shape, goal.shape
+            state = self.bm_s(state.view(B*L,-1)).view(*s_shape)
+            goal = self.bm_g(goal.view(B*L,-1)).view(*g_shape)
+
+        sg_cat = torch.cat([state,goal], dim=-1)
+        fc_x = self.actf(self.linear1(sg_cat))  
+        # fc_x = F.relu(self.linear2(fc_x)) 
+        sa_cat = torch.cat([state,last_action], dim=-1)
+        rnn_x = self.actf(self.linear_rnn(sa_cat)).view(B,L,-1)
+        rnn_out, rnn_hidden = self.rnn(rnn_x, hidden_in)
+        rnn_x = self.rnn_dropout(rnn_out.contiguous().view(*fc_x.shape))
+        merged_x = torch.cat([fc_x, rnn_x],dim=-1)
+        x = self.actf(self.linear3(merged_x))
+        x = self.actf(self.linear4(x))
+        mean = self.mean_linear(x)
+        if not self.out_actf is None:
+            mean = self.out_actf(mean)
+        std = F.softplus(self.log_std_linear(x))
+        std = torch.clamp(std, self.log_std_min, self.log_std_max)
+
+        if not L==1:
+            mean = mean.view(B,L,-1)
+            std = std.view(B,L,-1)
+
+        return self.action_scale * mean, self.action_scale * std, rnn_hidden, rnn_out
+    
+    def evaluate(self, state, last_action, hidden_in, goal,\
+                deterministic, eval_noise_scale):
+        '''
+        generate action with state as input wrt the policy network, for calculating gradients
+        '''
+        num_batch = 1 if len(state.shape) < 2 else state.shape[0]
+        mean, std, hidden_out, hidden_all = self.forward(state, last_action, hidden_in, goal)
+        
+        ''' add noise '''
+        normal = Normal(0, 1)
+        z = normal.sample(std.shape)
+        action_0 = mean + std * z.to(self.device)
+        action = mean if deterministic else action_0
+        
+        log_prob = Normal(mean, std).log_prob(action_0)
+        log_prob = log_prob.sum(dim=1, keepdim=True)
+
+        eval_noise_clip = 2*eval_noise_scale
+        noise = normal.sample(action.shape) * eval_noise_scale
+        noise = torch.clamp(
+        noise,
+        -eval_noise_clip,
+        eval_noise_clip)
+        action = torch.clamp(action + noise.to(self.device), -1.0, 1.0)
+
+        return action, hidden_out, hidden_all, log_prob, z, mean, std
+        
+    
+    def get_action(self, state, last_action, hidden_in, goal,\
+                    deterministic, explore_noise_scale):
+        '''
+        generate action for interaction with env
+        '''
+        self.eval()
+        num_batch = 1 if len(state.shape) < 2 else state.shape[0]
+        state = torch.FloatTensor(state).to(self.device)
+        last_action = torch.FloatTensor(last_action).to(self.device)
+        goal = torch.FloatTensor(goal).to(self.device)
+        mean, std, hidden_out, hidden_all = self.forward(state, last_action, hidden_in, goal)
+
+        # print("debug",state[0],hidden_in[0], mean[0], std[0])
+
+        normal = Normal(0,1)
+        z = normal.sample(std.shape).to(self.device)
+
+        action = mean.detach().cpu().numpy() if deterministic\
+                else (mean + std*z).detach().cpu().numpy()
+
+        # print("debug get action", mean.squeeze(), action)
+
+        ''' add noise '''
+        eval_noise_clip = 2*explore_noise_scale
+        noise = normal.sample(action.shape) * explore_noise_scale
+        noise = torch.clamp(
+        noise,
+        -eval_noise_clip,
+        eval_noise_clip)
+        action = np.clip(action + noise.numpy(), -1.0, 1.0)
+        self.train()
+
+        # last_action = last_action.detach().cpu().numpy()
+        # action = 4*(1/200)/0.15 * (action-last_action) + last_action
+
+        return action, hidden_out
+
+class PolicyNetworkGoalLSTM(PolicyNetworkGoalRNN):
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+        super().__init__(state_space, action_space, hidden_size, goal_dim, device, batchnorm=batchnorm, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
+        self.rnn = nn.LSTM(hidden_size, hidden_size, batch_first=True)
+
+class PolicyNetworkGoalGRU(PolicyNetworkGoalRNN):
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+        super().__init__(state_space, action_space, hidden_size, goal_dim, device, batchnorm=batchnorm, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
+        self.rnn = nn.GRU(hidden_size, hidden_size, batch_first=True)

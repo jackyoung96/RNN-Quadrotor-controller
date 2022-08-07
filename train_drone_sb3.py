@@ -1,24 +1,16 @@
-from email import policy
-from turtle import write_docstringdict
+
 import numpy as np
-from collections import deque
 import torch
-import torch.nn.functional as F
 
 from td3.td3 import *
 from td3.common.buffers import *
-from td3.agent import td3_agent
 from envs.customEnv import dynRandeEnv
-from utils import wandb_artifact
 
 import argparse
-from pyvirtualdisplay import Display
 import os
-from torch.utils.tensorboard import SummaryWriter
 import wandb
 from wandb.sdk.lib import telemetry as wb_telemetry
 from datetime import datetime
-from copy import deepcopy
 
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, VecVideoRecorder
 from stable_baselines3.common.monitor import Monitor
@@ -26,11 +18,6 @@ from stable_baselines3.common.callbacks import BaseCallback
 from gym_pybullet_drones.envs.BaseAviary import DroneModel
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 
-from time import time
-
-# stable baseline 3
-from wandb.integration.sb3 import WandbCallback
-import stable_baselines3 as SB3
 from stable_baselines3 import SAC, TD3, PPO
 # from sb3_contrib import RecurrentPPO
 
@@ -40,11 +27,11 @@ from stable_baselines3 import SAC, TD3, PPO
 
 dyn_range = {
     # drones
-    'mass_range': 0.1, # (1-n) ~ (1+n)
-    'cm_range': 0.05, # (1-n) ~ (1+n)
-    'kf_range': 0.1, # (1-n) ~ (1+n)
-    'km_range': 0.1, # (1-n) ~ (1+n)
-    'i_range': 0.1,
+    'mass_range': 0.3, # (1-n) ~ (1+n)
+    'cm_range': 0.3, # (1-n) ~ (1+n)
+    'kf_range': 0.3, # (1-n) ~ (1+n)
+    'km_range': 0.3, # (1-n) ~ (1+n)
+    'i_range': 0.3,
     't_range': 0.3,
     'battery_range': 0.0 # (1-n) ~ (1)
 }
