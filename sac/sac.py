@@ -25,7 +25,7 @@ from time import time
 
 
 class SAC_Trainer():
-    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, action_scale=1.0,out_actf=None, device='cpu', target_update_interval=2,**kwargs):
+    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, action_scale=1.0, out_actf=F.tanh, device='cpu', target_update_interval=2,**kwargs):
         self.replay_buffer = replay_buffer
         self.device = device
         self.state_space = state_space
@@ -36,7 +36,7 @@ class SAC_Trainer():
         self.q_net2 = QNetwork(state_space, action_space, 128).to(self.device)
         self.target_q_net1 = QNetwork(state_space, action_space, 128).to(self.device)
         self.target_q_net2 = QNetwork(state_space, action_space, 128).to(self.device)
-        policy_actf = kwargs.get('policy_actf', F.tanh)
+        policy_actf = kwargs.get('activation', F.relu)
         self.policy_net = PolicyNetwork(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
         self.target_policy_net = PolicyNetwork(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
         self.behavior_net = PolicyNetwork(state_space, action_space, hidden_dim, device, policy_actf, out_actf, action_scale).to(self.device)
@@ -47,8 +47,8 @@ class SAC_Trainer():
         self.target_policy_net = self.target_ini(self.policy_net, self.target_policy_net)
         
 
-        q_lr = kwargs.get('q_lr',1e-3)
-        policy_lr = kwargs.get('policy_lr',1e-4)
+        lr = kwargs.get('learning_rate',1e-4)
+        self.lr = lr
         weight_decay = kwargs.get('weight_decay',1e-4)
 
         # Entropy coeff
@@ -58,15 +58,15 @@ class SAC_Trainer():
         self.update_cnt = 0
         self.target_update_interval = target_update_interval
 
-        self.q_optimizer1 = optim.Adam(self.q_net1.parameters(), lr=q_lr, weight_decay=weight_decay)
-        self.q_optimizer2 = optim.Adam(self.q_net2.parameters(), lr=q_lr, weight_decay=weight_decay)
-        self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr, weight_decay=weight_decay)
+        self.q_optimizer1 = optim.Adam(self.q_net1.parameters(), lr=lr, weight_decay=weight_decay)
+        self.q_optimizer2 = optim.Adam(self.q_net2.parameters(), lr=lr, weight_decay=weight_decay)
+        self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=lr, weight_decay=weight_decay)
 
         if self.lr_scheduler:
             t_max = kwargs.get('t_max', 1000)
-            self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
-            self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=q_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
-            self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=policy_lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+            self.scheduler_q1 = CyclicLR(self.q_optimizer1, base_lr=1e-7, max_lr=lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+            self.scheduler_q2 = CyclicLR(self.q_optimizer2, base_lr=1e-7, max_lr=lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
+            self.scheduler_policy = CyclicLR(self.policy_optimizer, base_lr=1e-7, max_lr=lr, step_size_up=t_max, step_size_down=None, verbose=False, cycle_momentum=False, mode='triangular2')
 
         self.reward_norm = kwargs.get('reward_norm', False)
 
@@ -75,7 +75,7 @@ class SAC_Trainer():
 
         init_value = 1.0
         self.log_ent_coef = torch.log(torch.ones(1, device=self.device) * init_value).requires_grad_(True)
-        self.ent_coef_optimizer = torch.optim.Adam([self.log_ent_coef], lr=self.lr_schedule(1))
+        self.ent_coef_optimizer = torch.optim.Adam([self.log_ent_coef], lr=self.lr)
 
     def target_ini(self, net, target_net):
         for target_param, param in zip(target_net.parameters(), net.parameters()):
@@ -92,11 +92,7 @@ class SAC_Trainer():
         return target_net
 
     def get_action(self, state, last_action, **kwargs):
-        if not self.is_behavior:
-            return self.policy_net.get_action(state, last_action, **kwargs)
-        else:
-            # kwargs['explore_noise_scale'] = 0.0
-            return self.behavior_net.get_action(state, last_action, **kwargs)
+        return self.policy_net.get_action(state)
     
     def update(self, batch_size, gamma=0.99,soft_tau=1e-3):
         state, action, reward, next_state, done = self.replay_buffer.sample(batch_size)

@@ -112,10 +112,10 @@ def sac_agent(env,
     elif rnn == "None":
         replay_buffer = ReplayBuffer(replay_buffer_size, **hparam)
         td3_trainer = SAC_Trainer(replay_buffer,
-                    env.env.observation_space, 
-                    env.env.action_space, 
+                    env.observation_space, 
+                    env.action_space, 
                     out_actf=F.tanh,
-                    action_scale=1.0 if 'aviary' in env.env_name else 10.0,
+                    action_scale=1.0,
                     device=device, 
                     **hparam)
     else:

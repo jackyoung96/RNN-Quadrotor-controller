@@ -456,7 +456,7 @@ def drone_test(eval_env, agent, max_steps, test_itr=10):
     with torch.no_grad():
         for i_eval in range(test_itr):
 
-            state, param = eval_env.reset()
+            state = eval_env.reset()
             total_rew = 0
             last_action = eval_env.action_space.sample()[None,:]
             last_action = -np.ones_like(last_action)
@@ -488,8 +488,7 @@ def drone_test(eval_env, agent, max_steps, test_itr=10):
                                                             hidden_in, 
                                                             goal=goal)
                 else:
-                    action = agent.policy_net.get_action(state, 
-                                                        last_action)
+                    action = agent.policy_net.get_action(state)
 
                 next_state, reward, done, info = eval_env.step(action)
 

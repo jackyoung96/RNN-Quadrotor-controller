@@ -13,19 +13,18 @@ class ReplayBuffer:
         self.buffer = []
         self.position = 0
 
-    def push(self, state, action, last_action, reward, next_state, done, param):
+    def push(self, state, action, last_action, reward, next_state, done):
         if len(self.buffer) < self.capacity:
             self.buffer.append(None)
         self.buffer[self.position] = (state, action, last_action, reward, next_state, done)
         self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
 
-    def push_batch(self, state, action, last_action, reward, next_state, done, param):
-        np.stack(last_action,axis=1)
+    def push_batch(self, state, action, last_action, reward, next_state, done):
         state, action, last_action, reward, next_state, done = \
-            map(lambda x: np.concatenate(x, axis=0),[state, action, last_action, reward, next_state, done])
+            map(lambda x: np.stack(x, axis=0),[state, action, last_action, reward, next_state, done])
         assert all(state.shape[0] == x.shape[0] for x in [action, last_action, reward, next_state, done]), "Somethings wrong on dimension"
         for s,a,la,r,ns,d in zip(state, action, last_action, reward, next_state, done):
-            self.push(s,a,la,r,ns,d,None)
+            self.push(s,a,la,r,ns,d)
 
     def sample(self, batch_size):
         s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst=[],[],[],[],[],[]

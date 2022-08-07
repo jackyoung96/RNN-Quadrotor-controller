@@ -33,7 +33,7 @@ dyn_range = {
 hparam_set = {
     "learning_rate": (np.random.uniform,[1e-4,1e-4]),
     "learning_starts": (np.random.randint,[80000,80001]),
-    "activation": (np.random.choice, [[torch.nn.ReLU]]),
+    "activation": (np.random.choice, [[F.relu]]),
 
     # SAC, TD3
     "update_itr": (np.random.randint,[10,11]),
@@ -65,7 +65,7 @@ def train(args, hparam):
     writer_interval = 500
     eval_interval = 500
     model_save_interval = 500
-    learning_start = 80000
+    learning_start = hparam['learning_starts'] // max_steps
 
     # hparam['learning_rate'] = 10**hparam['learning_rate']
     hparam['hidden_dim'] = int(2**hparam['hidden_dim'])
@@ -155,7 +155,7 @@ def train(args, hparam):
 
     for i_episode in range(1,max_episodes+1):
         
-        state, param = env.reset()
+        state = env.reset()
         last_action = -np.ones(env.action_space.shape)[None,:]
         episode_state = []
         episode_action = []
@@ -192,17 +192,20 @@ def train(args, hparam):
                                 last_action, 
                                 hidden_in)
             next_state, reward, done, info = env.step(action) 
+            if not isinstance(reward, np.ndarray):
+                reward = np.array([reward])
+            if not isinstance(done, np.ndarray):
+                done = np.array([done])
 
             episode_state.append(state)
-            episode_action.append(action)
-            episode_last_action.append(last_action)
+            episode_action.append(action[0])
+            episode_last_action.append(last_action[0])
             episode_reward.append(reward)
             episode_next_state.append(next_state)
             episode_done.append(done)
 
             state = next_state
             last_action = action
-            frame_idx += 1
 
         episode_done[-1] = np.ones_like(episode_done[-1])
         
@@ -223,8 +226,7 @@ def train(args, hparam):
                             episode_last_action,
                             episode_reward, 
                             episode_next_state, 
-                            episode_done,
-                            param)
+                            episode_done)
 
         # Update TD3 trainer
         if i_episode > learning_start:
@@ -264,7 +266,7 @@ def train(args, hparam):
 
         if i_episode % eval_interval == 0 and i_episode != 0:
             trainer.policy_net.eval()
-            eval_rew, eval_success, infos = drone_test(eval_env, agent=trainer, max_steps=eval_max_steps, test_itr=50, record=False)
+            eval_rew, eval_success, infos = drone_test(eval_env, agent=trainer, max_steps=max_steps, test_itr=50)
             trainer.policy_net.train()
 
             eval_log = {}
@@ -351,6 +353,8 @@ if __name__=='__main__':
 
     # Common arguments
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
+    parser.add_argument('--rnn', choices=['None','RNN2','GRU2','LSTM2',
+                                                'RNN3','GRU3','LSTM3'])
 
     # Arguments for training 
     parser.add_argument('--tb_log', action='store_true', help="Tensorboard logging")
