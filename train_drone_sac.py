@@ -286,6 +286,8 @@ def train(args, hparam):
         ########################################
 
         if i_episode % model_save_interval == 0 and i_episode != 0:
+            if not os.path.isdir(savepath):
+                os.makedirs(savepath)
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
             path = os.path.join(savepath,"iter%07d"%i_episode)
             trainer.save_model(path)
