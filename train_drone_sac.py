@@ -102,7 +102,7 @@ def train(args, hparam):
     if args.tb_log:
         # wandb
         run = wandb.init(project="SAC-drone-final", config=hparam,
-                        sync_tensorboard=True,
+                        # sync_tensorboard=True,
                         save_code=True,
                         monitor_gym=True,)
         wandb.run.name = "%s_%s"%(algorithm_name, now)
@@ -249,15 +249,15 @@ def train(args, hparam):
         ##########################################
 
         if args.tb_log and i_episode % writer_interval == 0:
-            wandb.log({'loss/loss_p':np.mean(loss_storage['policy_loss']),
-                        'loss/loss_q_1': np.mean(loss_storage['q_loss_1']),
-                        'loss/loss_q_2': np.mean(loss_storage['q_loss_2']),
-                        'rewards': np.mean(scores_window)}, step=i_episode)
-            
             rollout_log = {}
             for key,item in info.items():
                 # Last 100 steps average states (pos, attitude, vel, ang vel)
                 rollout_log['rollout/%s'%key] = item
+            rollout_log.update({'loss/loss_p':np.mean(loss_storage['policy_loss']),
+                        'loss/loss_q_1': np.mean(loss_storage['q_loss_1']),
+                        'loss/loss_q_2': np.mean(loss_storage['q_loss_2']),
+                        'rollout/rewards': np.mean(scores_window)})
+            rollout_log['global_step'] = i_episode * max_steps
             wandb.log(rollout_log, step=i_episode)
 
         ######################################
@@ -277,6 +277,7 @@ def train(args, hparam):
                 eval_log[key] = item / len(infos)
             eval_log.update({'eval/reward':eval_rew,
                             'eval/success_rate':eval_success})
+            eval_log['global_step'] = i_episode * max_steps
 
             if args.tb_log:
                 wandb.log(eval_log, step=i_episode)
