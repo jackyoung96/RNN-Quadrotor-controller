@@ -32,7 +32,7 @@ dyn_range = {
 
 hparam_set = {
     "learning_rate": (np.random.uniform,[1e-4,1e-4]),
-    "learning_starts": (np.random.randint,[80000,80001]),
+    "learning_starts": (np.random.randint,[8000,8001]),
     "activation": (np.random.choice, [[F.relu]]),
 
     # SAC, TD3
