@@ -60,12 +60,14 @@ def train(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(12500)
+    max_episodes  = int(25000)
     max_steps = hparam['max_steps']
     writer_interval = 500
     eval_interval = 500
     model_save_interval = 500
     learning_start = hparam['learning_starts'] // max_steps
+    if args.rnn == 'None':
+        hparam['gradient_steps'] = hparam['gradient_steps'] * max_steps
 
     # hparam['learning_rate'] = 10**hparam['learning_rate']
     hparam['hidden_dim'] = int(2**hparam['hidden_dim'])
@@ -303,9 +305,9 @@ def train(args, hparam):
     wandb.save(path+"'_policy.pt'", base_path=savepath)
     print('\rFinal\tAverage Score: {:.2f}'.format(np.mean(scores_window)))
 
-    envs.close()
+    env.close()
     eval_env.close()
-    del envs, eval_env
+    del env, eval_env
     
     return mean_rewards, loss_storage, eval_rew, eval_success, dtime
 
