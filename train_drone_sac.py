@@ -62,7 +62,7 @@ def train(args, hparam):
 
     max_episodes  = int(25000)
     max_steps = hparam['max_steps']
-    writer_interval = 500
+    writer_interval = 20
     eval_interval = 500
     model_save_interval = 500
     learning_start = hparam['learning_starts'] // max_steps
