@@ -126,8 +126,8 @@ class SAC_Trainer():
         predicted_q_value2 = self.q_net2(state, action)
 
         # Critic update
-        q_value_loss1 = F.mse_loss(predicted_q_value1 - target_q_value.detach()) / 2  # detach: no gradients for the variable
-        q_value_loss2 = F.mse_loss(predicted_q_value2 - target_q_value.detach()) / 2  
+        q_value_loss1 = F.mse_loss(predicted_q_value1, target_q_value.detach()) / 2  # detach: no gradients for the variable
+        q_value_loss2 = F.mse_loss(predicted_q_value2, target_q_value.detach()) / 2  
         self.q_optimizer1.zero_grad()
         q_value_loss1.backward()
         self.q_optimizer1.step()
