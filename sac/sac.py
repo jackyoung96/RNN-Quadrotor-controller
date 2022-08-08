@@ -100,10 +100,14 @@ class SAC_Trainer():
         state      = torch.FloatTensor(state).to(self.device)
         next_state = torch.FloatTensor(next_state).to(self.device)
         action     = torch.FloatTensor(action).to(self.device)
+        reward     = torch.FloatTensor(reward).to(self.device)  # reward is single value, unsqueeze() to add one dim to be [reward] at the sample dim;
+        done       = torch.FloatTensor(np.float32(done)).to(self.device)
         if len(state.shape)==len(action.shape)+1:
             action = action.unsqueeze(-1)
-        reward     = torch.FloatTensor(reward).unsqueeze(1).to(self.device)  # reward is single value, unsqueeze() to add one dim to be [reward] at the sample dim;
-        done       = torch.FloatTensor(np.float32(done)).unsqueeze(1).to(self.device)
+        if len(state.shape)==len(reward.shape)+1:
+            reward = reward.unsqueeze(-1)
+        if len(state.shape)==len(done.shape)+1:
+            done = done.unsqueeze(-1)
 
         new_action, log_prob, *_ = self.policy_net.evaluate(state)
 
