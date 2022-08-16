@@ -32,7 +32,7 @@ dyn_range = {
 
 hparam_set = {
     "learning_rate": (np.random.uniform,[1e-4,1e-4]),
-    "learning_starts": (np.random.randint,[8000,8001]),
+    "learning_starts": (np.random.randint,[80000,80001]),
     "activation": (np.random.choice, [[F.relu]]),
 
     # SAC, TD3
@@ -52,7 +52,7 @@ hparam_set = {
     "gradient_steps": (np.random.randint,[1,2]),
 }
 
-def train(args, hparam):
+def main(args, hparam):
 
     global dyn_range
 
@@ -123,7 +123,7 @@ def train(args, hparam):
     # Define environment and agent #####
     ####################################
 
-    env, eval_env = [dynRandeEnv(
+    env = dynRandeEnv(
         initial_xyzs=np.array([[0,0,10000.0]]),
         initial_rpys=np.array([[0,0,0]]),
         observable=observable,
@@ -138,219 +138,272 @@ def train(args, hparam):
         record=False,
         wandb_render=True,
         is_noise=not args.no_random,
-    ) for _ in range(2)]
+    )
+    eval_env = dynRandeEnv(
+        initial_xyzs=np.array([[0,0,10000.0]]),
+        initial_rpys=np.array([[0,0,0]]),
+        observable=observable,
+        dyn_range={}, # No dynamic randomization for evaluation env
+        rpy_noise=2*np.pi,
+        vel_noise=1,
+        angvel_noise=np.pi,
+        reward_coeff=rew_coeff,
+        frame_stack=1,
+        episode_len_sec=max_steps/100,
+        gui=args.render,
+        record=False,
+        wandb_render=True,
+        is_noise=not args.no_random,
+    )
     trainer = sac_agent(env=env,
                 rnn=args.rnn,
                 device=device,
                 hparam=hparam,
                 replay_buffer_size=replay_buffer_size)
-
-    # keep track of progress
-    mean_rewards = []
-    scores_window = deque(maxlen=100)
-    
-    loss_storage = {"policy_loss":deque(maxlen=writer_interval),
-                    "q_loss_1":deque(maxlen=writer_interval),
-                    "q_loss_2":deque(maxlen=writer_interval),
-                    'param_loss':deque(maxlen=writer_interval)}
-
-
-    for i_episode in range(1,max_episodes+1):
+    if args.test == 0:
+        # keep track of progress
+        mean_rewards = []
+        scores_window = deque(maxlen=100)
         
-        state = env.reset()
-        last_action = -np.ones(env.action_space.shape)[None,:]
-        episode_state = []
-        episode_action = []
-        episode_last_action = []
-        episode_reward = []
-        episode_next_state = []
-        episode_done = []
-        if "LSTM" in args.rnn:
-            hidden_out = (torch.zeros([1, 1, policy_dim], dtype=torch.float).to(device), \
-                        torch.zeros([1, 1, policy_dim], dtype=torch.float).to(device))  # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
-        else:
-            hidden_out = torch.zeros([1, 1, policy_dim], dtype=torch.float).to(device)
+        loss_storage = {"policy_loss":deque(maxlen=writer_interval),
+                        "q_loss_1":deque(maxlen=writer_interval),
+                        "q_loss_2":deque(maxlen=writer_interval),
+                        'param_loss':deque(maxlen=writer_interval)}
 
-        policy_loss = []
-        q_loss_1,q_loss_2,param_loss = [],[],[]
 
-        for ep_step in range(max_steps):
-            hidden_in = hidden_out
-            if args.rnn == "None":
-                action = \
-                    trainer.get_action(state, last_action)
-                hidden_in = hidden_out = None
-            elif args.rnn in ["RNNHER", "LSTMHER","GRUHER"]:
-                raise NotImplementedError
-                action, hidden_out = \
+        for i_episode in range(1,max_episodes+1):
+            
+            state = env.reset()
+            last_action = -np.ones(env.action_space.shape)[None,:]
+            episode_state = []
+            episode_action = []
+            episode_last_action = []
+            episode_reward = []
+            episode_next_state = []
+            episode_done = []
+            if "LSTM" in args.rnn:
+                hidden_out = (torch.zeros([1, 1, policy_dim], dtype=torch.float).to(device), \
+                            torch.zeros([1, 1, policy_dim], dtype=torch.float).to(device))  # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
+            else:
+                hidden_out = torch.zeros([1, 1, policy_dim], dtype=torch.float).to(device)
+
+            policy_loss = []
+            q_loss_1,q_loss_2,param_loss = [],[],[]
+
+            for ep_step in range(max_steps):
+                hidden_in = hidden_out
+                if args.rnn == "None":
+                    action = \
+                        trainer.get_action(state, last_action)
+                    hidden_in = hidden_out = None
+                elif args.rnn in ["RNNHER", "LSTMHER","GRUHER"]:
+                    raise NotImplementedError
+                    action, hidden_out = \
+                            trainer.get_action(state, 
+                                        last_action, 
+                                        hidden_in,
+                                        goal=goal)
+                else:
+                    raise NotImplementedError
+                    action, hidden_out = \
                         trainer.get_action(state, 
                                     last_action, 
-                                    hidden_in,
-                                    goal=goal)
-            else:
+                                    hidden_in)
+                next_state, reward, done, info = env.step(action) 
+                if not isinstance(reward, np.ndarray):
+                    reward = np.array([reward])
+                if not isinstance(done, np.ndarray):
+                    done = np.array([done])
+
+                episode_state.append(state)
+                episode_action.append(action[0])
+                episode_last_action.append(last_action[0])
+                episode_reward.append(reward)
+                episode_next_state.append(next_state)
+                episode_done.append(done)
+
+                state = next_state
+                last_action = action
+
+            episode_done[-1] = np.ones_like(episode_done[-1])
+            
+            # Push into Experience replay buffer
+            if args.rnn in ["RNNHER","LSTMHER","GRUHER"]:
                 raise NotImplementedError
-                action, hidden_out = \
-                    trainer.get_action(state, 
-                                last_action, 
-                                hidden_in)
-            next_state, reward, done, info = env.step(action) 
-            if not isinstance(reward, np.ndarray):
-                reward = np.array([reward])
-            if not isinstance(done, np.ndarray):
-                done = np.array([done])
+                trainer.replay_buffer.push_batch(episode_state, 
+                                episode_action, 
+                                episode_last_action,
+                                episode_reward, 
+                                episode_next_state, 
+                                episode_done,
+                                param,
+                                goal)
+            else:           
+                trainer.replay_buffer.push_batch(episode_state, 
+                                episode_action, 
+                                episode_last_action,
+                                episode_reward, 
+                                episode_next_state, 
+                                episode_done)
 
-            episode_state.append(state)
-            episode_action.append(action[0])
-            episode_last_action.append(last_action[0])
-            episode_reward.append(reward)
-            episode_next_state.append(next_state)
-            episode_done.append(done)
-
-            state = next_state
-            last_action = action
-
-        episode_done[-1] = np.ones_like(episode_done[-1])
-        
-        # Push into Experience replay buffer
-        if args.rnn in ["RNNHER","LSTMHER","GRUHER"]:
-            raise NotImplementedError
-            trainer.replay_buffer.push_batch(episode_state, 
-                            episode_action, 
-                            episode_last_action,
-                            episode_reward, 
-                            episode_next_state, 
-                            episode_done,
-                            param,
-                            goal)
-        else:           
-            trainer.replay_buffer.push_batch(episode_state, 
-                            episode_action, 
-                            episode_last_action,
-                            episode_reward, 
-                            episode_next_state, 
-                            episode_done)
-
-        # Update TD3 trainer
-        if i_episode > learning_start:
-            for _ in range(gradient_steps):
-                loss_dict = trainer.update(batch_size)
-                policy_loss.append(loss_dict['policy_loss'])
-                q_loss_1.append(loss_dict['q_loss_1'])
-                q_loss_2.append(loss_dict['q_loss_2'])
+            # Update TD3 trainer
+            if i_episode > learning_start:
+                for _ in range(gradient_steps):
+                    loss_dict = trainer.update(batch_size)
+                    policy_loss.append(loss_dict['policy_loss'])
+                    q_loss_1.append(loss_dict['q_loss_1'])
+                    q_loss_2.append(loss_dict['q_loss_2'])
 
 
-        loss_storage['policy_loss'].append(np.mean(policy_loss))
-        loss_storage['q_loss_1'].append(np.mean(q_loss_1))
-        loss_storage['q_loss_2'].append(np.mean(q_loss_2))
-        rewards = np.sum(episode_reward)
-        mean_rewards.append(rewards)
-        scores_window.append(rewards)
+            loss_storage['policy_loss'].append(np.mean(policy_loss))
+            loss_storage['q_loss_1'].append(np.mean(q_loss_1))
+            loss_storage['q_loss_2'].append(np.mean(q_loss_2))
+            rewards = np.sum(episode_reward)
+            mean_rewards.append(rewards)
+            scores_window.append(rewards)
 
-        ##########################################
-        ## Tensorboard & WandB writing ###########
-        ##########################################
+            ##########################################
+            ## Tensorboard & WandB writing ###########
+            ##########################################
 
-        if args.tb_log and i_episode % writer_interval == 0:
-            rollout_log = {}
-            for key,item in info.items():
-                # Last 100 steps average states (pos, attitude, vel, ang vel)
-                rollout_log['rollout/%s'%key] = item
-            rollout_log.update({'loss/loss_p':np.mean(loss_storage['policy_loss']),
-                        'loss/loss_q_1': np.mean(loss_storage['q_loss_1']),
-                        'loss/loss_q_2': np.mean(loss_storage['q_loss_2']),
-                        'rollout/rewards': np.mean(scores_window)})
-            rollout_log['global_step'] = i_episode * max_steps
-            wandb.log(rollout_log, step=i_episode)
-
-        ######################################
-        ### Evaluation #######################
-        ######################################
-
-        if i_episode % eval_interval == 0 and i_episode != 0:
-            trainer.policy_net.eval()
-            eval_rew, eval_success, infos = drone_test(eval_env, agent=trainer, max_steps=max_steps, test_itr=50)
-            trainer.policy_net.train()
-
-            eval_log = {}
-            for info in infos:
+            if args.tb_log and i_episode % writer_interval == 0:
+                rollout_log = {}
                 for key,item in info.items():
-                    eval_log['eval/%s'%key] = eval_log.get('eval/%s'%key, 0) + item
-            for key,item in eval_log.items():
-                eval_log[key] = item / len(infos)
-            eval_log.update({'eval/reward':eval_rew,
-                            'eval/success_rate':eval_success})
-            eval_log['global_step'] = i_episode * max_steps
+                    # Last 100 steps average states (pos, attitude, vel, ang vel)
+                    rollout_log['rollout/%s'%key] = item
+                rollout_log.update({'loss/loss_p':np.mean(loss_storage['policy_loss']),
+                            'loss/loss_q_1': np.mean(loss_storage['q_loss_1']),
+                            'loss/loss_q_2': np.mean(loss_storage['q_loss_2']),
+                            'rollout/rewards': np.mean(scores_window)})
+                rollout_log['global_step'] = i_episode * max_steps
+                wandb.log(rollout_log, step=i_episode)
 
-            if args.tb_log:
-                wandb.log(eval_log, step=i_episode)
+            ######################################
+            ### Evaluation #######################
+            ######################################
 
-        ########################################
-        ### Model save #########################
-        ########################################
+            if i_episode % eval_interval == 0 and i_episode != 0:
+                trainer.policy_net.eval()
+                eval_rew, eval_success, infos = drone_test(eval_env, agent=trainer, max_steps=max_steps, test_itr=50)
+                trainer.policy_net.train()
 
-        if i_episode % model_save_interval == 0 and i_episode != 0:
-            if not os.path.isdir(savepath):
-                os.makedirs(savepath)
-            print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
-            path = os.path.join(savepath,"iter%07d"%i_episode)
-            trainer.save_model(path)
-            wandb.save(path+"'_q1.pt'", base_path=savepath)
-            wandb.save(path+"'_q2.pt'", base_path=savepath)
-            wandb.save(path+"'_policy.pt'", base_path=savepath)
+                eval_log = {}
+                for info in infos:
+                    for key,item in info.items():
+                        eval_log['eval/%s'%key] = eval_log.get('eval/%s'%key, 0) + item
+                for key,item in eval_log.items():
+                    eval_log[key] = item / len(infos)
+                eval_log.update({'eval/reward':eval_rew,
+                                'eval/success_rate':eval_success})
+                eval_log['global_step'] = i_episode * max_steps
 
-    path = os.path.join(savepath,"final")
-    trainer.save_model(path)
-    wandb.save(path+"'_q1.pt'", base_path=savepath)
-    wandb.save(path+"'_q2.pt'", base_path=savepath)
-    wandb.save(path+"'_policy.pt'", base_path=savepath)
-    print('\rFinal\tAverage Score: {:.2f}'.format(np.mean(scores_window)))
+                if args.tb_log:
+                    wandb.log(eval_log, step=i_episode)
 
-    env.close()
-    eval_env.close()
-    del env, eval_env
+            ########################################
+            ### Model save #########################
+            ########################################
+
+            if i_episode % model_save_interval == 0 and i_episode != 0:
+                if not os.path.isdir(savepath):
+                    os.makedirs(savepath)
+                print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
+                path = os.path.join(savepath,"iter%07d"%i_episode)
+                trainer.save_model(path)
+                wandb.save(path+"'_q1.pt'", base_path=savepath)
+                wandb.save(path+"'_q2.pt'", base_path=savepath)
+                wandb.save(path+"'_policy.pt'", base_path=savepath)
+
+        path = os.path.join(savepath,"final")
+        trainer.save_model(path)
+        wandb.save(path+"'_q1.pt'", base_path=savepath)
+        wandb.save(path+"'_q2.pt'", base_path=savepath)
+        wandb.save(path+"'_policy.pt'", base_path=savepath)
+        print('\rFinal\tAverage Score: {:.2f}'.format(np.mean(scores_window)))
+
+        env.close()
+        eval_env.close()
+        del env, eval_env
+        
+        return mean_rewards, loss_storage, eval_rew, eval_success, dtime
     
-    return mean_rewards, loss_storage, eval_rew, eval_success, dtime
+    else:
+        # Test code
+        max_steps = 1400
+        eval_env = dynRandeEnv(
+            initial_xyzs=np.array([[0,0,10000.0]]),
+            initial_rpys=np.array([[0,0,0]]),
+            observable=observable,
+            dyn_range={}, # No dynamic randomization for evaluation env
+            rpy_noise=2*np.pi,
+            vel_noise=1,
+            angvel_noise=np.pi,
+            reward_coeff=rew_coeff,
+            frame_stack=1,
+            episode_len_sec=max_steps/100,
+            gui=args.render,
+            record=False,
+            wandb_render=True,
+            is_noise=not args.no_random,
+        )
+        trainer.load_model(args.path)
+        total_info = []
 
-def test(args, hparam):
-    if args.record:
-        disp = Display(visible=False, size=(100, 60))
-        disp.start()
-    env_name = "takeoff-aviary-v0"
-    max_steps = 300
-    
-    device=torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
-    print("Device:",device)
+        for itr in range(args.test):
 
-    # Define environment
-    eval_env = dynRandeEnv(env_name=env_name, 
-                    #    load_path=args.path,
-                       tag="test", 
-                       task=args.task,
-                       episode_len=max_steps/200,
-                       nenvs=1, 
-                    #    dyn_range=dyn_range, 
-                       dyn_range=dict(),
-                       seed=int(args.seed+123456789),
-                       record=args.record)
-    eval_env.env.training = False
-    td3_trainer = td3_agent(env=eval_env,
-                rnn=args.rnn,
-                device=device,
-                hparam=hparam)
-    td3_trainer.load_model(args.path)
-    td3_trainer.policy_net.eval()
-    
-    action, hidden1 = td3_trainer.policy_net.get_action(np.ones((1,22)),np.zeros((1,4)),torch.zeros((1,1,32)),np.array([[0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0]]),True,0.0)
-    action2, hidden2 = td3_trainer.policy_net.get_action(np.concatenate([np.ones((1,18)),action[None,:]], axis=-1),action[None,:],hidden1,np.array([[0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0]]),True,0.0)
+            obs = eval_env.reset()
+            state = eval_env._getDroneStateVector(0).squeeze()
+            reward_sum = 0
+            state_buffer,obs_buffer, action_buffer = [],[],[]
+            goal_state = np.zeros_like(state)
+            goal_state[:3] = eval_env.goal_pos[0]
+            last_action = -np.ones(eval_env.action_space.shape)[None,:]
+            
+            for i in range(max_steps):
+                # obs[:,-15:] = 0
+                action = trainer.get_action(obs, last_action)
+                # action, *_ = ctrl.computeControlFromState(control_timestep=env.venv.envs[0].env.TIMESTEP,
+                #                                                            state=state,
+                #                                                            target_pos=env.venv.envs[0].env.goal_pos.squeeze(),
+                #                                                            target_rpy=np.array([0,0,0])
+                #                                                            )
+                # action = 2*(action/24000)-1
 
-    eval_rew, eval_success, eval_position, eval_angle = drone_test(eval_env, agent=td3_trainer, max_steps=max_steps, test_itr=10, record=args.record, log=True)
-    print("EVALUATION REWARD:",eval_rew)
-    print("EVALUATION SUCCESS RATE:",eval_success)
-    print("EVALUATION POSITION ERROR[m]:",eval_position)
-    print("EVALUATION ANGLE ERROR[deg]:",np.rad2deg(eval_angle))
+                obs_buffer.append(obs)
+                state_buffer.append(state)
+                action_buffer.append(action)
 
-    if args.record:
-        disp.stop()
+                obs, reward, done, info = eval_env.step(action)
+                state = eval_env._getDroneStateVector(0).squeeze()
+                
+                if args.render:
+                    eval_env.render()
+                    input()
+                if done:
+                    obs = eval_env.reset()
+                reward_sum+=reward
+            
+            state_buffer.append(goal_state)
+            np.savetxt('paperworks/test_state_%02d.txt'%itr,np.stack(state_buffer),delimiter=',')
+            np.savetxt('paperworks/test_obs_%02d.txt'%itr,np.stack(obs_buffer),delimiter=',')
+            np.savetxt('paperworks/test_action_%02d.txt'%itr,np.concatenate(action_buffer),delimiter=',')
+            print("iteration : ",itr)
+            info.update({'reward': reward_sum})
+            print(info)
+
+            total_info.append(info)
+        
+        final_info = {}
+        for info in total_info:
+            for key,value in info.items():
+                if key != 'episode':
+                    final_info[key] = final_info.get(key,0) + value
+        for key,value in final_info.items():
+            final_info[key] = value / args.test
+
+        print("Average results")
+        print(final_info)
+
 
 if __name__=='__main__':
     # train(1000, 'CartPole-v1')
@@ -384,4 +437,4 @@ if __name__=='__main__':
 
     hparam = dict([(k,v[0](*v[1])) for k,v in hparam_set.items()])
     hparam.update(vars(args))
-    train(args, hparam)
+    main(args, hparam)

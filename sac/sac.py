@@ -25,7 +25,7 @@ from time import time
 
 
 class SAC_Trainer():
-    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, action_scale=1.0, out_actf=F.tanh, device='cpu', target_update_interval=2,**kwargs):
+    def __init__(self, replay_buffer, state_space, action_space, hidden_dim, action_scale=1.0, out_actf=F.tanh, device='cpu', target_update_interval=1,**kwargs):
         self.replay_buffer = replay_buffer
         self.device = device
         self.state_space = state_space
@@ -49,7 +49,8 @@ class SAC_Trainer():
 
         lr = kwargs.get('learning_rate',1e-4)
         self.lr = lr
-        weight_decay = kwargs.get('weight_decay',1e-4)
+        # weight_decay = kwargs.get('weight_decay',1e-4)
+        weight_decay = kwargs.get('weight_decay',0.0)
 
         # Entropy coeff
         self._setup_entropy()
@@ -94,7 +95,7 @@ class SAC_Trainer():
     def get_action(self, state, last_action, **kwargs):
         return self.policy_net.get_action(state)
     
-    def update(self, batch_size, gamma=0.99,soft_tau=1e-3):
+    def update(self, batch_size, gamma=0.99,soft_tau=5e-3):
         state, action, reward, next_state, done = self.replay_buffer.sample(batch_size)
 
         state      = torch.FloatTensor(state).to(self.device)
@@ -195,10 +196,7 @@ class TD3RNN_Trainer():
             policy = PolicyNetworkGRU
         else:
             assert NotImplementedError
-        # self.q_net1 = qnet(state_space, action_space, hidden_dim).to(self.device)
-        # self.q_net2 = qnet(state_space, action_space, hidden_dim).to(self.device)
-        # self.target_q_net1 = qnet(state_space, action_space, hidden_dim).to(self.device)
-        # self.target_q_net2 = qnet(state_space, action_space, hidden_dim).to(self.device)
+
         self.q_net1 = qnet(state_space, action_space, 128).to(self.device)
         self.q_net2 = qnet(state_space, action_space, 128).to(self.device)
         self.target_q_net1 = qnet(state_space, action_space, 128).to(self.device)
