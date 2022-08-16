@@ -40,7 +40,7 @@ class PolicyNetworkBase(nn.Module):
         return a.numpy()
         
 class PolicyNetwork(PolicyNetworkBase):
-    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=-20, log_std_max=2):
         super().__init__(state_space, action_space, device)
 
         self.log_std_min = log_std_min
@@ -67,30 +67,29 @@ class PolicyNetwork(PolicyNetworkBase):
         x = self.actf(self.linear2(x))
         x = self.actf(self.linear3(x))
         mean = self.mean_linear(x)
-        if not self.out_actf is None:
-            mean = self.out_actf(mean)
-        std = F.softplus(self.log_std_linear(x))
-        std = torch.clamp(std, self.log_std_min, self.log_std_max)
+        log_std = self.log_std_linear(x)
+        log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
 
-        return self.action_scale * mean, self.action_scale * std
+        return self.action_scale * mean, self.action_scale * log_std
     
     def evaluate(self, state):
         '''
         generate action with state as input wrt the policy network, for calculating gradients
         '''
         num_batch = 1 if len(state.shape) < 2 else state.shape[0]
-        mean, std = self.forward(state)
+        mean, log_std = self.forward(state)
         
         ''' add noise '''
         normal = Normal(0, 1)
         z = normal.sample((num_batch,1))
-        action_0 = mean + std * z.to(self.device)
-        action = action_0
+        std = log_std.exp()
+        gaussian_action = mean + std * z.to(self.device)
+        action = self.out_actf(gaussian_action)
         
-        log_prob = Normal(mean, std).log_prob(action_0)
+        log_prob = Normal(mean, std).log_prob(gaussian_action)
         log_prob = log_prob.sum(dim=1, keepdim=True)
-
-        action = torch.clamp(action, -1.0, 1.0)
+        # Squash correction
+        log_prob -= torch.sum(torch.log(1-action**2 + 1e-6), dim=1, keepdim=True)
 
         return action, log_prob, z, mean, std
         
@@ -106,6 +105,8 @@ class PolicyNetwork(PolicyNetworkBase):
         z = normal.sample((num_batch,1)).to(self.device)
 
         action = (mean + std*z).detach().cpu().numpy()
+
+        action = np.clip(action, -1.0, 1.0)
 
         return action
 
