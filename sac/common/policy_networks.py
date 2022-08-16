@@ -100,13 +100,13 @@ class PolicyNetwork(PolicyNetworkBase):
         '''
         num_batch = 1 if len(state.shape) < 2 else state.shape[0]
         state = torch.FloatTensor(state).to(self.device)
-        mean, std = self.forward(state)
+        mean, log_std = self.forward(state)
+        std = log_std.exp()
         normal = Normal(0,1)
         z = normal.sample((num_batch,1)).to(self.device)
 
-        action = (mean + std*z).detach().cpu().numpy()
-
-        action = np.clip(action, -1.0, 1.0)
+        gaussian_action = (mean + std*z)
+        action = self.out_actf(gaussian_action).detach().cpu().numpy()
 
         return action
 

@@ -62,10 +62,11 @@ def main(args, hparam):
 
     max_episodes  = int(25000)
     max_steps = hparam['max_steps']
+    update_itr = hparam['update_itr']
     writer_interval = 20
     eval_interval = 500
     model_save_interval = 500
-    learning_start = hparam['learning_starts'] // max_steps
+    learning_start = hparam['learning_starts']
     if args.rnn == 'None':
         hparam['gradient_steps'] = hparam['gradient_steps'] * max_steps
 
@@ -225,6 +226,16 @@ def main(args, hparam):
                 state = next_state
                 last_action = action
 
+                # Update TD3 trainer\
+                total_step = (i_episode-1) * max_steps + ep_step
+                if total_step > learning_start:
+                    if total_step % update_itr == 0:
+                        for _ in range(gradient_steps):
+                            loss_dict = trainer.update(batch_size)
+                            policy_loss.append(loss_dict['policy_loss'])
+                            q_loss_1.append(loss_dict['q_loss_1'])
+                            q_loss_2.append(loss_dict['q_loss_2'])
+
             episode_done[-1] = np.ones_like(episode_done[-1])
             
             # Push into Experience replay buffer
@@ -245,15 +256,6 @@ def main(args, hparam):
                                 episode_reward, 
                                 episode_next_state, 
                                 episode_done)
-
-            # Update TD3 trainer
-            if i_episode > learning_start:
-                for _ in range(gradient_steps):
-                    loss_dict = trainer.update(batch_size)
-                    policy_loss.append(loss_dict['policy_loss'])
-                    q_loss_1.append(loss_dict['q_loss_1'])
-                    q_loss_2.append(loss_dict['q_loss_2'])
-
 
             loss_storage['policy_loss'].append(np.mean(policy_loss))
             loss_storage['q_loss_1'].append(np.mean(q_loss_1))
