@@ -332,13 +332,13 @@ def train(args, hparam):
     else:
         del trainer
         del env
-        max_steps = 800
+        max_steps = 1400
         dyn_range = {
             # drones
             'mass_range': 0.3, # (1-n) ~ (1+n)
             'cm_range': 0.3, # (1-n) ~ (1+n)
-            'kf_range': 0.1, # (1-n) ~ (1+n)
-            'km_range': 0.1, # (1-n) ~ (1+n)
+            'kf_range': 0.3, # (1-n) ~ (1+n)
+            'km_range': 0.3, # (1-n) ~ (1+n)
             'i_range': 0.3,
             't_range': 0.3,
             'battery_range': 0.0 # (1-n) ~ (1)
@@ -346,9 +346,9 @@ def train(args, hparam):
         dyn_range = {}
         if args.task == 'stabilize':
             initial_xyzs = np.array([[0,0,10000.0]])
-            rpy_noise=np.pi,
+            rpy_noise=2*np.pi,
             vel_noise=1,
-            angvel_noise=2*np.pi,
+            angvel_noise=np.pi,
             goal = None
         elif args.task == 'takeoff':
             initial_xyzs = np.array([[0,0,0.025]])
