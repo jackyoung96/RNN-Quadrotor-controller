@@ -87,21 +87,30 @@ def sac_agent(env,
                 hparam,
                 replay_buffer_size=1e6,
                 ):
-
-    if rnn in ["RNN2", "LSTM2", "GRU2"]:
+    if rnn in ["RNN", "LSTM", "GRU"]:
+        replay_buffer = ReplayBufferRNN(replay_buffer_size, **hparam)
+        td3_trainer = SACRNN_Trainer(replay_buffer,
+                    env.observation_space, 
+                    env.action_space,
+                    rnn_type=rnn,
+                    out_actf=F.tanh,
+                    action_scale=1.0,
+                    device=device, 
+                    **hparam)
+    elif rnn in ["RNNparam", "LSTMparam", "GRUparam"]:
+        replay_buffer = ReplayBufferRNN(replay_buffer_size, **hparam)
+        td3_trainer = SACparam_Trainer(replay_buffer,
+                    env.observation_space, 
+                    env.action_space,
+                    rnn_type=rnn,
+                    out_actf=F.tanh,
+                    action_scale=1.0,
+                    device=device, 
+                    **hparam)
+    elif rnn in ["RNN2", "LSTM2", "GRU2"]:
         # Param + FF
         replay_buffer = ReplayBufferRNN(replay_buffer_size, **hparam)
         td3_trainer = SACRNN_Trainer2(replay_buffer,
-                    env.env.observation_space, 
-                    env.env.action_space, 
-                    rnn_type=rnn,
-                    out_actf=F.tanh,
-                    action_scale=1.0 if 'aviary' in env.env_name else 10.0,
-                    device=device, 
-                    **hparam)
-    elif rnn in ["RNN3", "LSTM3", "GRU3"]:
-        replay_buffer = ReplayBufferRNN(replay_buffer_size, **hparam)
-        td3_trainer = SACRNN_Trainer3(replay_buffer,
                     env.env.observation_space, 
                     env.env.action_space, 
                     rnn_type=rnn,

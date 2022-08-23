@@ -39,14 +39,14 @@ hparam_set = {
     "update_itr": (np.random.randint,[10,11]),
 
     "goal_dim": (np.random.randint,[18,19]),
-    "param_num": (np.random.randint,[15,16]),
+    "param_dim": (np.random.randint,[15,16]),
     "hidden_dim": (np.random.randint,[6,7]),
     "critic_dim": (np.random.randint,[7,8]),
     "policy_net_layers": (np.random.randint,[3,4]),
     "critic_net_layers": (np.random.randint,[4,5]),
 
     "max_steps": (np.random.randint,[800,801]),
-    "her_length": (np.random.randint,[800,801]),
+    "seq_length": (np.random.randint,[16,17]),
     "rnn_dropout": (np.random.uniform,[0,0]),
     "replay_buffer_size": (np.random.randint,[int(1e6), int(1e6+1)]),
     "gradient_steps": (np.random.randint,[1,2]),
@@ -60,15 +60,13 @@ def main(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(25000)
+    max_episodes  = int(37500)
     max_steps = hparam['max_steps']
     update_itr = hparam['update_itr']
     writer_interval = 20
     eval_interval = 500
     model_save_interval = 500
     learning_start = hparam['learning_starts']
-    if args.rnn == 'None':
-        hparam['gradient_steps'] = hparam['gradient_steps'] * max_steps
 
     # hparam['learning_rate'] = 10**hparam['learning_rate']
     hparam['hidden_dim'] = int(2**hparam['hidden_dim'])
@@ -80,7 +78,7 @@ def main(args, hparam):
     replay_buffer_size = hparam['replay_buffer_size']
     gradient_steps = hparam['gradient_steps']
     observable = ['rel_pos', 'rotation', 'rel_vel', 'rel_angular_vel']
-    if hparam['param']:
+    if hparam['param'] or (hparam['rnn']!='None'):
         observable += ['param']
     rew_coeff = {'pos':1.0, 'vel':0.0, 'ang_vel': args.rew_angvel, 'ang_vel_xy': args.rew_angvel_xy, 'ang_vel_z': args.rew_angvel_z, 'd_action':0.0, 'rotation': 0.0}
     hparam['observable'] = observable
@@ -193,19 +191,11 @@ def main(args, hparam):
 
             for ep_step in range(max_steps):
                 hidden_in = hidden_out
-                if args.rnn == "None":
+                if args.rnn in ["None","RNNparam","GRUparam","LSTMparam"]:
                     action = \
                         trainer.get_action(state, last_action)
                     hidden_in = hidden_out = None
-                elif args.rnn in ["RNNHER", "LSTMHER","GRUHER"]:
-                    raise NotImplementedError
-                    action, hidden_out = \
-                            trainer.get_action(state, 
-                                        last_action, 
-                                        hidden_in,
-                                        goal=goal)
                 else:
-                    raise NotImplementedError
                     action, hidden_out = \
                         trainer.get_action(state, 
                                     last_action, 
@@ -235,31 +225,22 @@ def main(args, hparam):
                             policy_loss.append(loss_dict['policy_loss'])
                             q_loss_1.append(loss_dict['q_loss_1'])
                             q_loss_2.append(loss_dict['q_loss_2'])
+                            param_loss.append(loss_dict.get('param_loss',0))
 
             episode_done[-1] = np.ones_like(episode_done[-1])
             
-            # Push into Experience replay buffer
-            if args.rnn in ["RNNHER","LSTMHER","GRUHER"]:
-                raise NotImplementedError
-                trainer.replay_buffer.push_batch(episode_state, 
-                                episode_action, 
-                                episode_last_action,
-                                episode_reward, 
-                                episode_next_state, 
-                                episode_done,
-                                param,
-                                goal)
-            else:           
-                trainer.replay_buffer.push_batch(episode_state, 
-                                episode_action, 
-                                episode_last_action,
-                                episode_reward, 
-                                episode_next_state, 
-                                episode_done)
+            # Push into Experience replay buffer     
+            trainer.replay_buffer.push_batch(episode_state, 
+                            episode_action, 
+                            episode_last_action,
+                            episode_reward, 
+                            episode_next_state, 
+                            episode_done)
 
             loss_storage['policy_loss'].append(np.mean(policy_loss))
             loss_storage['q_loss_1'].append(np.mean(q_loss_1))
             loss_storage['q_loss_2'].append(np.mean(q_loss_2))
+            loss_storage['param_loss'].append(np.mean(param_loss))
             rewards = np.sum(episode_reward)
             mean_rewards.append(rewards)
             scores_window.append(rewards)
@@ -276,6 +257,7 @@ def main(args, hparam):
                 rollout_log.update({'loss/loss_p':np.mean(loss_storage['policy_loss']),
                             'loss/loss_q_1': np.mean(loss_storage['q_loss_1']),
                             'loss/loss_q_2': np.mean(loss_storage['q_loss_2']),
+                            'loss/loss_param': np.mean(loss_storage['param_loss']),
                             'rollout/rewards': np.mean(scores_window)})
                 rollout_log['global_step'] = i_episode * max_steps
                 wandb.log(rollout_log, step=i_episode)
@@ -284,7 +266,7 @@ def main(args, hparam):
             ### Evaluation #######################
             ######################################
 
-            if i_episode % eval_interval == 0 and i_episode != 0:
+            if i_episode % eval_interval == 0:
                 trainer.policy_net.eval()
                 eval_rew, eval_success, infos = drone_test(eval_env, agent=trainer, max_steps=max_steps, test_itr=50)
                 trainer.policy_net.train()
@@ -413,7 +395,9 @@ if __name__=='__main__':
 
     # Common arguments
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
-    parser.add_argument('--rnn', choices=['None','RNN2','GRU2','LSTM2',
+    parser.add_argument('--rnn', choices=['None',
+                                                'RNNparam','GRUparam','LSTMparam',
+                                                'RNN','GRU','LSTM',
                                                 'RNN3','GRU3','LSTM3'])
 
     # Arguments for training 

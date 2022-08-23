@@ -474,21 +474,21 @@ def drone_test(eval_env, agent, max_steps, test_itr=10):
                 start = time.time()
                 if getattr(agent, 'rnn_type', 'None') in ['GRU','RNN','LSTM']:
                     hidden_in = hidden_out
-                    if not hasattr(agent.q_net1, '_goal_dim'):
-                        raise NotImplementedError
+                    if hasattr(agent, 'param_net'):
                         action, hidden_out = \
-                            agent.policy_net.get_action(state, 
-                                                            last_action, 
-                                                            hidden_in)
+                            agent.get_action(state, 
+                                        last_action, 
+                                        hidden_in,
+                                        param=False,
+                                        deterministic=True)
                     else:
-                        raise NotImplementedError
                         action, hidden_out = \
-                            agent.policy_net.get_action(state, 
-                                                            last_action, 
-                                                            hidden_in, 
-                                                            goal=goal)
+                            agent.get_action(state, 
+                                        last_action, 
+                                        hidden_in,
+                                        deterministic=True)
                 else:
-                    action = agent.policy_net.get_action(state)
+                    action = agent.policy_net.get_action(state, deterministic=True)
 
                 next_state, reward, done, info = eval_env.step(action)
 
