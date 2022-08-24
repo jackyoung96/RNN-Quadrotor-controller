@@ -46,7 +46,7 @@ hparam_set = {
     "critic_net_layers": (np.random.randint,[4,5]),
 
     "max_steps": (np.random.randint,[800,801]),
-    "seq_length": (np.random.randint,[16,17]),
+    "seq_length": (np.random.randint,[100,101]),
     "rnn_dropout": (np.random.uniform,[0,0]),
     "replay_buffer_size": (np.random.randint,[int(1e6), int(1e6+1)]),
     "gradient_steps": (np.random.randint,[1,2]),
@@ -71,7 +71,7 @@ def main(args, hparam):
     max_steps = hparam['max_steps']
     update_itr = hparam['update_itr']
     writer_interval = 20
-    eval_interval = 2
+    eval_interval = 500
     model_save_interval = 500
     learning_start = hparam['learning_starts']
 
@@ -405,7 +405,9 @@ if __name__=='__main__':
     parser.add_argument('--rnn', choices=['None',
                                                 'RNNparam','GRUparam','LSTMparam',
                                                 'RNN','GRU','LSTM',
-                                                'RNNpolicy','GRUpolicy','LSTMpolicy'])
+                                                'RNNfull','GRUfull','LSTMfull',
+                                                'RNNpolicy','GRUpolicy','LSTMpolicy',
+                                                'RNNpolicyfull','GRUpolicyfull','LSTMpolicyfull'])
 
     # Arguments for training 
     parser.add_argument('--tb_log', action='store_true', help="Tensorboard logging")

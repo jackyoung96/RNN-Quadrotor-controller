@@ -218,11 +218,64 @@ class PolicyNetworkRNN(PolicyNetworkBase):
         return action, hidden_out
 
 class PolicyNetworkLSTM(PolicyNetworkRNN):
-    def __init__(self, state_space, action_space, hidden_size, device, actf=F.relu, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=-20, log_std_max=2, rnn_dropout=0.5):
-        super().__init__(state_space, action_space, hidden_size, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max, rnn_dropout=rnn_dropout)
+    def __init__(self, state_space, action_space, hidden_size, param_dim, device, actf=F.relu, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=-20, log_std_max=2, rnn_dropout=0.5):
+        super().__init__(state_space, action_space, hidden_size, param_dim, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max, rnn_dropout=rnn_dropout)
         self.rnn = nn.LSTM(hidden_size, hidden_size, batch_first=True)
 
 class PolicyNetworkGRU(PolicyNetworkRNN):
-    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=-20, log_std_max=2, rnn_dropout=0.5):
-        super().__init__(state_space, action_space, hidden_size, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max, rnn_dropout=rnn_dropout)
+    def __init__(self, state_space, action_space, hidden_size, param_dim, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=-20, log_std_max=2, rnn_dropout=0.5):
+        super().__init__(state_space, action_space, hidden_size, param_dim, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max, rnn_dropout=rnn_dropout)
+        self.rnn = nn.GRU(hidden_size, hidden_size, batch_first=True)
+
+
+class PolicyNetworkRNNfull(PolicyNetworkRNN):
+    def __init__(self, state_space, action_space, hidden_size, param_dim, device, actf=F.relu, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=-20, log_std_max=2, rnn_dropout=0.5):
+        super().__init__(state_space, action_space, hidden_size, param_dim, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max, rnn_dropout=rnn_dropout)
+        
+    def forward(self, state, last_action, hidden_in):
+        
+        if len(state.shape)==2:
+            B,L=state.shape[0],1
+        elif len(state.shape)==3:
+            B,L = state.shape[:2]
+        else:
+            assert True, "Something wrong"
+        
+        state, last_action = state.view(B,L,-1), last_action.view(B,L,-1)
+        
+
+        fc_x = self.actf(self.linear1(state))
+        # fc_x = F.relu(self.linear2(fc_x)) 
+        sa_cat = torch.cat([state,last_action], dim=-1)
+        rnn_x = self.actf(self.linear_rnn(sa_cat)).view(B,L,-1)
+        rnn_out, rnn_hidden = self.rnn(rnn_x, hidden_in)
+        # Use only last result
+        rnn_x = self.rnn_dropout(rnn_out.contiguous().view(*fc_x.shape)) # Dropout for make RNN weaker
+        merged_x = torch.cat([fc_x, rnn_x],dim=-1)
+        x = self.actf(self.linear2(merged_x))
+        x = self.actf(self.linear3(x))
+        mean = self.mean_linear(x)
+        log_std = self.log_std_linear(x)
+        log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
+
+        return self.action_scale * mean, self.action_scale * log_std, rnn_out, rnn_hidden
+
+    
+    def get_action(self, state, last_action, hidden_in, deterministic=False):
+        '''
+        generate action for interaction with env
+        '''
+        action, hidden_out = super().get_action(state,last_action, hidden_in, deterministic=deterministic)
+        action = action.reshape((1,-1))
+
+        return action, hidden_out
+
+class PolicyNetworkLSTMfull(PolicyNetworkRNNfull):
+    def __init__(self, state_space, action_space, hidden_size, param_dim, device, actf=F.relu, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=-20, log_std_max=2, rnn_dropout=0.5):
+        super().__init__(state_space, action_space, hidden_size, param_dim, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max, rnn_dropout=rnn_dropout)
+        self.rnn = nn.LSTM(hidden_size, hidden_size, batch_first=True)
+
+class PolicyNetworkGRUfull(PolicyNetworkRNNfull):
+    def __init__(self, state_space, action_space, hidden_size, param_dim, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=-20, log_std_max=2, rnn_dropout=0.5):
+        super().__init__(state_space, action_space, hidden_size, param_dim, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max, rnn_dropout=rnn_dropout)
         self.rnn = nn.GRU(hidden_size, hidden_size, batch_first=True)

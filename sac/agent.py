@@ -17,6 +17,16 @@ def sac_agent(env,
                     action_scale=1.0,
                     device=device, 
                     **hparam)
+    elif rnn in ["RNNfull", "LSTMfull", "GRUfull"]:
+        replay_buffer = ReplayBufferRNN(replay_buffer_size, **hparam)
+        td3_trainer = SACRNNfull_Trainer(replay_buffer,
+                    env.observation_space, 
+                    env.action_space,
+                    rnn_type=rnn,
+                    out_actf=F.tanh,
+                    action_scale=1.0,
+                    device=device, 
+                    **hparam)
     elif rnn in ["RNNparam", "LSTMparam", "GRUparam"]:
         replay_buffer = ReplayBufferRNN(replay_buffer_size, **hparam)
         td3_trainer = SACparam_Trainer(replay_buffer,
@@ -31,6 +41,17 @@ def sac_agent(env,
         # Param + FF
         replay_buffer = ReplayBufferRNN(replay_buffer_size, **hparam)
         td3_trainer = SACRNNpolicy_Trainer(replay_buffer,
+                    env.observation_space, 
+                    env.action_space, 
+                    rnn_type=rnn,
+                    out_actf=F.tanh,
+                    action_scale=1.0,
+                    device=device, 
+                    **hparam)
+    elif rnn in ["RNNpolicyfull", "LSTMpolicyfull", "GRUpolicyfull"]:
+        # Param + FF
+        replay_buffer = ReplayBufferRNN(replay_buffer_size, **hparam)
+        td3_trainer = SACRNNpolicyfull_Trainer(replay_buffer,
                     env.observation_space, 
                     env.action_space, 
                     rnn_type=rnn,
