@@ -425,7 +425,7 @@ class dynRandeEnv(TakeoffAviary):
 
         elif type=='param':
             if self.is_noise:
-                norm_state = norm_state + np.random.normal(0,0.05,norm_state.shape)
+                norm_state = norm_state + np.random.normal(0,0.005,norm_state.shape)
             pass
 
         return norm_state

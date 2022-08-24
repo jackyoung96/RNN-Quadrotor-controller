@@ -158,7 +158,7 @@ class QNetworkRNN(QNetworkBase):
         # branch 2
         rnn_branch = torch.cat([state, last_action], -1)
         rnn_branch = self.activation(self.linear_rnn(rnn_branch)).view(B,L,-1)  # linear layer for 3d input only applied on the last dim
-        rnn_hidden_all, rnn_branch = self.rnn(rnn_branch, hidden_in)  # no activation after lstm
+        rnn_branch, rnn_hidden = self.rnn(rnn_branch[:-1], hidden_in)  # no activation after lstm
         # merged
         rnn_branch = self.rnn_dropout(rnn_branch.contiguous().view(*fc_branch.shape))
         merged_branch=torch.cat([fc_branch, rnn_branch], -1) 
@@ -168,7 +168,7 @@ class QNetworkRNN(QNetworkBase):
         x = self.activation(self.linear4(x))
         x = self.linearout(x)
 
-        return x, rnn_hidden_all    # lstm_hidden is actually tuple: (hidden, cell)   
+        return x, rnn_hidden    # lstm_hidden is actually tuple: (hidden, cell)   
 
 class QNetworkLSTM(QNetworkRNN):
     def __init__(self, state_space, action_space, hidden_dim, activation=F.relu, output_activation=None):

@@ -55,6 +55,13 @@ hparam_set = {
 def main(args, hparam):
 
     global dyn_range
+    
+    # Set randomness seed 
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    random.seed(args.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     #####################################
     # hyper-parameters for RL training ##
@@ -64,7 +71,7 @@ def main(args, hparam):
     max_steps = hparam['max_steps']
     update_itr = hparam['update_itr']
     writer_interval = 20
-    eval_interval = 500
+    eval_interval = 2
     model_save_interval = 500
     learning_start = hparam['learning_starts']
 
@@ -398,7 +405,7 @@ if __name__=='__main__':
     parser.add_argument('--rnn', choices=['None',
                                                 'RNNparam','GRUparam','LSTMparam',
                                                 'RNN','GRU','LSTM',
-                                                'RNN3','GRU3','LSTM3'])
+                                                'RNNpolicy','GRUpolicy','LSTMpolicy'])
 
     # Arguments for training 
     parser.add_argument('--tb_log', action='store_true', help="Tensorboard logging")
@@ -407,6 +414,7 @@ if __name__=='__main__':
     parser.add_argument('--rew_angvel_z', type=float, default=0.0, help="Reward for angvel z")
     parser.add_argument('--rew_angvel', type=float, default=0.0, help="Reward for angvel xyz")
     parser.add_argument('--no_random', action='store_true')
+    parser.add_argument('--seed', type=int, default=0)
 
     # parser.add_argument('--dyn', choices=['mass', 'cm', 'kf', 'km', 'i', 't', 'no'], default=None)
 
