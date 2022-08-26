@@ -1,0 +1,1 @@
+python train_drone_sac.py --rew_angvel_z 0.05 --gpu $2 --rnn $1 --tb_log --seed 0
