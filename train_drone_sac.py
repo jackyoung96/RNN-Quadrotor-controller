@@ -67,7 +67,7 @@ def main(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(37500)
+    max_episodes  = int(20000)
     max_steps = hparam['max_steps']
     update_itr = hparam['update_itr']
     writer_interval = 20
