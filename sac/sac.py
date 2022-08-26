@@ -268,7 +268,8 @@ class SACparam_Trainer(SAC_Trainer):
 
         predicted_param, hidden_out = self.param_net(state_noparam, last_action, hidden_in)
         # Many-to-One RNN
-        param_loss = F.mse_loss(predicted_param[:,-1], param.mean(dim=1))
+        # param_loss = F.mse_loss(predicted_param[:,-1], param.mean(dim=1))
+        param_loss = F.mse_loss(predicted_param, param)
         
         self.param_optimizer.zero_grad()
         param_loss.backward()
