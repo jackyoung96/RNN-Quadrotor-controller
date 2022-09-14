@@ -99,7 +99,8 @@ class SAC_Trainer():
         return target_net
 
     def get_action(self, state, last_action, *args, **kwargs):
-        return self.policy_net.get_action(state)
+        deterministic = kwargs.get('deterministic', False)
+        return self.policy_net.get_action(state, deterministic=deterministic)
     
     def update(self, batch_size, gamma=0.99,soft_tau=5e-3):
         sample = self.replay_buffer.sample(batch_size)
@@ -236,8 +237,9 @@ class SACparam_Trainer(SAC_Trainer):
             deterministic = kwargs.get('deterministic',False)
             state_torch = torch.FloatTensor(state[:-self.param_dim]).view(1,1,-1).to(self.device)
             last_action_torch = torch.FloatTensor(last_action).view(1,1,-1).to(self.device)
-            param, hidden_out = self.param_net(state_torch, last_action_torch, hidden_in)
-            state[-self.param_dim:] = param.detach().cpu().numpy().squeeze()
+            with torch.no_grad():
+                param, hidden_out = self.param_net(state_torch, last_action_torch, hidden_in)
+            # state[-self.param_dim:] = param.detach().cpu().numpy().squeeze()
             return self.policy_net.get_action(state, deterministic=deterministic), hidden_out
 
     def update(self, batch_size, gamma=0.99, soft_tau=1e-3):

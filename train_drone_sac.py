@@ -19,15 +19,18 @@ from evaluation import drone_test
 ####### Global Vars ########
 ############################
 
+import warnings
+warnings.simplefilter("ignore", UserWarning)
+
 dyn_range = {
     # drones
     'mass_range': 0.3, # (1-n) ~ (1+n)
-    'cm_range': 0.3, # (1-n) ~ (1+n)
+    'cm_range': 0.1, # (1-n) ~ (1+n)
     'kf_range': 0.3, # (1-n) ~ (1+n)
     'km_range': 0.3, # (1-n) ~ (1+n)
     'i_range': 0.3,
     't_range': 0.3,
-    'battery_range': 0.0 # (1-n) ~ (1)
+    'norm_range': 0.5, # Just for normalization
 }
 
 hparam_set = {
@@ -67,7 +70,7 @@ def main(args, hparam):
     # hyper-parameters for RL training ##
     #####################################
 
-    max_episodes  = int(20000)
+    max_episodes  = int(40000)
     max_steps = hparam['max_steps']
     update_itr = hparam['update_itr']
     writer_interval = 20
@@ -102,7 +105,7 @@ def main(args, hparam):
     ### Path, Basic variable setting ########
     #########################################
 
-    print("hyperparam set:",hparam)
+    
     algorithm_name = 'SAC'
     env_name = "takeoff-aviary-v0"
     dtime = datetime.now()
@@ -123,7 +126,6 @@ def main(args, hparam):
     else:
         device=torch.device('cpu')
     
-    print("Device:",device)
 
     ####################################
     # Define environment and agent #####
@@ -166,7 +168,10 @@ def main(args, hparam):
                 device=device,
                 hparam=hparam,
                 replay_buffer_size=replay_buffer_size)
+
     if args.test == 0:
+        print("hyperparam set:",hparam)
+        print("Device:",device)
         # keep track of progress
         mean_rewards = []
         scores_window = deque(maxlen=100)
@@ -319,82 +324,275 @@ def main(args, hparam):
         return mean_rewards, loss_storage, eval_rew, eval_success, dtime
     
     else:
-        # Test code
-        max_steps = 1400
-        eval_env = dynRandeEnv(
-            initial_xyzs=np.array([[0,0,10000.0]]),
-            initial_rpys=np.array([[0,0,0]]),
-            observable=observable,
-            dyn_range={}, # No dynamic randomization for evaluation env
-            rpy_noise=2*np.pi,
-            vel_noise=1,
-            angvel_noise=np.pi,
-            reward_coeff=rew_coeff,
-            frame_stack=1,
-            episode_len_sec=max_steps/100,
-            gui=args.render,
-            record=False,
-            wandb_render=True,
-            is_noise=not args.no_random,
-        )
-        trainer.load_model(args.path)
-        total_info = []
+        if args.task =='stabilize':
+            # Test code
+            max_steps = 800
+            dyn_range = {
+                # drones
+                'mass_range': args.test_dyn_range, # (1-n) ~ (1+n)
+                'cm_range': args.test_dyn_range, # (1-n) ~ (1+n)
+                'kf_range': args.test_dyn_range, # (1-n) ~ (1+n)
+                'km_range': args.test_dyn_range, # (1-n) ~ (1+n)
+                'i_range': args.test_dyn_range,
+                't_range': args.test_dyn_range,
+                'norm_range': 0.3, # Just for normalization
+            }
+            eval_env = dynRandeEnv(
+                initial_xyzs=np.array([[0,0,10000.0]]),
+                initial_rpys=np.array([[0,0,0]]),
+                observable=observable,
+                dyn_range=dyn_range, # No dynamic randomization for evaluation env
+                rpy_noise=2*np.pi,
+                vel_noise=1,
+                angvel_noise=np.pi,
+                # rpy_noise=0,
+                # vel_noise=0,
+                # angvel_noise=0,
+                reward_coeff=rew_coeff,
+                frame_stack=1,
+                episode_len_sec=max_steps/100,
+                gui=args.render,
+                record=False,
+                wandb_render=True,
+                is_noise=not args.no_random,
+            )
+            trainer.load_model(args.path)
+            total_info = []
 
-        for itr in range(args.test):
-
-            obs = eval_env.reset()
-            state = eval_env._getDroneStateVector(0).squeeze()
-            reward_sum = 0
-            state_buffer,obs_buffer, action_buffer = [],[],[]
-            goal_state = np.zeros_like(state)
-            goal_state[:3] = eval_env.goal_pos[0]
-            last_action = -np.ones(eval_env.action_space.shape)[None,:]
-            
-            for i in range(max_steps):
-                # obs[:,-15:] = 0
-                action = trainer.get_action(obs, last_action)
-                # action, *_ = ctrl.computeControlFromState(control_timestep=env.venv.envs[0].env.TIMESTEP,
-                #                                                            state=state,
-                #                                                            target_pos=env.venv.envs[0].env.goal_pos.squeeze(),
-                #                                                            target_rpy=np.array([0,0,0])
-                #                                                            )
-                # action = 2*(action/24000)-1
-
-                obs_buffer.append(obs)
-                state_buffer.append(state)
-                action_buffer.append(action)
-
-                obs, reward, done, info = eval_env.step(action)
-                state = eval_env._getDroneStateVector(0).squeeze()
+            for itr in range(args.test):
                 
-                if args.render:
-                    eval_env.render()
-                    input()
-                if done:
-                    obs = eval_env.reset()
-                reward_sum+=reward
+                obs = eval_env.reset()
+                if args.rnn == 'PID':
+                    trainer.reset(env=eval_env)
+                state = eval_env._getDroneStateVector(0).squeeze()
+                reward_sum = 0
+                state_buffer,obs_buffer, action_buffer = [],[],[]
+                goal_state = np.zeros_like(state)
+                goal_state[:3] = eval_env.goal_pos[0]
+                last_action = -np.ones(eval_env.action_space.shape)[None,:]
+                success = 0
+
+                if "LSTM" in args.rnn:
+                    hidden_out = (torch.zeros([1, 1, policy_dim], dtype=torch.float).to(device), \
+                                torch.zeros([1, 1, policy_dim], dtype=torch.float).to(device))  # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
+                else:
+                    hidden_out = torch.zeros([1, 1, policy_dim], dtype=torch.float).to(device)
+                
+                for step in range(max_steps):
+
+                    hidden_in = hidden_out
+                    # Get action
+                    if args.rnn == 'PID':
+                        action = trainer.get_action(state)
+                    elif args.rnn in ["None"]:
+                        action = \
+                            trainer.get_action(obs, 
+                                                last_action,
+                                                param=False,
+                                                deterministic=True)
+                        hidden_in = hidden_out = None
+                    else:
+                        action, hidden_out = \
+                            trainer.get_action(obs, 
+                                        last_action, 
+                                        hidden_in,
+                                        param=False,
+                                        deterministic=True)
+
+                    obs_buffer.append(obs)
+                    state_buffer.append(state)
+                    action_buffer.append(action)
+
+                    obs, reward, done, info = eval_env.step(action)
+                    state = eval_env._getDroneStateVector(0).squeeze()
+                    
+                    if args.render:
+                        eval_env.render()
+                        input()
+                    if done:
+                        obs = eval_env.reset()
+                    
+                    if np.linalg.norm(state[:3]-goal_state[:3]) < 0.2:
+                    # if np.linalg.norm(state[:3]-goal_state[:3]) < 0.15 and np.linalg.norm(state[10:13]) < 0.2:
+                        success = 1
+                        break
+
+                    reward_sum+=reward
+                    last_action = action
+                
+                state_buffer.append(goal_state)
+                rnn_name = args.rnn_name
+                if rnn_name == "":
+                    rnn_name = args.rnn
+                if not os.path.isdir('paperworks/%s_rand%d'%(rnn_name,args.test_dyn_range*10)):
+                    os.mkdir('paperworks/%s_rand%d'%(rnn_name,args.test_dyn_range*10))
+                np.savetxt('paperworks/%s_rand%d/test_state_%02d.txt'%(rnn_name,args.test_dyn_range*10,itr),np.stack(state_buffer),delimiter=',')
+                np.savetxt('paperworks/%s_rand%d/test_obs_%02d.txt'%(rnn_name,args.test_dyn_range*10,itr),np.stack(obs_buffer),delimiter=',')
+                np.savetxt('paperworks/%s_rand%d/test_action_%02d.txt'%(rnn_name,args.test_dyn_range*10,itr),np.concatenate(action_buffer),delimiter=',')
+                # print("iteration : ",itr)
+                info.update({'reward': reward_sum,
+                            'position_error': np.linalg.norm(np.stack(obs_buffer)[-100:,:3],axis=1).mean(),
+                            'yaw_rate': np.abs(np.stack(obs_buffer)[:,17]).mean(),
+                            'success': success,
+                            'success_timestep': step*success})
+
+                # print(info)
+
+                total_info.append(info)
             
-            state_buffer.append(goal_state)
-            np.savetxt('paperworks/test_state_%02d.txt'%itr,np.stack(state_buffer),delimiter=',')
-            np.savetxt('paperworks/test_obs_%02d.txt'%itr,np.stack(obs_buffer),delimiter=',')
-            np.savetxt('paperworks/test_action_%02d.txt'%itr,np.concatenate(action_buffer),delimiter=',')
-            print("iteration : ",itr)
-            info.update({'reward': reward_sum})
-            print(info)
+            final_info = {}
+            for info in total_info:
+                for key,value in info.items():
+                    if key != 'episode':
+                        if key == 'reward':
+                            final_info[key] = final_info.get(key,0) + value
+                        else:
+                            final_info[key] = final_info.get(key,0) + np.abs(value)
+            total_success = final_info['success']
+            for key,value in final_info.items():
+                if key == ' success_timestep':
+                    final_info[key] = value / total_success
+                else:
+                    final_info[key] = value / args.test
 
-            total_info.append(info)
-        
-        final_info = {}
-        for info in total_info:
-            for key,value in info.items():
-                if key != 'episode':
-                    final_info[key] = final_info.get(key,0) + value
-        for key,value in final_info.items():
-            final_info[key] = value / args.test
+            print("------%s Average results------"%args.rnn)
+            print("pos error",final_info['position_error'])
+            print("yaw rate", final_info['yaw_rate'])
+            print("success rate", final_info['success'])
+            print("average time", final_info['success_timestep'])
 
-        print("Average results")
-        print(final_info)
 
+        elif args.task=='takeoff':
+            # Test code
+            sec = 200
+            goal_poses = [
+                # 2 seconds each
+                [1,0,10000],
+                [1,1,10000],
+                [0,1,10000],
+                [0,0,10000]
+            ]
+            max_steps = int(sec * len(goal_poses))
+            dyn_range = {
+                # drones
+                'mass_range': args.test_dyn_range, # (1-n) ~ (1+n)
+                'cm_range': args.test_dyn_range, # (1-n) ~ (1+n)
+                'kf_range': args.test_dyn_range, # (1-n) ~ (1+n)
+                'km_range': args.test_dyn_range, # (1-n) ~ (1+n)
+                'i_range': args.test_dyn_range,
+                't_range': args.test_dyn_range,
+                'norm_range': 0.3, # Just for normalization
+            }
+            eval_env = dynRandeEnv(
+                initial_xyzs=np.array([[0,0,10000]]),
+                initial_rpys=np.array([[0,0,np.random.uniform(0,2*np.pi)]]),
+                observable=observable,
+                dyn_range=dyn_range, # No dynamic randomization for evaluation env
+                rpy_noise=0,
+                vel_noise=0,
+                angvel_noise=0,
+                reward_coeff=rew_coeff,
+                frame_stack=1,
+                episode_len_sec=max_steps/100,
+                gui=args.render,
+                record=False,
+                wandb_render=True,
+                is_noise=not args.no_random,
+                goal=np.array(goal_poses[0])
+            )
+            trainer.load_model(args.path)
+            total_info = []
+
+            for itr in range(args.test):
+                
+                obs = eval_env.reset()
+                if args.rnn == 'PID':
+                    trainer.reset(env=eval_env)
+                state = eval_env._getDroneStateVector(0).squeeze()
+                reward_sum = 0
+                state_buffer,obs_buffer, action_buffer = [],[],[]
+                goal_state = np.zeros_like(state)
+                goal_state[:3] = eval_env.goal_pos[0]
+                last_action = -np.ones(eval_env.action_space.shape)[None,:]
+
+                if "LSTM" in args.rnn:
+                    hidden_out = (torch.zeros([1, 1, policy_dim], dtype=torch.float).to(device), \
+                                torch.zeros([1, 1, policy_dim], dtype=torch.float).to(device))  # initialize hidden state for lstm, (hidden, cell), each is (layer, batch, dim)
+                else:
+                    hidden_out = torch.zeros([1, 1, policy_dim], dtype=torch.float).to(device)
+                
+                for step in range(max_steps):
+                    if step % sec == 0:
+                        eval_env.goal_pos[0] = np.array(goal_poses[step//sec])
+                        if args.rnn == 'PID':
+                            trainer.reset(env=eval_env)
+
+                    hidden_in = hidden_out
+                    # Get action
+                    if args.rnn == 'PID':
+                        action = trainer.get_action(state)
+                    elif args.rnn in ["None"]:
+                        action = \
+                            trainer.get_action(obs, 
+                                                last_action,
+                                                param=False,
+                                                deterministic=True)
+                        hidden_in = hidden_out = None
+                    else:
+                        action, hidden_out = \
+                            trainer.get_action(obs, 
+                                        last_action, 
+                                        hidden_in,
+                                        param=False,
+                                        deterministic=True)
+
+                    obs_buffer.append(obs)
+                    state_buffer.append(state)
+                    action_buffer.append(action)
+
+                    obs, reward, done, info = eval_env.step(action)
+                    state = eval_env._getDroneStateVector(0).squeeze()
+                    
+                    if args.render:
+                        eval_env.render()
+                        input()
+                    if done:
+                        obs = eval_env.reset()
+                    reward_sum+=reward
+                    last_action = action
+                
+
+                rnn_name = args.rnn_name
+                if rnn_name == "":
+                    rnn_name = args.rnn
+                if not os.path.isdir('paperworks/%s_rand%d'%(rnn_name,args.test_dyn_range*10)):
+                    os.mkdir('paperworks/%s_rand%d'%(rnn_name,args.test_dyn_range*10))
+                np.savetxt('paperworks/%s_rand%d/takeoff_state_%02d.txt'%(rnn_name,args.test_dyn_range*10,itr),np.stack(state_buffer),delimiter=',')
+                np.savetxt('paperworks/%s_rand%d/takeoff_obs_%02d.txt'%(rnn_name,args.test_dyn_range*10,itr),np.stack(obs_buffer),delimiter=',')
+                np.savetxt('paperworks/%s_rand%d/takeoff_action_%02d.txt'%(rnn_name,args.test_dyn_range*10,itr),np.concatenate(action_buffer),delimiter=',')
+                # print("iteration : ",itr)
+                info.update({'reward': reward_sum})
+                info.update({'position_error': np.linalg.norm(np.stack(obs_buffer)[:,:3],axis=1).mean()})
+                info.update({'yaw_rate': np.abs(np.stack(obs_buffer)[:,17]).mean()})
+
+                # print(info)
+
+                total_info.append(info)
+            
+            final_info = {}
+            for info in total_info:
+                for key,value in info.items():
+                    if key != 'episode':
+                        if key == 'reward':
+                            final_info[key] = final_info.get(key,0) + value
+                        else:
+                            final_info[key] = final_info.get(key,0) + np.abs(value)
+            for key,value in final_info.items():
+                final_info[key] = value / args.test
+
+            print("------%s Average results------"%args.rnn)
+            print("pos error",final_info['position_error'])
+            print("yaw rate", final_info['yaw_rate'])
 
 if __name__=='__main__':
     # train(1000, 'CartPole-v1')
@@ -402,7 +600,7 @@ if __name__=='__main__':
 
     # Common arguments
     parser.add_argument('--gpu', default='0', type=int, help="gpu number")
-    parser.add_argument('--rnn', choices=['None',
+    parser.add_argument('--rnn', choices=['None','PID',
                                                 'RNNparam','GRUparam','LSTMparam',
                                                 'RNN','GRU','LSTM',
                                                 'RNNfull','GRUfull','LSTMfull',
@@ -425,8 +623,10 @@ if __name__=='__main__':
     parser.add_argument('--path', type=str, default=None, help='required only at test phase')
     parser.add_argument('--render', action='store_true', help='whether record or not')
     parser.add_argument('--record', action='store_true', help='whether record or not')
-    parser.add_argument('--task', default='stabilize',choices=['stabilize', 'stabilize-record', 'takeoff'],
+    parser.add_argument('--test_dyn_range', type=float, default=0.0)
+    parser.add_argument('--task', default='stabilize',choices=['stabilize', 'takeoff'],
                         help='For takeoff-aviary-v0 environment')
+    parser.add_argument('--rnn_name', type=str, default="")
 
 
     args = parser.parse_args()

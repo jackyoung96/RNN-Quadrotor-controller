@@ -62,8 +62,8 @@ class dynRandeEnv(TakeoffAviary):
         self.i_range = dyn_range.get('i_range', 0.0)
         self.kf_range = dyn_range.get('kf_range', 0.0)
         self.km_range = dyn_range.get('km_range', 0.0)
-        self.battery_range = dyn_range.get('battery_range', 0.0)
         self.t_range = dyn_range.get('t_range', 0.0)
+        self.norm_range = dyn_range.get('norm_range', 0.3)
 
         self.frame_stack = frame_stack
         self.frame_buffer = []
@@ -72,7 +72,10 @@ class dynRandeEnv(TakeoffAviary):
         self.maketime = datetime.now().strftime("%m%d%Y_%H%M%S")
 
         self.goal = goal
-        self.goal_pos = deepcopy(initial_xyzs) if goal is None else goal
+        if goal is None:
+            self.goal_pos = deepcopy(initial_xyzs)
+        else:
+            self.goal_pos = goal.reshape(initial_xyzs.shape)
 
         super(dynRandeEnv, self).__init__(
             drone_model=DroneModel.CF2X,
@@ -235,29 +238,32 @@ class dynRandeEnv(TakeoffAviary):
         if self.OBSTACLES:
             self._addObstacles()
 
-    def random_urdf(self):
+    def set_urdf(self, set_dyn):
+        set_mass, set_cm, set_I, set_T, set_KF, set_KM = set_dyn.get('mass',0.0),\
+                                                            set_dyn.get('cm',np.zeros(2)),\
+                                                            set_dyn.get('I',np.zeros(3)),\
+                                                            set_dyn.get('T',0.0),\
+                                                            set_dyn.get('KF',np.zeros(4)),\
+                                                            set_dyn.get('KM',np.zeros(4))
+
         self.new_URDF = self.maketime + "/cf2x.urdf"
         norm_mass, norm_xcm, norm_ycm, norm_ixx, norm_iyy, norm_izz, norm_T = 0,0,0,0,0,0,0
         norm_KF, norm_KM = [0,0,0,0], [0,0,0,0]
 
-        mass = np.random.uniform(1-self.mass_range, 1+self.mass_range) * self.orig_params['M']
-        x_cm, y_cm = np.random.uniform(-self.cm_range, self.cm_range, size=(2,)) * self.orig_params['L']
-        i_xx, i_yy, i_zz = np.random.uniform(1-self.i_range, 1+self.i_range, size=(3,))
-        i_xx, i_yy = 1.4e-5 * i_xx, 1.4e-5 * i_yy
-        i_zz = min(2.17e-5 * i_zz,i_xx+i_yy) # Inertia property
-        T = np.random.uniform(1-self.t_range, 1+self.t_range)
+        mass = (1+set_mass) * self.orig_params['M']
+        x_cm, y_cm = (set_cm) * self.orig_params['L']
+        i_xx, i_yy = (1+set_I[:2]) * 1.4e-5
+        i_zz = min((1+set_I[2]) * 2.17e-5,i_xx+i_yy) # Inertia property
+        T = (1 + set_T)
         
-        if self.mass_range != 0:
-            norm_mass = 2*(mass/self.orig_params['M']-(1-self.mass_range))/(2*self.mass_range)-1
-        if self.cm_range != 0:
-            norm_xcm = 2*(x_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
-            norm_ycm = 2*(y_cm/self.orig_params['L']+self.cm_range)/(2*self.cm_range)-1
-        if self.i_range != 0:
-            norm_ixx = 2*((i_xx/1.4e-5)-(1-self.i_range))/(2*self.i_range)-1
-            norm_iyy = 2*((i_yy/1.4e-5)-(1-self.i_range))/(2*self.i_range)-1
-            norm_izz = 2*((i_zz/2.17e-5)-(1-self.i_range))/(2*self.i_range)-1
-        if self.t_range != 0:
-            norm_T = 2*(T-(1-self.t_range))/(2*self.t_range)-1
+        if self.norm_range != 0:
+            norm_mass = 2*(mass/self.orig_params['M']-(1-self.norm_range))/(2*self.norm_range)-1
+            norm_xcm = 2*(x_cm/self.orig_params['L']+self.norm_range)/(2*self.norm_range)-1
+            norm_ycm = 2*(y_cm/self.orig_params['L']+self.norm_range)/(2*self.norm_range)-1
+            norm_ixx = 2*((i_xx/1.4e-5)-(1-self.norm_range))/(2*self.norm_range)-1
+            norm_iyy = 2*((i_yy/1.4e-5)-(1-self.norm_range))/(2*self.norm_range)-1
+            norm_izz = 2*((i_zz/2.17e-5)-(1-self.norm_range))/(2*self.norm_range)-1
+            norm_T = 2*(T-(1-self.norm_range))/(2*self.norm_range)-1
         
 
         generate_urdf(self.new_URDF, mass, x_cm, y_cm, i_xx, i_yy, i_zz)
@@ -279,21 +285,82 @@ class dynRandeEnv(TakeoffAviary):
         self.DW_COEFF_2, \
         self.DW_COEFF_3 = self._parseURDFParameters()
 
-        self.battery = self.orig_params['BATTERY'] * np.random.uniform(1.0-self.battery_range, 1.0)
-        if self.battery_range != 0:
-            norm_battery = 2*(self.battery-(1-self.battery_range))/(self.battery_range)-1
-        else:
-            norm_battery = 0
+        self.M = mass
+        self.T = self.orig_params['T'] * T
+        self.KF = (1+set_KF) * self.orig_params['KF']
+        self.KM = (1+set_KM) * self.orig_params['KM']
+        if self.norm_range != 0:
+            norm_KF = 2*(self.KF/self.orig_params['KF']-(1-self.norm_range))/(2*self.norm_range)-1
+            norm_KM = 2*(self.KM/self.orig_params['KM']-(1-self.norm_range))/(2*self.norm_range)-1
+        #### Compute constants #####################################
+        self.GRAVITY = self.G*self.M
+        self.HOVER_RPM = np.sqrt(self.GRAVITY / np.sum(self.KF))
+        self.MAX_THRUST = (np.sum(self.KF)*self.MAX_RPM**2)
+        self.MAX_XY_TORQUE = (2*self.L*np.mean(self.KF)*self.MAX_RPM**2)/np.sqrt(2)
+        self.MAX_Z_TORQUE = (2*np.mean(self.KM)*self.MAX_RPM**2)
+        self.GND_EFF_H_CLIP = 0.25 * self.PROP_RADIUS * np.sqrt((15 * self.MAX_RPM**2 * np.mean(self.KF) * self.GND_EFF_COEFF) / self.MAX_THRUST)
+
+        self.mass = mass
+        self.com = [x_cm, y_cm]
+        self.kf = self.KF
+        self.km = self.KM
+
+        # return np.array([mass, x_cm, y_cm, self.battery, *self.env.KF, *self.env.KM])
+        # param_num = 15
+        return np.array([norm_mass, norm_xcm, norm_ycm, norm_ixx, norm_iyy, norm_izz, norm_T, *norm_KF, *norm_KM])
+
+    def random_urdf(self):
+        self.new_URDF = self.maketime + "/cf2x.urdf"
+        norm_mass, norm_xcm, norm_ycm, norm_ixx, norm_iyy, norm_izz, norm_T = 0,0,0,0,0,0,0
+        norm_KF, norm_KM = [0,0,0,0], [0,0,0,0]
+
+        mass = np.random.uniform(1-self.mass_range, 1+self.mass_range) * self.orig_params['M']
+        x_cm, y_cm = np.random.uniform(-self.cm_range, self.cm_range, size=(2,)) * self.orig_params['L']
+        i_xx, i_yy, i_zz = np.random.uniform(1-self.i_range, 1+self.i_range, size=(3,))
+        i_xx, i_yy = 1.4e-5 * i_xx, 1.4e-5 * i_yy
+        i_zz = min(2.17e-5 * i_zz,i_xx+i_yy) # Inertia property
+        T = np.random.uniform(1-self.t_range, 1+self.t_range)
+        
+        if self.mass_range != 0:
+            norm_mass = 2*(mass/self.orig_params['M']-(1-self.mass_range))/(2*self.norm_range)-1
+        if self.cm_range != 0:
+            norm_xcm = 2*(x_cm/self.orig_params['L']+self.cm_range)/(2*self.norm_range)-1
+            norm_ycm = 2*(y_cm/self.orig_params['L']+self.cm_range)/(2*self.norm_range)-1
+        if self.i_range != 0:
+            norm_ixx = 2*((i_xx/1.4e-5)-(1-self.i_range))/(2*self.norm_range)-1
+            norm_iyy = 2*((i_yy/1.4e-5)-(1-self.i_range))/(2*self.norm_range)-1
+            norm_izz = 2*((i_zz/2.17e-5)-(1-self.i_range))/(2*self.norm_range)-1
+        if self.t_range != 0:
+            norm_T = 2*(T-(1-self.t_range))/(2*self.norm_range)-1
+        
+
+        generate_urdf(self.new_URDF, mass, x_cm, y_cm, i_xx, i_yy, i_zz)
+        self.M, \
+        self.L, \
+        self.THRUST2WEIGHT_RATIO, \
+        self.J, \
+        self.J_INV, \
+        self.KF, \
+        self.KM, \
+        self.COLLISION_H,\
+        self.COLLISION_R, \
+        self.COLLISION_Z_OFFSET, \
+        self.MAX_SPEED_KMH, \
+        self.GND_EFF_COEFF, \
+        self.PROP_RADIUS, \
+        self.DRAG_COEFF, \
+        self.DW_COEFF_1, \
+        self.DW_COEFF_2, \
+        self.DW_COEFF_3 = self._parseURDFParameters()
+
         self.M = mass
         self.T = self.orig_params['T'] * T
         self.KF = self.orig_params['KF'] * np.random.uniform(1.0-self.kf_range, 1.0+self.kf_range, size=(4,))
         self.KM = self.orig_params['KM'] * np.random.uniform(1.0-self.km_range, 1.0+self.km_range, size=(4,))
         if self.kf_range != 0:
-            norm_KF = 2*(self.KF/self.orig_params['KF']-(1-self.kf_range))/(2*self.kf_range)-1
+            norm_KF = 2*(self.KF/self.orig_params['KF']-(1-self.kf_range))/(2*self.norm_range)-1
         if self.km_range != 0:
-            norm_KM = 2*(self.KM/self.orig_params['KM']-(1-self.km_range))/(2*self.km_range)-1
-        self.KF = self.battery * self.KF
-        self.KM = self.battery * self.KM
+            norm_KM = 2*(self.KM/self.orig_params['KM']-(1-self.km_range))/(2*self.norm_range)-1
         #### Compute constants #####################################
         self.GRAVITY = self.G*self.M
         self.HOVER_RPM = np.sqrt(self.GRAVITY / np.sum(self.KF))
@@ -483,8 +550,12 @@ class dynRandeEnv(TakeoffAviary):
     def _computeInfo(self):
         return {}
 
-    def reset(self):
-        self.param = self.random_urdf()
+    def reset(self, set_dyn=None):
+        if set_dyn is None:
+            self.param = self.random_urdf()
+        else:
+            assert isinstance(set_dyn, dict), "set_dyn should be dictionary type"
+            self.param = self.set_urdf(set_dyn)
         return super().reset()
 
     def step(self, action):
@@ -494,10 +565,7 @@ class dynRandeEnv(TakeoffAviary):
         self.last_action_custom = action
         if self.is_noise:
             action += np.random.normal(0, 0.005, action.shape)
-        if self.step_counter >= 1598:
-            state, reward, done, _ = super().step(action)
-        else:
-            state, reward, done, _ = super().step(action)
+        state, reward, done, _ = super().step(action)
         
         self.droneStates.append(self._getDroneStateVector(0))
         if len(self.droneStates) > 100:

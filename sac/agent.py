@@ -1,6 +1,8 @@
 from sac.sac import *
 from sac.common.buffers import *
 
+from sac.PIDcontroller import SimplePIDcontroller, DSLPIDcontroller
+
 def sac_agent(env,
                 rnn,
                 device,
@@ -68,6 +70,8 @@ def sac_agent(env,
                     action_scale=1.0,
                     device=device, 
                     **hparam)
+    elif rnn == "PID":
+        td3_trainer = DSLPIDcontroller(env)
     else:
         raise "Something wrong"
 
