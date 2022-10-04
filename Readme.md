@@ -1,5 +1,5 @@
 
-## generating gif
+<!-- ## generating gif
 > ```python train_td3.py --test --hidden_dim 256 --gpu 0 --env Pendulum-v0 --rnn LSTM --path save/TD3/randomize/LSTM/Pendulum-v0/best```
 > ```python train_td3.py --test --hidden_dim 128 --gpu 0 --env Pendulum-v0 --rnn RNN --path save/TD3/randomize/fastRNN/Pendulum-v0/22Apr28161113/best```
 > ```python train_td3.py --test --hidden_dim 128 --gpu 2 --env takeoff-aviary-v0 --rnn RNN --path save/TD3/randomize/RNN/takeoff-aviary-v0/22May03042352/best```
@@ -37,4 +37,13 @@ python train_pendulum_td3.py --policy_actf tanh --reward_norm --gpu 0 --rnn None
 > rostopic echo /crazyflie/log1
 
 
-controller.c, estimate.c -> Default controller, Default estimate modifying -> flashing
+controller.c, estimate.c -> Default controller, Default estimate modifying -> flashing -->
+
+# Low-level controller in response to changes in quadrotor dynamics
+
+Official codebase for [Low-level controller in response to changes in quadrotor dynamics]()  
+(The link will be activated after publishing)
+
+## Overview
+
+![https://youtu.be/FLPYOGI_PkE/0.jpg](https://youtu.be/FLPYOGI_PkE)
