@@ -1,0 +1,23 @@
+[  0%] Built target geometry_msgs_generate_messages_cpp
+[  1%] Built target vicon_bridge_gencfg
+[  1%] Built target _vicon_bridge_generate_messages_check_deps_Markers
+[  1%] Built target _vicon_bridge_generate_messages_check_deps_viconGrabPose
+[  1%] Built target _vicon_bridge_generate_messages_check_deps_TfDistortInfo
+[ 19%] Built target _vicon_bridge_generate_messages_check_deps_viconCalibrateSegment
+[ 36%] Built target vicon_sdk
+[ 36%] Built target _vicon_bridge_generate_messages_check_deps_Marker
+[ 36%] Built target geometry_msgs_generate_messages_nodejs
+[ 36%] Built target geometry_msgs_generate_messages_py
+[ 36%] Built target geometry_msgs_generate_messages_lisp
+[ 45%] Built target vicon_bridge_generate_messages_cpp
+[ 45%] Built target geometry_msgs_generate_messages_eus
+[ 49%] Built target testclient
+[ 57%] Built target vicon_bridge_generate_messages_nodejs
+[ 70%] Built target vicon_bridge_generate_messages_py
+[ 78%] Built target vicon_bridge_generate_messages_lisp
+[ 78%] Built target vicon_bridge_gencpp
+[ 89%] Built target vicon_bridge_generate_messages_eus
+[ 89%] Built target vicon_bridge_generate_messages
+[ 92%] Built target calibrate
+[ 96%] Built target vicon_bridge
+[100%] Built target tf_distort

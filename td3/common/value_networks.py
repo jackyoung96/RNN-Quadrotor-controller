@@ -132,7 +132,13 @@ class QNetworkGoalParam(QNetworkBase):
         else:
             assert True, "Something wrong"
 
-        goal = goal[:,:,:self._goal_dim]
+        if len(goal.shape)==2:
+            goal = goal[:,:self._goal_dim]
+        elif len(goal.shape)==3:
+            goal = goal[:,:,:self._goal_dim]
+        else:
+            raise "Something wrong"
+
         if self.batchnorm:
             s_shape, g_shape = state.shape, goal.shape
             state = self.bm_s(state.view(B*L,-1)).view(*s_shape)
@@ -153,7 +159,7 @@ class QNetworkRNN(QNetworkBase):
     The network follows two-branch structure as in paper: 
     Sim-to-Real Transfer of Robotic Control with Dynamics Randomization
     """
-    def __init__(self, state_space, action_space, hidden_dim, activation=F.relu, output_activation=None):
+    def __init__(self, state_space, action_space, hidden_dim, activation=F.relu, output_activation=None, rnn_dropout=0.5):
         super().__init__(state_space, action_space, activation)
         self.hidden_dim = hidden_dim
 
@@ -161,6 +167,7 @@ class QNetworkRNN(QNetworkBase):
         # self.linear2 = nn.Linear(hidden_dim, hidden_dim)
         self.linear_rnn = nn.Linear(self._state_dim+self._action_dim, hidden_dim)
         self.rnn = nn.RNN(hidden_dim, hidden_dim, batch_first=True)
+        self.rnn_dropout = nn.Dropout(p=rnn_dropout)
         self.linear3 = nn.Linear(2*hidden_dim, hidden_dim)
         self.linear4 = nn.Linear(hidden_dim, 1)
         # weights initialization
@@ -194,7 +201,7 @@ class QNetworkRNN(QNetworkBase):
         rnn_branch = self.activation(self.linear_rnn(rnn_branch)).view(B,L,-1)  # linear layer for 3d input only applied on the last dim
         rnn_branch, rnn_hidden = self.rnn(rnn_branch, hidden_in)  # no activation after lstm
         # merged
-        rnn_branch = rnn_branch.contiguous().view(*fc_branch.shape)
+        rnn_branch = self.rnn_dropout(rnn_branch.contiguous().view(*fc_branch.shape))
         merged_branch=torch.cat([fc_branch, rnn_branch], -1) 
 
         x = self.activation(self.linear3(merged_branch))
@@ -221,7 +228,7 @@ class QNetworkRNNParam(QNetworkBase):
     The network follows two-branch structure as in paper: 
     Sim-to-Real Transfer of Robotic Control with Dynamics Randomization
     """
-    def __init__(self, state_space, action_space, hidden_dim, param_num, activation=F.relu, output_activation=None):
+    def __init__(self, state_space, action_space, hidden_dim, param_num, activation=F.relu, output_activation=None, rnn_dropout=0.5):
         super().__init__(state_space, action_space, activation)
         self.hidden_dim = hidden_dim
         self._param_num = param_num
@@ -230,6 +237,7 @@ class QNetworkRNNParam(QNetworkBase):
         # self.linear2 = nn.Linear(hidden_dim, hidden_dim)
         self.linear_rnn = nn.Linear(self._state_dim+self._action_dim, hidden_dim)
         self.rnn = nn.RNN(hidden_dim, hidden_dim, batch_first=True)
+        self.rnn_dropout = nn.Dropout(p=rnn_dropout)
         self.linear3 = nn.Linear(2*hidden_dim, hidden_dim)
         self.linear4 = nn.Linear(hidden_dim, 1)
         # weights initialization
@@ -263,7 +271,7 @@ class QNetworkRNNParam(QNetworkBase):
         rnn_branch = self.activation(self.linear_rnn(rnn_branch)).view(B,L,-1)  # linear layer for 3d input only applied on the last dim
         rnn_branch, rnn_hidden = self.rnn(rnn_branch, hidden_in)  # no activation after lstm
         # merged
-        rnn_branch = rnn_branch.contiguous().view(*fc_branch.shape)
+        rnn_branch = self.rnn_dropout(rnn_branch.contiguous().view(*fc_branch.shape))
         merged_branch=torch.cat([fc_branch, rnn_branch], -1) 
 
         x = self.activation(self.linear3(merged_branch))
@@ -290,7 +298,7 @@ class QNetworkGoalRNN(QNetworkBase):
     The network follows two-branch structure as in paper: 
     Sim-to-Real Transfer of Robotic Control with Dynamics Randomization
     """
-    def __init__(self, state_space, action_space, hidden_dim, param_num, goal_dim, activation=F.relu, output_activation=None):
+    def __init__(self, state_space, action_space, hidden_dim, param_num, goal_dim, activation=F.relu, output_activation=None, rnn_dropout=0.5):
         super().__init__(state_space, action_space, activation)
         self.hidden_dim = hidden_dim
         self._param_num = param_num
@@ -300,6 +308,7 @@ class QNetworkGoalRNN(QNetworkBase):
         # self.linear2 = nn.Linear(hidden_dim, hidden_dim)
         self.linear_rnn = nn.Linear(self._state_dim+self._action_dim, hidden_dim)
         self.rnn = nn.RNN(hidden_dim, hidden_dim, batch_first=True)
+        self.rnn_dropout = nn.Dropout(p=rnn_dropout)
         self.linear3 = nn.Linear(2*hidden_dim, hidden_dim)
         self.linear4 = nn.Linear(hidden_dim, 1)
         # weights initialization
@@ -333,7 +342,7 @@ class QNetworkGoalRNN(QNetworkBase):
         rnn_branch = self.activation(self.linear_rnn(rnn_branch)).view(B,L,-1)  # linear layer for 3d input only applied on the last dim
         rnn_branch, rnn_hidden = self.rnn(rnn_branch, hidden_in)  # no activation after lstm
         # merged
-        rnn_branch = rnn_branch.contiguous().view(*fc_branch.shape)
+        rnn_branch = self.rnn_dropout(rnn_branch.contiguous().view(*fc_branch.shape))
         merged_branch=torch.cat([fc_branch, rnn_branch], -1) 
 
         x = self.activation(self.linear3(merged_branch))

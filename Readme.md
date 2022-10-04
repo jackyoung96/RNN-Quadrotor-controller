@@ -8,5 +8,33 @@
 ## Hyperparameter search
 > ```python train_td3.py --env Pendulum-v0 --randomize --rnn GRU --tb_log --gpu 3 --hparam```
 
+## pendulum run command
 
-LSTM은 0.01, RNN은 0.05로 km kf 설정
+python train_pendulum_td3.py --policy_actf tanh --reward_norm --gpu 0 --rnn None --hparam 
+
+
+## drone run command
+
+### FF + reward normalize
+
+> python train_drone_td3.py --policy_actf tanh --tb_log --reward_norm --gpu 1 --rnn None
+
+### HER + no her + reward normalize
+
+> python train_drone_td3.py --policy_actf tanh --her_length 100 --tb_log --reward_norm --her_gamma 1.0 --gpu 0 --rnn RNNHER 
+
+### HER
+
+> python train_drone_td3.py --policy_actf tanh --her_gamma 0.0 --tb_log --gpu 0 --rnn LSTMHER
+
+### HERbhv
+
+> python train_drone_td3.py --policy_actf tanh --her_gamma 0.0 --her_length 100 --tb_log --gpu 0 --rnn RNNbhvHER --behavior_path artifacts/agent-22Jun01050026:v15/iter0055000
+
+## Test drone in real world
+
+> roslaunch sim2real sim2real.launch
+> rostopic echo /crazyflie/log1
+
+
+controller.c, estimate.c -> Default controller, Default estimate modifying -> flashing

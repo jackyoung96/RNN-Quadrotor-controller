@@ -40,7 +40,7 @@ class PolicyNetworkBase(nn.Module):
         return a.numpy()
         
 class PolicyNetwork(PolicyNetworkBase):
-    def __init__(self, state_space, action_space, hidden_size, device, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
         super().__init__(state_space, action_space, device)
 
         self.log_std_min = log_std_min
@@ -59,14 +59,15 @@ class PolicyNetwork(PolicyNetworkBase):
         self.log_std_linear.weight.data.uniform_(-init_w, init_w)
         self.log_std_linear.bias.data.uniform_(-init_w, init_w)
 
+        self.actf = actf
         self.out_actf = out_actf
         self.action_scale = action_scale
         
     def forward(self, state):
-        x = F.relu(self.linear1(state))
-        x = F.relu(self.linear2(x))
-        x = F.relu(self.linear3(x))
-        x = F.relu(self.linear4(x))
+        x = self.actf(self.linear1(state))
+        x = self.actf(self.linear2(x))
+        x = self.actf(self.linear3(x))
+        x = self.actf(self.linear4(x))
         mean = self.mean_linear(x)
         if not self.out_actf is None:
             mean = self.out_actf(mean)
@@ -97,12 +98,12 @@ class PolicyNetwork(PolicyNetworkBase):
         noise,
         -eval_noise_clip,
         eval_noise_clip)
-        action = action + noise.to(self.device)
+        action = torch.clamp(action + noise.to(self.device), -1.0, 1.0)
 
         return action, log_prob, z, mean, std
         
     
-    def get_action(self, state, deterministic, explore_noise_scale):
+    def get_action(self, state, last_action, deterministic, explore_noise_scale):
         '''
         generate action for interaction with env
         '''
@@ -112,17 +113,19 @@ class PolicyNetwork(PolicyNetworkBase):
         normal = Normal(0,1)
         z = normal.sample((num_batch,1)).to(self.device)
 
-        action = mean.detach().cpu().numpy().squeeze() if deterministic\
-                else (mean + std*z).detach().cpu().numpy().squeeze()
+        action = mean.detach().cpu().numpy() if deterministic\
+                else (mean + std*z).detach().cpu().numpy()
 
         ''' add noise '''
         noise = normal.sample(action.shape) * explore_noise_scale
-        action = action + noise.numpy()
+        action = np.clip(action + noise.numpy(), -1.0, 1.0)
+
+        # action = 4*(1/200)/0.15 * (action-last_action) + last_action
 
         return action
 
 class PolicyNetworkRNN(PolicyNetworkBase):
-    def __init__(self, state_space, action_space, hidden_size, device, actf=F.relu, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2), rnn_dropout=0.5):
         super().__init__(state_space, action_space, device)
         
         self.log_std_min = log_std_min
@@ -132,6 +135,7 @@ class PolicyNetworkRNN(PolicyNetworkBase):
         # self.linear2 = nn.Linear(hidden_size, hidden_size)
         self.linear_rnn = nn.Linear(self._state_dim+self._action_dim, hidden_size)
         self.rnn = nn.RNN(hidden_size, hidden_size, batch_first=True)
+        self.rnn_dropout = nn.Dropout(p=rnn_dropout)
         self.linear3 = nn.Linear(2*hidden_size, hidden_size)
         self.linear4 = nn.Linear(hidden_size, hidden_size)
 
@@ -164,7 +168,7 @@ class PolicyNetworkRNN(PolicyNetworkBase):
         sa_cat = torch.cat([state,last_action], dim=-1)
         rnn_x = self.actf(self.linear_rnn(sa_cat)).view(B,L,-1)
         rnn_out, rnn_hidden = self.rnn(rnn_x, hidden_in)
-        rnn_x = rnn_out.contiguous().view(*fc_x.shape)
+        rnn_x = self.rnn_dropout(rnn_out.contiguous().view(*fc_x.shape)) # Dropout for make RNN weaker
         merged_x = torch.cat([fc_x, rnn_x],dim=-1)
         x = self.actf(self.linear3(merged_x))
         x = self.actf(self.linear4(x))
@@ -203,7 +207,7 @@ class PolicyNetworkRNN(PolicyNetworkBase):
         noise,
         -eval_noise_clip,
         eval_noise_clip)
-        action = action + noise.to(self.device)
+        action = torch.clamp(action + noise.to(self.device), -1.0, 1.0)
 
         return action, hidden_out, hidden_all, log_prob, z, mean, std
         
@@ -223,30 +227,34 @@ class PolicyNetworkRNN(PolicyNetworkBase):
         normal = Normal(0,1)
         z = normal.sample(std.shape).to(self.device)
 
-        action = mean.detach().cpu().numpy().squeeze() if deterministic\
-                else (mean + std*z).detach().cpu().numpy().squeeze()
+        action = mean.detach().cpu().numpy() if deterministic\
+                else (mean + std*z).detach().cpu().numpy()
 
         # print("debug get action", mean.squeeze(), action)
 
         ''' add noise '''
         noise = normal.sample(action.shape) * explore_noise_scale
-        action = action + noise.numpy()
+        action = np.clip(action + noise.numpy(), -1.0, 1.0)
+
+        # last_action = last_action.detach().cpu().numpy()
+        # action = 4*(1/200)/0.15 * (action-last_action) + last_action
 
         return action, hidden_out
 
 class PolicyNetworkLSTM(PolicyNetworkRNN):
-    def __init__(self, state_space, action_space, hidden_size, device, actf=F.relu, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
         super().__init__(state_space, action_space, hidden_size, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
         self.rnn = nn.LSTM(hidden_size, hidden_size, batch_first=True)
 
 class PolicyNetworkGRU(PolicyNetworkRNN):
-    def __init__(self, state_space, action_space, hidden_size, device, actf=F.relu, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+    def __init__(self, state_space, action_space, hidden_size, device, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
         super().__init__(state_space, action_space, hidden_size, device, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
         self.rnn = nn.GRU(hidden_size, hidden_size, batch_first=True)
 
 
+
 class PolicyNetworkGoalRNN(PolicyNetworkBase):
-    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.relu ,out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.tanh ,out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2), rnn_dropout=0.5):
         super().__init__(state_space, action_space, device)
         self._goal_dim = goal_dim
         
@@ -262,6 +270,7 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         # self.linear2 = nn.Linear(hidden_size, hidden_size)
         self.linear_rnn = nn.Linear(self._state_dim+self._action_dim, hidden_size)
         self.rnn = nn.RNN(hidden_size, hidden_size, batch_first=True)
+        self.rnn_dropout = nn.Dropout(p=rnn_dropout)
         self.linear3 = nn.Linear(2*hidden_size, hidden_size)
         self.linear4 = nn.Linear(hidden_size, hidden_size)
 
@@ -305,7 +314,7 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         sa_cat = torch.cat([state,last_action], dim=-1)
         rnn_x = self.actf(self.linear_rnn(sa_cat)).view(B,L,-1)
         rnn_out, rnn_hidden = self.rnn(rnn_x, hidden_in)
-        rnn_x = rnn_out.contiguous().view(*fc_x.shape)
+        rnn_x = self.rnn_dropout(rnn_out.contiguous().view(*fc_x.shape))
         merged_x = torch.cat([fc_x, rnn_x],dim=-1)
         x = self.actf(self.linear3(merged_x))
         x = self.actf(self.linear4(x))
@@ -344,8 +353,7 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         noise,
         -eval_noise_clip,
         eval_noise_clip)
-        action = action + noise.to(self.device)
-        action = torch.clamp(action,-1,1)
+        action = torch.clamp(action + noise.to(self.device), -1.0, 1.0)
 
         return action, hidden_out, hidden_all, log_prob, z, mean, std
         
@@ -367,8 +375,8 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         normal = Normal(0,1)
         z = normal.sample(std.shape).to(self.device)
 
-        action = mean.detach().cpu().numpy().squeeze() if deterministic\
-                else (mean + std*z).detach().cpu().numpy().squeeze()
+        action = mean.detach().cpu().numpy() if deterministic\
+                else (mean + std*z).detach().cpu().numpy()
 
         # print("debug get action", mean.squeeze(), action)
 
@@ -379,18 +387,20 @@ class PolicyNetworkGoalRNN(PolicyNetworkBase):
         noise,
         -eval_noise_clip,
         eval_noise_clip)
-        action = action + noise.numpy()
-        action = np.clip(action,-1,1)
+        action = np.clip(action + noise.numpy(), -1.0, 1.0)
         self.train()
+
+        # last_action = last_action.detach().cpu().numpy()
+        # action = 4*(1/200)/0.15 * (action-last_action) + last_action
 
         return action, hidden_out
 
 class PolicyNetworkGoalLSTM(PolicyNetworkGoalRNN):
-    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.relu, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
         super().__init__(state_space, action_space, hidden_size, goal_dim, device, batchnorm=batchnorm, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
         self.rnn = nn.LSTM(hidden_size, hidden_size, batch_first=True)
 
 class PolicyNetworkGoalGRU(PolicyNetworkGoalRNN):
-    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.relu, out_actf=None, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
+    def __init__(self, state_space, action_space, hidden_size, goal_dim, device, batchnorm=False, actf=F.tanh, out_actf=F.tanh, action_scale=1.0, init_w=3e-3, log_std_min=np.exp(-20), log_std_max=np.exp(2)):
         super().__init__(state_space, action_space, hidden_size, goal_dim, device, batchnorm=batchnorm, actf=actf, out_actf=out_actf, action_scale=action_scale, init_w=init_w, log_std_min=log_std_min, log_std_max=log_std_max)
         self.rnn = nn.GRU(hidden_size, hidden_size, batch_first=True)

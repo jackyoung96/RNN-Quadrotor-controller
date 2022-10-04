@@ -1,24 +1,36 @@
 tb_log/
+tb_log_v0/
 tb_log_backup/
 gif/
 evaluation/
 
 screen_log/
+screen_log_v0/
 screen_log_backup/
 save/
+save_v0/
 hparamDB/
 gifs/
 figs/
 paperutils/
 videos/
 
-envs/assets/
+wandb/
+artifacts/
+
+envs/assets/**
 !envs/assets/cf2x_default.urdf
 !envs/assets/quad.obj
 !envs/assets/cf2.dae
+!envs/assets/random_urdf.py
 
 __pycache__/
 envs/__pycache__/
 td3/__pycache__/
 td3/common/__pycache__/
 .vscode/
+paperworks/
+
+models/
+runs/
+sb3_models/
