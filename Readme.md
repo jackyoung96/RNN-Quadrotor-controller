@@ -46,4 +46,4 @@ Official codebase for [Low-level controller in response to changes in quadrotor 
 
 ## Overview
 
-![https://youtu.be/FLPYOGI_PkE/0.jpg](https://youtu.be/FLPYOGI_PkE)
+[![](https://youtu.be/FLPYOGI_PkE/0.jpg)](https://youtu.be/FLPYOGI_PkE)
