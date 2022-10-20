@@ -1,1 +1,0 @@
-/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/vicon_bridge/lib/python3/dist-packages/vicon_bridge/msg/__init__.py

@@ -1,0 +1,20 @@
+
+# TODO: need to modify 
+gpu: 0
+nenvs: 1
+seed: 0
+
+update_itr: 1
+gradient_steps: 1
+batch_size: 128
+max_episodes: ${envs.max_episodes}
+max_steps: ${envs.max_steps}
+learning_start: ${envs.learning_start}
+
+eval_interval: 200
+eval_itr: 50
+
+defaults:
+  - envs: pendulum
+  - algorithms: sac
+  - wandb: default

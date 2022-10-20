@@ -1,8 +1,0 @@
-prefix=/home/jack/crazyflie/sim-to-real-TD3/ros/install
-
-Name: libobjecttracker
-Description: Description of libobjecttracker
-Version: 0.0.1
-Cflags: -I${prefix}/include
-Libs: -L${prefix}/lib -llibobjecttracker
-Requires: 

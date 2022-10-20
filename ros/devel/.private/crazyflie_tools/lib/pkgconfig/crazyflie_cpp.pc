@@ -1,8 +1,0 @@
-prefix=/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/crazyflie_tools
-
-Name: crazyflie_cpp
-Description: Description of crazyflie_cpp
-Version: 0.0.1
-Cflags: -I/home/jack/crazyflie/sim-to-real-TD3/ros/src/crazyflie_tools/crazyflie_cpp/include
-Libs: -L${prefix}/lib -lcrazyflie_cpp
-Requires: 

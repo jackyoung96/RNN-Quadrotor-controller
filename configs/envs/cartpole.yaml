@@ -1,0 +1,14 @@
+name: CartPole-v1
+dyn_range:
+  masscart: 3
+  masspole: 3
+  length: 3
+  force_mag: 3
+
+param_num: 3
+goal_angle: 5
+goal_steps: 50
+
+max_episodes: 40000
+max_steps: 150
+learning_start: 1000 # 1000 episodes

@@ -1,6 +1,0 @@
-Symlinking /home/jack/crazyflie/sim-to-real-TD3/ros/devel/lib/pkgconfig/sim2real.pc
-Symlinking /home/jack/crazyflie/sim-to-real-TD3/ros/devel/lib/sim2real/cmake.lock
-Symlinking /home/jack/crazyflie/sim-to-real-TD3/ros/devel/lib/sim2real/state_publisher.py
-Symlinking /home/jack/crazyflie/sim-to-real-TD3/ros/devel/lib/sim2real/command.py
-Symlinking /home/jack/crazyflie/sim-to-real-TD3/ros/devel/share/sim2real/cmake/sim2realConfig-version.cmake
-Symlinking /home/jack/crazyflie/sim-to-real-TD3/ros/devel/share/sim2real/cmake/sim2realConfig.cmake

@@ -1,8 +1,0 @@
-prefix=/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/sim2real
-
-Name: sim2real
-Description: Description of sim2real
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

@@ -1,0 +1,12 @@
+name: SAC
+rnn: None
+
+replay_buffer_size: 1000000
+
+actor_hidden_dim: 64
+critic_hidden_dim: 128
+actor_learning_rate: 0.001
+critic_learning_rate: 0.001
+
+activation: relu
+target_update_interval: 1 # How often update target net w.r.t update step

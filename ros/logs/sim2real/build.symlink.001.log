@@ -1,8 +1,0 @@
-Linked: (/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/sim2real/lib/pkgconfig/sim2real.pc, /home/jack/crazyflie/sim-to-real-TD3/ros/devel/lib/pkgconfig/sim2real.pc)
-Linked: (/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/sim2real/lib/sim2real/cmake.lock, /home/jack/crazyflie/sim-to-real-TD3/ros/devel/lib/sim2real/cmake.lock)
-Symlinking /home/jack/crazyflie/sim-to-real-TD3/ros/devel/lib/sim2real/goal_publisher.py
-Linked: (/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/sim2real/lib/sim2real/state_publisher.py, /home/jack/crazyflie/sim-to-real-TD3/ros/devel/lib/sim2real/state_publisher.py)
-Linked: (/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/sim2real/lib/sim2real/command.py, /home/jack/crazyflie/sim-to-real-TD3/ros/devel/lib/sim2real/command.py)
-Symlinking /home/jack/crazyflie/sim-to-real-TD3/ros/devel/lib/sim2real/controller_select.py
-Linked: (/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/sim2real/share/sim2real/cmake/sim2realConfig-version.cmake, /home/jack/crazyflie/sim-to-real-TD3/ros/devel/share/sim2real/cmake/sim2realConfig-version.cmake)
-Linked: (/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/sim2real/share/sim2real/cmake/sim2realConfig.cmake, /home/jack/crazyflie/sim-to-real-TD3/ros/devel/share/sim2real/cmake/sim2realConfig.cmake)

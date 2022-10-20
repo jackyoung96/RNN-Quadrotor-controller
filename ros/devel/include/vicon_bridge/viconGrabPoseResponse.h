@@ -1,1 +1,0 @@
-/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/vicon_bridge/include/vicon_bridge/viconGrabPoseResponse.h

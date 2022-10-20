@@ -1,8 +1,0 @@
-prefix=/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/crazyswarm
-
-Name: crazyswarm
-Description: Description of crazyswarm
-Version: 0.0.3
-Cflags: -I/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/crazyswarm/include
-Libs: -L${prefix}/lib 
-Requires: message_runtime std_msgs tf crazyflie_cpp

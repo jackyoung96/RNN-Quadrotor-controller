@@ -1,0 +1,36 @@
+envs:
+  name: Pendulum-v0
+  dyn_range:
+    max_torque: 3
+    m: 3
+    l: 3
+  param_num: 3
+  goal_angle: 5
+  goal_steps: 50
+  max_episodes: 40000
+  max_steps: 150
+  learning_start: 1000
+algorithms:
+  name: SAC
+  rnn: None
+  replay_buffer_size: 1000000
+  actor_hidden_dim: 64
+  critic_hidden_dim: 128
+  actor_learning_rate: 0.001
+  critic_learning_rate: 0.001
+  activation: relu
+  target_update_interval: 1
+wandb:
+  project: RNN-Quadrotor
+  gpu: 0
+gpu: 0
+nenvs: 1
+seed: 0
+update_itr: 1
+gradient_steps: 1
+batch_size: 128
+max_episodes: ${envs.max_episodes}
+max_steps: ${envs.max_steps}
+learning_start: ${envs.learning_start}
+eval_interval: 200
+eval_itr: 50

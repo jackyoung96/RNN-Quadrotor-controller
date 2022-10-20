@@ -1,5 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-  <!-- run vicon bridge -->
-  <include file="$(find vicon_bridge)/launch/vicon.launch"/>
-</launch>

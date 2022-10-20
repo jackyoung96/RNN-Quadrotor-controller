@@ -1,8 +1,0 @@
-prefix=/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/vicon_bridge
-
-Name: vicon_bridge
-Description: Description of vicon_bridge
-Version: 1.0.1
-Cflags: -I/home/jack/crazyflie/sim-to-real-TD3/ros/devel/.private/vicon_bridge/include
-Libs: -L${prefix}/lib 
-Requires: dynamic_reconfigure geometry_msgs message_runtime roscpp
